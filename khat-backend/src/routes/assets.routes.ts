@@ -38,24 +38,27 @@ export async function assetRoutes(app: FastifyInstance) {
   );
 
   // ---- Teacher/Admin: search + browse ----
-  // ?q= does a full-text search (title + tags, via the trigger-maintained
-  // search_vector); results rank by relevance when searching, otherwise by
-  // newest first. ?khatTypeId= narrows to one script.
+  // ?q= searches the MySQL full-text index on title plus the JSON tags; results
+  // rank by title relevance and then tag match, otherwise by newest first.
   app.get<{ Querystring: { q?: string; khatTypeId?: string } }>(
     '/',
     { preHandler: [app.authenticate, app.requireRole('teacher', 'admin')] },
     async (request) => {
       const { q, khatTypeId } = request.query;
-      const params: unknown[] = [q ?? null, khatTypeId ?? null];
+      const search = q?.trim() || null;
+      const params: unknown[] = [search, khatTypeId ?? null];
 
       const { rows } = await pool.query(
         `SELECT a.*, u.name AS uploader_name,
-                CASE WHEN $1::text IS NOT NULL
-                     THEN ts_rank(a.search_vector, websearch_to_tsquery('english', $1))
-                     ELSE 0 END AS relevance
+                CASE WHEN $1::text IS NOT NULL THEN
+                  MATCH(a.title) AGAINST ($1 IN NATURAL LANGUAGE MODE)
+                  + CASE WHEN CAST(a.tags AS CHAR) LIKE CONCAT('%', $1, '%') THEN 1 ELSE 0 END
+                  ELSE 0 END AS relevance
          FROM assets a
          JOIN users u ON u.id = a.uploaded_by
-         WHERE ($1::text IS NULL OR a.search_vector @@ websearch_to_tsquery('english', $1))
+         WHERE ($1::text IS NULL
+                OR MATCH(a.title) AGAINST ($1 IN NATURAL LANGUAGE MODE)
+                OR CAST(a.tags AS CHAR) LIKE CONCAT('%', $1, '%'))
            AND ($2::uuid IS NULL OR a.khat_type_id = $2)
          ORDER BY
            CASE WHEN $1::text IS NOT NULL THEN 1 ELSE 0 END DESC, -- relevance order only kicks in when searching

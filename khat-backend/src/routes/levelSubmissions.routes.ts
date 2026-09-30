@@ -99,10 +99,13 @@ export async function levelSubmissionRoutes(app: FastifyInstance) {
 
       // Auto-enroll on first submission if there's no enrollment yet — simpler
       // UX than forcing an explicit enroll step before a student can start.
-      const { rows: enrollmentRows } = await pool.query(
+      await pool.query(
         `INSERT INTO enrollments (student_id, course_id) VALUES ($1, $2)
-         ON CONFLICT (student_id, course_id) DO UPDATE SET student_id = enrollments.student_id
-         RETURNING *`,
+         ON CONFLICT (student_id, course_id) DO NOTHING`,
+        [studentId, level.course_id]
+      );
+      const { rows: enrollmentRows } = await pool.query(
+        `SELECT * FROM enrollments WHERE student_id = $1 AND course_id = $2`,
         [studentId, level.course_id]
       );
       const enrollment = enrollmentRows[0];

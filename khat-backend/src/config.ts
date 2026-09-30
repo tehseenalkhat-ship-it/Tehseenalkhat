@@ -16,7 +16,13 @@ function required(name: string): string {
 
 export const config = {
   port: Number(process.env.PORT ?? 4000),
-  databaseUrl: required('DATABASE_URL'),
+  database: {
+    host: required('DB_HOST'),
+    port: Number(process.env.DB_PORT ?? 3306),
+    name: required('DB_NAME'),
+    user: required('DB_USER'),
+    password: required('DB_PASSWORD'),
+  },
   jwtSecret: required('JWT_SECRET'),
   r2: {
     accountId: r2AccountId,

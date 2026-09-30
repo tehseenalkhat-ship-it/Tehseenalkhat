@@ -10,7 +10,7 @@ export async function adminAnalyticsRoutes(app: FastifyInstance) {
            (SELECT COUNT(*) FROM users WHERE role = 'teacher' AND deleted_at IS NULL)::int AS teachers,
            (SELECT COUNT(*) FROM users WHERE role = 'admin' AND deleted_at IS NULL)::int AS admins,
            (SELECT COUNT(*) FROM users WHERE deleted_at IS NULL)::int AS total_users,
-           (SELECT COUNT(DISTINCT user_id) FROM activity_log WHERE activity_date >= CURRENT_DATE - INTERVAL '30 days')::int AS active_users_30d,
+           (SELECT COUNT(DISTINCT user_id) FROM activity_log WHERE activity_date >= DATE_SUB(CURRENT_DATE, INTERVAL 30 DAY))::int AS active_users_30d,
            (SELECT COALESCE(SUM(login_count), 0)::int FROM activity_log) AS total_logins,
            (SELECT COALESCE(SUM(login_count), 0)::int FROM activity_log WHERE activity_date = CURRENT_DATE) AS logins_today,
            (SELECT COUNT(*) FROM entries)::int AS entries_submitted,
@@ -35,30 +35,31 @@ export async function adminAnalyticsRoutes(app: FastifyInstance) {
            (SELECT COUNT(*) FROM level_submissions)::int AS practice_submissions`
       ),
       pool.query(
-        `WITH months AS (
-           SELECT generate_series(
-             date_trunc('month', CURRENT_DATE) - INTERVAL '11 months',
-             date_trunc('month', CURRENT_DATE), INTERVAL '1 month'
-           ) AS month_start
+        `WITH RECURSIVE months AS (
+           SELECT DATE_SUB(CAST(DATE_FORMAT(CURRENT_DATE, '%Y-%m-01') AS DATE), INTERVAL 11 MONTH) AS month_start
+           UNION ALL
+           SELECT DATE_ADD(month_start, INTERVAL 1 MONTH)
+           FROM months
+           WHERE month_start < CAST(DATE_FORMAT(CURRENT_DATE, '%Y-%m-01') AS DATE)
          ), logins AS (
-           SELECT date_trunc('month', activity_date) AS month_start,
+           SELECT CAST(DATE_FORMAT(activity_date, '%Y-%m-01') AS DATE) AS month_start,
                   COALESCE(SUM(login_count), 0)::int AS logins,
                   COUNT(DISTINCT user_id)::int AS active_users
            FROM activity_log
-           WHERE activity_date >= date_trunc('month', CURRENT_DATE) - INTERVAL '11 months'
-           GROUP BY date_trunc('month', activity_date)
+           WHERE activity_date >= DATE_SUB(CAST(DATE_FORMAT(CURRENT_DATE, '%Y-%m-01') AS DATE), INTERVAL 11 MONTH)
+           GROUP BY month_start
          ), submissions AS (
-           SELECT date_trunc('month', created_at) AS month_start, COUNT(*)::int AS submitted
+           SELECT CAST(DATE_FORMAT(created_at, '%Y-%m-01') AS DATE) AS month_start, COUNT(*)::int AS submitted
            FROM entries
-           WHERE created_at >= date_trunc('month', CURRENT_DATE) - INTERVAL '11 months'
-           GROUP BY date_trunc('month', created_at)
+           WHERE created_at >= DATE_SUB(CAST(DATE_FORMAT(CURRENT_DATE, '%Y-%m-01') AS DATE), INTERVAL 11 MONTH)
+           GROUP BY month_start
          ), reviews AS (
-           SELECT date_trunc('month', reviewed_at) AS month_start, COUNT(*)::int AS reviewed
+           SELECT CAST(DATE_FORMAT(reviewed_at, '%Y-%m-01') AS DATE) AS month_start, COUNT(*)::int AS reviewed
            FROM entries
-           WHERE reviewed_at >= date_trunc('month', CURRENT_DATE) - INTERVAL '11 months'
-           GROUP BY date_trunc('month', reviewed_at)
+           WHERE reviewed_at >= DATE_SUB(CAST(DATE_FORMAT(CURRENT_DATE, '%Y-%m-01') AS DATE), INTERVAL 11 MONTH)
+           GROUP BY month_start
          )
-         SELECT to_char(m.month_start, 'YYYY-MM') AS month,
+         SELECT DATE_FORMAT(m.month_start, '%Y-%m') AS month,
                 COALESCE(l.logins, 0)::int AS logins,
                 COALESCE(l.active_users, 0)::int AS active_users,
                 COALESCE(s.submitted, 0)::int AS submitted,

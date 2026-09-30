@@ -208,7 +208,7 @@ export async function entryRoutes(app: FastifyInstance) {
       ),
       pool.query(
         `SELECT COUNT(*) AS total_reviewed,
-                AVG(EXTRACT(EPOCH FROM (reviewed_at - locked_at)) / 3600) AS avg_response_hours,
+                AVG(TIMESTAMPDIFF(SECOND, locked_at, reviewed_at) / 3600) AS avg_response_hours,
                 COUNT(*) FILTER (WHERE is_diverted = true) AS escalated_away_count
          FROM entries WHERE reviewed_by = $1`,
         [teacherId]

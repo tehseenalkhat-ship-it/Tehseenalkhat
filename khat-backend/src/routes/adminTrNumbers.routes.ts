@@ -23,14 +23,19 @@ export async function adminTrNumberRoutes(app: FastifyInstance) {
       }
 
       const uniqueNumbers = [...new Set(normalized)];
-      const { rowCount } = await pool.query(
-        `INSERT INTO approved_tr_numbers (tr_number, branch_id)
-         SELECT imported.tr_number, $2
-         FROM unnest($1::text[]) AS imported(tr_number)
-         ON CONFLICT DO NOTHING`,
-        [uniqueNumbers, branchId ?? null]
-      );
-      const imported = rowCount ?? 0;
+      let imported = 0;
+      // Keep each insert comfortably below MySQL's packet/placeholder limits.
+      for (let offset = 0; offset < uniqueNumbers.length; offset += 500) {
+        const batch = uniqueNumbers.slice(offset, offset + 500);
+        const placeholders = batch.map((_, index) => `($${index * 2 + 1}, $${index * 2 + 2})`).join(', ');
+        const values = batch.flatMap(trNumber => [trNumber, branchId ?? null]);
+        const { rowCount } = await pool.query(
+          `INSERT INTO approved_tr_numbers (tr_number, branch_id) VALUES ${placeholders}
+           ON CONFLICT DO NOTHING`,
+          values
+        );
+        imported += rowCount;
+      }
       return reply.code(201).send({ imported, skipped: trNumbers.length - imported });
     }
   );

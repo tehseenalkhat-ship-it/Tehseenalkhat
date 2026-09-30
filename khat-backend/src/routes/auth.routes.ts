@@ -48,7 +48,7 @@ export async function authRoutes(app: FastifyInstance) {
     await pool.query(
       `INSERT INTO activity_log (user_id, activity_date, login_count)
        VALUES ($1, CURRENT_DATE, 1)
-       ON CONFLICT (user_id, activity_date) DO UPDATE SET login_count = activity_log.login_count + 1`,
+      ON CONFLICT (user_id, activity_date) DO UPDATE SET login_count = login_count + 1`,
       [user.id]
     );
 

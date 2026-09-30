@@ -1,6 +1,6 @@
 import type { FastifyInstance } from 'fastify';
 import { pool } from '../db.js';
-import { mapPgError } from '../utils/pgErrors.js';
+import { mapDatabaseError } from '../utils/dbErrors.js';
 import type { AuthUser } from '../plugins/auth.js';
 import { notifyAllStudents } from '../services/notify.js';
 
@@ -95,10 +95,10 @@ export async function courseRoutes(app: FastifyInstance) {
         await notifyAllStudents('course_created', { courseId: rows[0].id, title });
         return reply.code(201).send(rows[0]);
       } catch (err) {
-        const mapped = mapPgError(err);
+        const mapped = mapDatabaseError(err);
         if (mapped) {
-          // The partial unique index on (khat_type_id) WHERE category='certification'
-          // fires here — give a specific message rather than the generic one.
+          // The generated-column unique index enforces one certification course
+          // per khat type — provide a specific response for that collision.
           if (category === 'certification' && mapped.status === 409) {
             return reply.code(409).send({ error: 'This khat type already has a certification course.' });
           }
@@ -178,7 +178,7 @@ export async function courseRoutes(app: FastifyInstance) {
         await notifyAllStudents('course_updated', { courseId: request.params.id, title });
         return reply.code(201).send(rows[0]);
       } catch (err) {
-        const mapped = mapPgError(err);
+        const mapped = mapDatabaseError(err);
         if (mapped) return reply.code(mapped.status).send(mapped.body);
         request.log.error(err);
         return reply.code(500).send({ error: 'Failed to create level' });

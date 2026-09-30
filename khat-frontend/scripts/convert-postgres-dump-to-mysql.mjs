@@ -240,8 +240,8 @@ indexes.push('CREATE UNIQUE INDEX `uq_one_certification_course_per_khat_type` ON
 mysql.unshift(
   '-- Converted from a plain PostgreSQL pg_dump for MySQL 8.0.16+.',
   '-- UUIDs are stored as CHAR(36); PostgreSQL text arrays are converted to JSON.',
-  '-- PostgreSQL tsvector data is retained as LONGTEXT; its trigger/index requires a separate MySQL application-search implementation.',
-  '-- This translates the SQL dump only. The current Node backend uses PostgreSQL/pg-specific SQL and is NOT MySQL-compatible without a separate application port.',
+  '-- PostgreSQL tsvector data is retained as LONGTEXT; application search uses the MySQL full-text title index and JSON tag matching.',
+  '-- This translates the database dump; the Node backend connects through mysql2 and its MySQL compatibility adapter.',
   'SET NAMES utf8mb4;',
   'SET FOREIGN_KEY_CHECKS = 0;',
   'START TRANSACTION;'
