@@ -1,0 +1,46 @@
+.livekit-event-room {
+  width: 100%;
+  height: min(72vh, 760px);
+  min-height: 420px;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: #111827;
+}
+
+.livekit-event-room .lk-video-conference {
+  height: 100%;
+}
+
+.livekit-studio-card {
+  display: grid;
+  gap: 1rem;
+}
+
+.livekit-studio-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.livekit-studio-heading h2 {
+  margin: 0.2rem 0;
+}
+
+.livekit-studio-heading p:last-child {
+  margin: 0;
+  color: var(--muted);
+}
+
+@media (max-width: 700px) {
+  .livekit-event-room {
+    height: 68vh;
+    min-height: 360px;
+  }
+
+  .livekit-studio-heading {
+    align-items: stretch;
+    flex-direction: column;
+  }
+}

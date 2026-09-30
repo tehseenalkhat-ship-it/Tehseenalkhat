@@ -1,0 +1,9 @@
+# This repository is rooted in Downloads only to include both existing project folders.
+# Keep every unrelated download, personal document, and credential out of Git.
+*
+!.gitignore
+!/khat-frontend/
+!/khat-frontend/**
+!/khat-backend/
+!/khat-backend/**
+**/.DS_Store

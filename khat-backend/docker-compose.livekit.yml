@@ -1,0 +1,31 @@
+# Local development only. Do not use these development credentials in production.
+services:
+  redis:
+    image: redis:7-alpine
+    command: ["redis-server", "--save", "", "--appendonly", "no"]
+    ports:
+      - "6379:6379"
+
+  livekit:
+    image: livekit/livekit-server:latest
+    command: ["--config", "/etc/livekit.yaml"]
+    volumes:
+      - ./livekit.local.yaml:/etc/livekit.yaml:ro
+    ports:
+      - "7880:7880/tcp"
+      - "7881:7881/tcp"
+      - "50100-50200:50100-50200/udp"
+    depends_on:
+      - redis
+
+  egress:
+    image: livekit/egress:latest
+    environment:
+      EGRESS_CONFIG_FILE: /out/egress.yaml
+    volumes:
+      - ./egress.local.yaml:/out/egress.yaml:ro
+    cap_add:
+      - SYS_ADMIN
+    depends_on:
+      - livekit
+      - redis

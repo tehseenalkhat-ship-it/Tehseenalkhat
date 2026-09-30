@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 160 160" fill="none">
+  <defs>
+    <linearGradient id="medal" x1="35" y1="20" x2="128" y2="135" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#f8e9bd"/>
+      <stop offset="1" stop-color="#d4a64a"/>
+    </linearGradient>
+    <linearGradient id="ribbon" x1="61" y1="106" x2="100" y2="155" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#bb8730"/>
+      <stop offset="1" stop-color="#8f6420"/>
+    </linearGradient>
+  </defs>
+  <path d="m60 101-7 46 27-15 27 15-7-46" fill="url(#ribbon)" stroke="#815919" stroke-width="3" stroke-linejoin="round"/>
+  <circle cx="80" cy="66" r="48" fill="url(#medal)" stroke="#a97824" stroke-width="4"/>
+  <circle cx="80" cy="66" r="39" stroke="#fff8e7" stroke-width="2"/>
+  <path d="m80 35 8 17 19 3-14 13 4 19-17-10-17 10 4-19-14-13 19-3 8-17Z" fill="#fffaf0" stroke="#a97824" stroke-width="3" stroke-linejoin="round"/>
+  <circle cx="80" cy="66" r="6" fill="#bd8a32"/>
+</svg>

@@ -1,0 +1,43 @@
+.assistant-chat-root{position:fixed;right:22px;bottom:20px;z-index:4700;font-family:inherit;color:var(--ink)}
+.assistant-chat-launcher{display:flex;align-items:center;gap:9px;min-height:48px;padding:0 17px;border:1px solid color-mix(in srgb,var(--gold) 38%,var(--line));border-radius:999px;background:var(--surface-deep);color:var(--text-on-deep);box-shadow:0 8px 28px color-mix(in srgb,var(--surface-deep) 26%,transparent);font-size:12px;font-weight:700;letter-spacing:.01em;transition:transform .18s,box-shadow .18s,background .18s}
+.assistant-chat-launcher:hover{transform:translateY(-2px);box-shadow:0 12px 34px color-mix(in srgb,var(--surface-deep) 34%,transparent)}
+.assistant-chat-launcher>svg{color:var(--gold-soft)}
+.assistant-chat-launcher.is-open{width:46px;min-height:46px;justify-content:center;padding:0;background:var(--card);color:var(--ink)}
+.assistant-chat-launcher.is-open>svg{color:var(--gold)}
+.assistant-chat-panel{position:absolute;right:0;bottom:62px;width:min(390px,calc(100vw - 28px));height:min(590px,calc(100dvh - 112px));display:flex;flex-direction:column;overflow:hidden;border:1px solid color-mix(in srgb,var(--gold) 22%,var(--line));border-radius:18px;background:var(--card);box-shadow:0 22px 75px rgba(20,28,25,.24);animation:assistant-panel-enter .18s ease-out}
+@keyframes assistant-panel-enter{from{opacity:0;transform:translateY(8px) scale(.985)}to{opacity:1;transform:translateY(0) scale(1)}}
+.assistant-chat-header{display:flex;align-items:center;gap:10px;min-height:70px;padding:13px 14px;border-bottom:1px solid var(--line);background:linear-gradient(115deg,color-mix(in srgb,var(--surface-tint) 70%,var(--card)),var(--card))}
+.assistant-chat-avatar{width:37px;height:37px;flex:none;display:grid;place-items:center;border-radius:12px;background:var(--surface-deep);color:var(--gold-soft)}
+.assistant-chat-title-copy{display:grid;gap:3px;flex:1;min-width:0}
+.assistant-chat-title-copy strong{font-size:13px;line-height:1.2}
+.assistant-chat-title-copy span{color:var(--muted);font-size:10px}
+.assistant-chat-icon-button{width:32px;height:32px;flex:none;display:grid;place-items:center;border-radius:8px;color:var(--muted);transition:background .15s,color .15s}
+.assistant-chat-icon-button:hover{background:var(--surface-tint-2);color:var(--ink)}
+.assistant-chat-messages{flex:1;min-height:0;display:flex;flex-direction:column;gap:12px;overflow-y:auto;padding:16px 14px 12px;scrollbar-width:thin;scrollbar-color:var(--line) transparent}
+.assistant-chat-message{display:flex;align-items:flex-start;gap:7px;max-width:91%}
+.assistant-chat-message.assistant{align-self:flex-start}
+.assistant-chat-message.user{align-self:flex-end;justify-content:flex-end}
+.assistant-chat-message p{margin:0;padding:10px 12px;border:1px solid var(--line);border-radius:13px 13px 13px 4px;background:var(--surface-tint-2);color:var(--ink);font-size:11px;line-height:1.6;white-space:pre-wrap;overflow-wrap:anywhere}
+.assistant-chat-message.user p{border-color:color-mix(in srgb,var(--gold) 25%,transparent);border-radius:13px 13px 4px 13px;background:color-mix(in srgb,var(--gold) 15%,var(--card))}
+.assistant-message-mark{width:20px;height:20px;flex:none;display:grid;place-items:center;margin-top:4px;border-radius:7px;background:var(--surface-deep);color:var(--gold-soft)}
+.assistant-chat-suggestions{display:grid;gap:7px;margin:2px 0 2px 27px}
+.assistant-chat-suggestions>span{margin-bottom:1px;color:var(--muted);font-size:9px;font-weight:700;letter-spacing:.09em;text-transform:uppercase}
+.assistant-chat-suggestions button{display:flex;align-items:center;gap:8px;width:100%;padding:9px 10px;border:1px solid var(--line);border-radius:9px;background:var(--card);color:var(--ink);font-size:10px;text-align:left;transition:border-color .15s,background .15s}
+.assistant-chat-suggestions button:hover{border-color:var(--gold);background:var(--surface-tint-2)}
+.assistant-chat-suggestions button>svg:first-child{color:var(--gold)}
+.assistant-chat-suggestions button>svg:last-child{margin-left:auto;color:var(--muted)}
+.assistant-chat-thinking{display:flex;align-items:center;gap:7px;margin-left:28px;color:var(--muted);font-size:10px}
+.assistant-spin{animation:assistant-spin .85s linear infinite}
+@keyframes assistant-spin{to{transform:rotate(360deg)}}
+.assistant-chat-error{margin:0;padding:8px 14px;background:color-mix(in srgb,var(--danger) 8%,var(--card));color:var(--danger);font-size:10px;line-height:1.4}
+.assistant-chat-composer{position:relative;display:grid;grid-template-columns:minmax(0,1fr) 37px;gap:7px;padding:11px 12px 25px;border-top:1px solid var(--line);background:var(--card)}
+.assistant-chat-composer textarea{width:100%;min-height:38px;max-height:100px;resize:vertical;padding:10px 11px;border:1px solid var(--line);border-radius:10px;background:var(--surface-tint-2);color:var(--ink);font:inherit;font-size:11px;line-height:1.45;outline:none}
+.assistant-chat-composer textarea:focus{border-color:var(--gold);box-shadow:0 0 0 2px color-mix(in srgb,var(--gold) 15%,transparent)}
+.assistant-chat-composer textarea::placeholder{color:var(--muted)}
+.assistant-chat-composer>button{width:37px;height:37px;display:grid;place-items:center;align-self:start;border-radius:10px;background:var(--surface-deep);color:var(--text-on-deep);transition:opacity .15s,transform .15s}
+.assistant-chat-composer>button:hover:not(:disabled){transform:translateY(-1px)}
+.assistant-chat-composer>button:disabled{opacity:.42;cursor:not-allowed}
+.assistant-chat-composer>button svg{color:var(--gold-soft)}
+.assistant-chat-composer small{position:absolute;right:13px;bottom:8px;color:var(--muted);font-size:8px}
+@media(max-width:600px){.assistant-chat-root{right:12px;bottom:12px}.assistant-chat-panel{position:fixed;right:10px;bottom:68px;width:calc(100vw - 20px);height:min(650px,calc(100dvh - 92px));border-radius:16px}.assistant-chat-launcher{min-height:45px;padding:0 14px;font-size:11px}.assistant-chat-launcher.is-open{width:44px;min-height:44px}}
+@media(prefers-reduced-motion:reduce){.assistant-chat-panel{animation:none}.assistant-chat-launcher,.assistant-chat-icon-button,.assistant-chat-suggestions button,.assistant-chat-composer>button{transition:none}.assistant-spin{animation-duration:1.8s}}

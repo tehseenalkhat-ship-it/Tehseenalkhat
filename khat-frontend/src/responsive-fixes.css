@@ -1,0 +1,17 @@
+/* Responsive fixes appended by automated script */
+
+/* Ensure last action cell in history rows aligns to the right across table-like lists */
+.history-row > span:last-child{
+  justify-self: end !important;
+  display: flex !important;
+  align-items: center !important;
+  gap: 12px !important;
+}
+
+/* Ensure action buttons are grouped and spaced consistently */
+.history-row > span:last-child .btn, .history-row > span:last-child .text-link{margin-left: 0 !important}
+
+/* Fallback: when a row becomes single-column on small screens, make the actions appear at the end with normal flow */
+@media (max-width: 760px){
+  .history-row > span:last-child{grid-column:auto !important;justify-self:auto !important}
+}
