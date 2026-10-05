@@ -2,9 +2,6 @@ import 'dotenv/config';
 
 const r2EndpointOverride = process.env.R2_ENDPOINT_OVERRIDE?.trim() || undefined;
 const r2AccountId = process.env.R2_ACCOUNT_ID?.trim() ?? '';
-if (!r2EndpointOverride && !r2AccountId) {
-  throw new Error('Set R2_ACCOUNT_ID for Cloudflare R2, or set R2_ENDPOINT_OVERRIDE for an S3-compatible storage service.');
-}
 
 function required(name: string): string {
   const value = process.env[name];
@@ -18,11 +15,13 @@ export const config = {
   port: Number(process.env.PORT ?? 4000),
   databaseUrl: required('DATABASE_URL'),
   jwtSecret: required('JWT_SECRET'),
+  // Uploads are stored on the server's disk (see storage.ts). These S3 settings are only used by
+  // LiveKit Egress to save event recordings, and are optional.
   r2: {
     accountId: r2AccountId,
-    accessKeyId: required('R2_ACCESS_KEY_ID'),
-    secretAccessKey: required('R2_SECRET_ACCESS_KEY'),
-    bucket: required('R2_BUCKET_NAME'),
+    accessKeyId: process.env.R2_ACCESS_KEY_ID ?? '',
+    secretAccessKey: process.env.R2_SECRET_ACCESS_KEY ?? '',
+    bucket: process.env.R2_BUCKET_NAME ?? '',
     endpointOverride: r2EndpointOverride,
     forcePathStyle: process.env.R2_FORCE_PATH_STYLE === 'true',
     region: process.env.R2_REGION?.trim() || (r2EndpointOverride ? 'us-east-1' : 'auto'),

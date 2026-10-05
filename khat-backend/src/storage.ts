@@ -1,27 +1,30 @@
-import { S3Client, PutObjectCommand, GetObjectCommand, DeleteObjectCommand, HeadObjectCommand } from '@aws-sdk/client-s3';
-import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
-import { randomUUID } from 'node:crypto';
+import fs from 'node:fs';
+import path from 'node:path';
+import { createHmac, randomUUID, timingSafeEqual } from 'node:crypto';
 import { config } from './config.js';
 
-// Cloudflare R2 and MinIO both expose an S3-compatible API. Keep the R2
-// endpoint as the default, but allow an explicit endpoint for self-hosted S3
-// services. Path-style URLs are required by many MinIO deployments.
-const s3 = new S3Client({
-  region: config.r2.region,
-  endpoint: config.r2.endpointOverride ?? `https://${config.r2.accountId}.r2.cloudflarestorage.com`,
-  forcePathStyle: config.r2.forcePathStyle,
-  credentials: {
-    accessKeyId: config.r2.accessKeyId,
-    secretAccessKey: config.r2.secretAccessKey,
-  },
-});
+// Files live on the server's own disk, in UPLOAD_DIR (default: an `uploads` folder next to the
+// app folder, so redeploying the app never touches it). The browser still uploads/downloads
+// directly via short-lived signed URLs, exactly like the old object-storage flow:
+//   PUT /uploads/put?key=..&exp=..&sig=..   (see uploads.routes.ts)
+//   GET /uploads/raw?key=..&exp=..&sig=..
+export const uploadDir = path.resolve(process.env.UPLOAD_DIR ?? path.join(process.cwd(), '..', 'uploads'));
 
-const PRESIGNED_URL_EXPIRY_SECONDS = 60 * 10; // 10 minutes — plenty for a single upload/download
+const SIGNED_URL_EXPIRY_SECONDS = 60 * 60; // 1 hour — long enough for large uploads and video playback
+
+const MIME: Record<string, string> = {
+  jpg: 'image/jpeg', jpeg: 'image/jpeg', png: 'image/png', gif: 'image/gif', webp: 'image/webp', svg: 'image/svg+xml',
+  heic: 'image/heic', pdf: 'application/pdf', mp4: 'video/mp4', webm: 'video/webm', mov: 'video/quicktime',
+  mp3: 'audio/mpeg', m4a: 'audio/mp4', wav: 'audio/wav', ogg: 'audio/ogg', json: 'application/json', txt: 'text/plain',
+};
+
+export function contentTypeFor(storageKey: string): string {
+  return MIME[storageKey.split('.').pop()?.toLowerCase() ?? ''] ?? 'application/octet-stream';
+}
 
 /**
  * Builds a consistent storage key. `prefix` groups files by what they are
- * (e.g. 'levels', 'entries', 'showcase', 'certificates') so the bucket stays
- * organized even though it's all one flat bucket under the hood.
+ * (e.g. 'levels', 'entries', 'showcase', 'certificates') — it becomes a sub-folder.
  */
 export function buildStorageKey(prefix: string, originalFilename: string): string {
   const ext = originalFilename.includes('.') ? originalFilename.split('.').pop() : undefined;
@@ -29,59 +32,55 @@ export function buildStorageKey(prefix: string, originalFilename: string): strin
   return ext ? `${prefix}/${unique}.${ext}` : `${prefix}/${unique}`;
 }
 
-/**
- * Returns a short-lived URL the FRONTEND uploads directly to via a PUT request
- * (no file bytes ever pass through our server). Call this from a route like
- * POST /uploads/presign, given a desired prefix + filename + content type.
- */
-export async function getUploadUrl(storageKey: string, contentType: string): Promise<string> {
-  const command = new PutObjectCommand({
-    Bucket: config.r2.bucket,
-    Key: storageKey,
-    ContentType: contentType,
-  });
-  return getSignedUrl(s3, command, { expiresIn: PRESIGNED_URL_EXPIRY_SECONDS });
+/** Absolute path for a key; throws on anything that could escape the upload folder. */
+export function filePath(storageKey: string): string {
+  if (!/^[\w\-.]+(\/[\w\-.]+)*$/.test(storageKey) || storageKey.split('/').includes('..')) {
+    throw new Error('Invalid storage key');
+  }
+  const full = path.resolve(uploadDir, storageKey);
+  if (!full.startsWith(uploadDir + path.sep)) throw new Error('Invalid storage key');
+  return full;
 }
 
-/**
- * Returns a short-lived URL to VIEW/DOWNLOAD a private file. Since the bucket
- * is not public, every view of a student's upload, a course video, etc. goes
- * through this — call it right before returning data to the frontend, not
- * ahead of time (the URL expires quickly by design).
- */
+function sign(action: string, key: string, exp: number, extra = ''): string {
+  return createHmac('sha256', config.jwtSecret).update(`${action}\n${key}\n${exp}\n${extra}`).digest('base64url');
+}
+
+export function verifySignature(action: string, key: string, exp: string, sig: string, extra = ''): boolean {
+  const expNum = Number(exp);
+  if (!key || !sig || !Number.isFinite(expNum) || expNum < Date.now() / 1000) return false;
+  const expected = Buffer.from(sign(action, key, expNum, extra));
+  const given = Buffer.from(sig);
+  return expected.length === given.length && timingSafeEqual(expected, given);
+}
+
+function signedUrl(action: 'put' | 'raw', storageKey: string, extra: Record<string, string> = {}): string {
+  const exp = Math.floor(Date.now() / 1000) + SIGNED_URL_EXPIRY_SECONDS;
+  const params = new URLSearchParams({ key: storageKey, exp: String(exp), ...extra });
+  params.set('sig', sign(action, storageKey, exp, extra.filename ?? ''));
+  return `/uploads/${action}?${params.toString()}`;
+}
+
+/** Short-lived URL the frontend PUTs the file bytes to. */
+export async function getUploadUrl(storageKey: string, _contentType: string): Promise<string> {
+  filePath(storageKey); // validate early
+  return signedUrl('put', storageKey);
+}
+
+/** Short-lived URL to view (or, with a filename, download) a stored file. */
 export async function getDownloadUrl(storageKey: string, downloadFilename?: string): Promise<string> {
   const safeFilename = downloadFilename?.replace(/[\r\n"/\\]/g, '_').trim();
-  const command = new GetObjectCommand({
-    Bucket: config.r2.bucket,
-    Key: storageKey,
-    ...(safeFilename ? {
-      ResponseContentDisposition: `attachment; filename="${safeFilename.replace(/[^\x20-\x7E]/g, '_')}"; filename*=UTF-8''${encodeURIComponent(safeFilename)}`,
-    } : {}),
-  });
-  return getSignedUrl(s3, command, { expiresIn: PRESIGNED_URL_EXPIRY_SECONDS });
+  return signedUrl('raw', storageKey, safeFilename ? { filename: safeFilename } : {});
 }
 
 export async function getObjectBytes(storageKey: string): Promise<{ body: Buffer; contentType: string }> {
-  const result = await s3.send(new GetObjectCommand({ Bucket: config.r2.bucket, Key: storageKey }));
-  if (!result.Body) throw new Error('Stored file has no content');
-  return {
-    body: Buffer.from(await result.Body.transformToByteArray()),
-    contentType: result.ContentType ?? 'application/octet-stream',
-  };
+  return { body: await fs.promises.readFile(filePath(storageKey)), contentType: contentTypeFor(storageKey) };
 }
 
 export async function deleteObject(storageKey: string): Promise<void> {
-  await s3.send(new DeleteObjectCommand({ Bucket: config.r2.bucket, Key: storageKey }));
+  await fs.promises.rm(filePath(storageKey), { force: true });
 }
 
 export async function objectExists(storageKey: string): Promise<boolean> {
-  try {
-    await s3.send(new HeadObjectCommand({ Bucket: config.r2.bucket, Key: storageKey }));
-    return true;
-  } catch (error) {
-    const name = (error as { name?: string }).name;
-    const statusCode = (error as { $metadata?: { httpStatusCode?: number } }).$metadata?.httpStatusCode;
-    if (name === 'NotFound' || name === 'NoSuchKey' || statusCode === 404) return false;
-    throw error;
-  }
+  return fs.existsSync(filePath(storageKey));
 }
