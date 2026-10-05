@@ -1,4 +1,5 @@
 import type { Role } from './data/types';
+import { compressForUpload } from './compress';
 
 export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:4000';
 
@@ -153,8 +154,10 @@ export async function apiFetch<T = unknown>(
 // ---- Presigned upload helper — used by every file-upload surface ----
 export async function uploadFile(
   prefix: string,
-  file: File
+  original: File
 ): Promise<{ storageKey: string; originalFilename: string }> {
+  // Images are shrunk to under 1 MB and videos re-encoded to 720p before anything is sent.
+  const file = await trackApiRequest(() => compressForUpload(original));
   const contentType = file.type || (file.name.toLowerCase().endsWith('.pdf') ? 'application/pdf' : 'application/octet-stream');
   const { storageKey, uploadUrl } = await apiFetch<{ storageKey: string; uploadUrl: string }>('/uploads/presign', {
     method: 'POST',
