@@ -50,15 +50,12 @@ export async function assetRoutes(app: FastifyInstance) {
 
       const { rows } = await pool.query(
         `SELECT a.*, u.name AS uploader_name,
-                CASE WHEN $1::text IS NOT NULL
-                     THEN ts_rank(a.search_vector, websearch_to_tsquery('english', $1))
-                     ELSE 0 END AS relevance
+                CASE WHEN $1 IS NOT NULL AND a.title LIKE CONCAT('%', $1, '%') THEN 1 ELSE 0 END AS relevance
          FROM assets a
          JOIN users u ON u.id = a.uploaded_by
-         WHERE ($1::text IS NULL OR a.search_vector @@ websearch_to_tsquery('english', $1))
-           AND ($2::uuid IS NULL OR a.khat_type_id = $2)
+         WHERE ($1 IS NULL OR a.title LIKE CONCAT('%', $1, '%') OR CAST(a.tags AS CHAR) LIKE CONCAT('%', $1, '%'))
+           AND ($2 IS NULL OR a.khat_type_id = $2)
          ORDER BY
-           CASE WHEN $1::text IS NOT NULL THEN 1 ELSE 0 END DESC, -- relevance order only kicks in when searching
            relevance DESC,
            a.created_at DESC`,
         params

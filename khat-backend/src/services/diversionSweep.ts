@@ -37,7 +37,7 @@ export async function runDiversionAndIdleFlagSweep(): Promise<{
 
   // --- 1. Retry the pending queue ---
   const { rows: pending } = await pool.query(
-    `SELECT id, created_at < now() - ($1 || ' days')::interval AS past_window
+    `SELECT id, created_at < DATE_SUB(now(), INTERVAL $1 DAY) AS past_window
      FROM entries WHERE status = 'pending'`,
     [diversionWindowDays]
   );
@@ -51,7 +51,7 @@ export async function runDiversionAndIdleFlagSweep(): Promise<{
     `SELECT id, assigned_teacher_id, level_id
      FROM entries
      WHERE status = 'assigned'
-       AND created_at < now() - ($1 || ' days')::interval`,
+       AND created_at < DATE_SUB(now(), INTERVAL $1 DAY)`,
     [diversionWindowDays]
   );
 
@@ -105,7 +105,7 @@ export async function runDiversionAndIdleFlagSweep(): Promise<{
      SET idle_flagged = true
      WHERE status = 'in_review'
        AND idle_flagged = false
-       AND locked_at < now() - (($1 + $2) || ' days')::interval
+       AND locked_at < DATE_SUB(now(), INTERVAL ($1 + $2) DAY)
      RETURNING id, assigned_teacher_id`,
     [diversionWindowDays, graceDays]
   );

@@ -97,9 +97,9 @@ export async function authRoutes(app: FastifyInstance) {
         [name.trim(), normalizedEmail, passwordHash, branchId, normalizedTrNumber]
       );
       const newUser = userRows[0];
-      await client.query(`UPDATE approved_tr_numbers SET used = true, student_id = $1 WHERE id = $2`, [
+      await client.query(`UPDATE approved_tr_numbers SET used = true, student_id = $1 WHERE tr_number = $2`, [
         newUser.id,
-        trRecord.id,
+        trRecord.tr_number,
       ]);
       await client.query('COMMIT');
 

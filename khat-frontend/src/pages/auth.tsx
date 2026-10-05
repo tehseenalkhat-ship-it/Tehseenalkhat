@@ -4,6 +4,7 @@ import { navigate, Button, Logo } from '@/components/ui';
 import { ProfilePhotoCropper } from '@/components/ProfilePhotoCropper';
 import { THEME_OPTIONS, type ThemeName } from '@/theme';
 import type { Role } from '@/data/types';
+import jameaPhoto from '../public/jamea-photo2.jpeg';
 import { apiFetch, saveSession, clearSession, getSessionUser, ApiError, getViewUrl, uploadFile, broadcastProfilePhotoUpdated } from '@/api';
 
 const roleCards: { role: Role; label: string; desc: string; icon: string }[] = [
@@ -33,7 +34,7 @@ export function LandingRoleSelect() {
     <main className="landing-page reference-landing">
       <div 
         className="landing-photo" 
-        style={{ backgroundImage: "url('src/public/jamea-photo2.jpeg')" }} 
+        style={{ backgroundImage: `url('${jameaPhoto}')` }}
         role="img" 
         aria-label="Al-Jamea-tus-Saifiyah campus architecture" 
       />

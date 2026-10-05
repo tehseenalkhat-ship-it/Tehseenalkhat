@@ -25,10 +25,9 @@ export async function adminTrNumberRoutes(app: FastifyInstance) {
       const uniqueNumbers = [...new Set(normalized)];
       const { rowCount } = await pool.query(
         `INSERT INTO approved_tr_numbers (tr_number, branch_id)
-         SELECT imported.tr_number, $2
-         FROM unnest($1::text[]) AS imported(tr_number)
+         VALUES ${uniqueNumbers.map((_, i) => `($${2 * i + 1}, $${2 * i + 2})`).join(', ')}
          ON CONFLICT DO NOTHING`,
-        [uniqueNumbers, branchId ?? null]
+        uniqueNumbers.flatMap((tr) => [tr, branchId ?? null])
       );
       const imported = rowCount ?? 0;
       return reply.code(201).send({ imported, skipped: trNumbers.length - imported });

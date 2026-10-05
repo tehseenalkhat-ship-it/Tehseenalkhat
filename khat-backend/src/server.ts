@@ -1,5 +1,8 @@
+import fs from 'node:fs';
+import path from 'node:path';
 import Fastify from 'fastify';
 import cors from '@fastify/cors';
+import fastifyStatic from '@fastify/static';
 import { config } from './config.js';
 import { authPlugin } from './plugins/auth.js';
 import { healthRoutes } from './routes/health.js';
@@ -55,6 +58,13 @@ async function main() {
   await app.register(bookRoutes, { prefix: '/books' });
   await app.register(notificationRoutes, { prefix: '/notifications' });
   await app.register(referenceDataRoutes); // no prefix — /branches, /khat-types
+
+  // Serve the built frontend from ./public (copied there by the deploy build) so one Node app hosts
+  // both the site and the API. Registered last so every API route above takes precedence.
+  const publicDir = process.env.STATIC_DIR ?? path.join(process.cwd(), 'public');
+  if (fs.existsSync(publicDir)) {
+    await app.register(fastifyStatic, { root: publicDir });
+  }
 
   try {
     const address = await app.listen({ port: config.port, host: '0.0.0.0' });
