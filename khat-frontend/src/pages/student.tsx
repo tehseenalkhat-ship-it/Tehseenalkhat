@@ -1,7 +1,7 @@
 import { lazy, Suspense, useEffect, useRef, useState } from 'react';
 import {
   ArrowRight, Award, Bell, BookOpen, CalendarDays, Check, ChevronDown, ChevronLeft, ChevronRight,
-  ClipboardList, ExternalLink, FileImage, FileText, FileVideo, Flame, Lock, Pause, Play, Search, Sparkles, Trophy, Upload, X,
+  ClipboardList, ExternalLink, FileImage, FileText, FileVideo, Flame, Grid2X2, List, Lock, Pause, Play, Search, Sparkles, Trophy, Upload, X,
   Clock, Download,
 } from 'lucide-react';
 import type { Script } from '@/data/types';
@@ -1004,6 +1004,7 @@ export function StudentDashboard() {
 
 export function Catalog() {
   const [script, setScript] = useState<Script>(preferredCatalogScript);
+  const [levelView, setLevelView] = useState<'list' | 'cards'>('list');
   const [course, setCourse] = useState<ApiCourse | null>(null);
   const [levels, setLevels] = useState<ApiLevel[]>([]);
   const [enrollment, setEnrollment] = useState<ApiEnrollment | null>(null);
@@ -1099,6 +1100,32 @@ export function Catalog() {
     }
   };
 
+  const levelGroups: { level: ApiLevel; index: number }[][] = [];
+  for (let start = 0; start < levels.length;) {
+    const checkpointIndex = levels.findIndex((level, index) => index >= start && level.level_type === 'test');
+    const end = checkpointIndex < 0 ? levels.length : checkpointIndex + 1;
+    levelGroups.push(levels.slice(start, end).map((level, offset) => ({ level, index: start + offset })));
+    start = end;
+  }
+
+  const renderLevelRow = (level: ApiLevel, index: number, card = false) => (
+    <button
+      className={`level-row ${card ? 'level-card-row' : ''} ${level.locked ? 'locked' : ''} ${level.level_type === 'test' ? 'is-checkpoint' : ''}`}
+      onClick={() => !level.locked && openLevel(course!.id, level.id)}
+      key={level.id}
+      disabled={level.locked}
+      aria-label={`Level ${index + 1}: ${level.title}${level.locked ? ', locked' : ''}${level.level_type === 'test' ? ', checkpoint test' : ', practice'}`}
+    >
+      <span className="level-number">{String(index + 1).padStart(2, '0')}</span>
+      <div>
+        <strong>{level.title}</strong>
+        <small>{level.level_type === 'test' ? 'Checkpoint test · thorough teacher assessment' : 'Practice level · teacher marking required'}</small>
+      </div>
+      <span>{level.locked ? <Lock size={16} /> : level.level_type === 'test' ? <StatusChip tone="amber">Test</StatusChip> : <Check size={16} />}</span>
+      <ChevronRight size={16} />
+    </button>
+  );
+
   return (
     <main className="page portal-page">
       <SectionHeading eyebrow="Course catalog" title={`${khatTypes[script].name} curriculum`} text="Build the hand one measured exercise at a time." action={<div className="tabs course-script-tabs" role="group" aria-label="Choose a certification script">{certificationScriptList.map(item => <button key={item} className={script === item ? 'active' : ''} onClick={() => setScript(item)}>{khatTypes[item].name}</button>)}</div>} />
@@ -1115,23 +1142,29 @@ export function Catalog() {
             </div>
             <StatusChip>{levels.length > 0 ? `${Math.round(Number(enrollment?.percent_complete ?? 0))}% complete` : 'In preparation'}</StatusChip>
           </div>
-          {levels.length > 0 ? <div className="level-list">
-            {levels.map((level, i) => (
-              <button
-                className={`level-row ${level.locked ? 'locked' : ''} ${level.level_type === 'test' ? 'is-checkpoint' : ''}`}
-                onClick={() => !level.locked && openLevel(course.id, level.id)}
-                key={level.id}
-              >
-                <span className="level-number">{String(i + 1).padStart(2, '0')}</span>
-                <div>
-                  <strong>{level.title}</strong>
-                  <small>{level.level_type === 'test' ? 'Checkpoint test · thorough teacher assessment' : 'Practice level · teacher marking required'}</small>
+          {levels.length > 0 ? (
+            <>
+              <div className="level-view-toolbar">
+                <div><strong>Course levels</strong><span>{levels.length} lessons · checkpoints included</span></div>
+                <div className="level-view-toggle" role="group" aria-label="Choose how to view course levels">
+                  <button type="button" className={levelView === 'list' ? 'active' : ''} aria-pressed={levelView === 'list'} onClick={() => setLevelView('list')}><List size={16} /><span>List</span></button>
+                  <button type="button" className={levelView === 'cards' ? 'active' : ''} aria-pressed={levelView === 'cards'} onClick={() => setLevelView('cards')}><Grid2X2 size={16} /><span>Cards</span></button>
                 </div>
-                <span>{level.locked ? <Lock size={16} /> : level.level_type === 'test' ? <StatusChip tone="amber">Test</StatusChip> : <Check size={16} />}</span>
-                <ChevronRight size={16} />
-              </button>
-            ))}
-          </div> : <div className="course-preparation-note"><BookOpen size={19} /><span>Course design is in progress. Please check back soon.</span></div>}
+              </div>
+              {levelView === 'list' ? (
+                <div className="level-list">{levels.map((level, index) => renderLevelRow(level, index))}</div>
+              ) : (
+                <div className="level-groups-grid">
+                  {levelGroups.map((group, groupIndex) => (
+                    <section className="level-group-card" key={groupIndex} aria-label={`Levels ${group[0].index + 1} to ${group[group.length - 1].index + 1}`}>
+                      <header><div><span>COURSE BLOCK {String(groupIndex + 1).padStart(2, '0')}</span><strong>Levels {group[0].index + 1}–{group[group.length - 1].index + 1}</strong></div><small>{group.filter(item => item.level.level_type === 'test').length} checkpoint{group.filter(item => item.level.level_type === 'test').length === 1 ? '' : 's'}</small></header>
+                      <div className="level-group-card-items">{group.map(({ level, index }) => renderLevelRow(level, index, true))}</div>
+                    </section>
+                  ))}
+                </div>
+              )}
+            </>
+          ) : <div className="course-preparation-note"><BookOpen size={19} /><span>Course design is in progress. Please check back soon.</span></div>}
         </>
       )}
       {!loading && !course && !error && <p className="muted">No certification course has been set up yet for {khatTypes[script].name} — check back soon.</p>}

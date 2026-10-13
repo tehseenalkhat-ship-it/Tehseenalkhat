@@ -2493,6 +2493,39 @@ html[data-theme] .competitions-manager-page .competition-list-empty{border:1px d
 .achievement-empty{display:flex;align-items:center;gap:13px;padding:19px;border:1px dashed var(--line);border-radius:9px;background:color-mix(in srgb,var(--card) 75%,var(--surface-tint-2));color:var(--gold)}
 .achievement-empty>div strong{color:var(--ink);font-size:12px}
 .achievement-empty>div p{margin-top:3px;font-size:10px}
+
+/* Certification curriculum: switch between the compact list and five-level cards. */
+.level-view-toolbar{display:flex;align-items:center;justify-content:space-between;gap:14px;margin:0 0 12px}
+.level-view-toolbar>div:first-child{display:grid;gap:3px}
+.level-view-toolbar>div:first-child strong{color:var(--ink);font-size:12px}
+.level-view-toolbar>div:first-child span{color:var(--muted);font-size:9px}
+.level-view-toggle{display:inline-flex;align-items:center;gap:3px;padding:3px;border:1px solid var(--line);border-radius:8px;background:color-mix(in srgb,var(--card) 76%,var(--surface-tint-2))}
+.level-view-toggle button{min-height:33px;display:inline-flex;align-items:center;justify-content:center;gap:6px;padding:6px 10px;border:0;border-radius:6px;background:transparent;color:var(--muted);font:700 9px 'DM Sans',sans-serif;transition:background .15s,color .15s,box-shadow .15s}
+.level-view-toggle button:hover{color:var(--ink)}
+.level-view-toggle button.active{background:var(--card);color:var(--gold);box-shadow:0 1px 4px color-mix(in srgb,var(--theme-deep) 12%,transparent)}
+.level-groups-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));align-items:start;gap:14px;margin-bottom:72px}
+.level-group-card{min-width:0;overflow:hidden;border:1px solid var(--line);border-radius:10px;background:var(--card);box-shadow:0 4px 15px color-mix(in srgb,var(--theme-deep) 4%,transparent)}
+.level-group-card>header{min-height:56px;display:flex;align-items:center;justify-content:space-between;gap:10px;padding:11px 14px;border-bottom:1px solid var(--line);background:color-mix(in srgb,var(--surface-tint-2) 40%,var(--card))}
+.level-group-card>header>div{display:grid;gap:3px}
+.level-group-card>header>div>span{color:var(--gold);font-size:8px;font-weight:800;letter-spacing:.1em}
+.level-group-card>header>div>strong{color:var(--ink);font:700 11px 'DM Sans',sans-serif}
+.level-group-card>header>small{flex:none;color:var(--muted);font-size:8px}
+.level-group-card-items{display:grid;padding:5px 10px}
+.level-group-card .level-row.level-card-row{grid-template-columns:31px minmax(0,1fr) 32px 12px;gap:9px;min-height:58px;padding:9px 4px;border:0;border-bottom:1px solid color-mix(in srgb,var(--line) 70%,transparent);background:transparent;color:var(--ink);transition:background .14s ease,border-radius .14s ease}
+.level-group-card .level-card-row:last-child{border-bottom:0}
+.level-group-card .level-card-row:not(:disabled):hover{border-radius:6px;background:color-mix(in srgb,var(--surface-tint-2) 72%,var(--card))}
+.level-group-card .level-card-row .level-number{font:700 13px 'Libre Baskerville',serif;color:var(--gold)}
+.level-group-card .level-card-row>div{min-width:0}
+.level-group-card .level-card-row>div strong{font-size:10px;line-height:1.4;overflow-wrap:anywhere}
+.level-group-card .level-card-row>div small{margin-top:3px;font-size:8px;line-height:1.35}
+.level-group-card .level-card-row>span:nth-last-of-type(1){justify-content:center}
+.level-group-card .level-card-row>svg:last-child{width:13px;color:var(--muted)}
+.level-group-card .level-card-row .chip{padding:4px 6px;font-size:7px}
+.level-group-card .level-card-row.is-checkpoint{border-radius:5px;background:color-mix(in srgb,var(--gold-soft) 62%,var(--card));box-shadow:inset 3px 0 0 var(--gold)}
+.level-group-card .level-card-row.is-checkpoint>div strong,.level-group-card .level-card-row.is-checkpoint>div small{color:var(--gold)}
+.level-group-card .level-card-row.locked{opacity:.62;cursor:not-allowed}
+@media(max-width:760px){.level-groups-grid{grid-template-columns:minmax(0,1fr);gap:11px}}
+@media(max-width:520px){.level-view-toolbar{align-items:flex-start;flex-direction:column}.level-view-toggle{align-self:flex-end;margin-top:-2px}.level-group-card>header{padding:10px 12px}.level-group-card-items{padding:4px 9px}}
 .achievement-badge-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px}
 .achievement-badge-card{display:grid;grid-template-columns:74px minmax(0,1fr);align-items:center;gap:13px;padding:17px;border:1px solid var(--line);border-radius:10px;background:var(--card)}
 .achievement-badge-art{display:grid;width:72px;height:72px;place-items:center;overflow:hidden;border:1px solid color-mix(in srgb,var(--script) 25%,var(--line));border-radius:50%;background:color-mix(in srgb,var(--script) 8%,var(--card));color:var(--script)}
