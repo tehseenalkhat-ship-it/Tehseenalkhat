@@ -1,7 +1,7 @@
 import type { FastifyInstance } from 'fastify';
 import { pool } from '../db.js';
 import type { AuthUser } from '../plugins/auth.js';
-import { notify, notifyAllAdmins } from '../services/notify.js';
+import { autoAssignEntry } from '../services/entryRouting.js';
 
 type EnrollBody = { courseId: string };
 type SubmitBody = { fileStorageKey: string; originalFilename?: string; timeSpentMinutes: number };
@@ -56,13 +56,14 @@ export async function levelSubmissionRoutes(app: FastifyInstance) {
       const { rows: passedCheckpointRows } = await pool.query(
         `SELECT DISTINCT e.level_id
          FROM entries e JOIN levels l ON l.id = e.level_id
-         WHERE e.student_id = $1 AND l.course_id = $2 AND l.level_type = 'test'
-           AND e.source_type = 'checkpoint' AND e.status = 'reviewed'`,
+         WHERE e.student_id = $1 AND l.course_id = $2
+           AND e.source_type IN ('checkpoint', 'level_practice') AND e.status = 'reviewed'`,
         [studentId, request.params.courseId]
       );
       const passedCheckpoints = new Set(passedCheckpointRows.map((row: { level_id: string }) => row.level_id));
-      // Secondary/self-learning courses have no locks at all — every level is
-      // open regardless of order unless an earlier checkpoint is still unpassed.
+      // Preserve the existing enrollment pointer for students who progressed
+      // before marking was introduced. New levels move this pointer only after
+      // a passing teacher mark. The checkpoint barrier remains unchanged.
       const withLockState = levels.map((l) => ({
         ...l,
         locked: (!isSecondary && l.order_index > enrollment.current_level_index) || levels.some((checkpoint) =>
@@ -129,83 +130,26 @@ export async function levelSubmissionRoutes(app: FastifyInstance) {
         return reply.code(403).send({ error: 'This level is locked — complete the checkpoint before it first' });
       }
 
+      const { rows: activeRows } = await pool.query(
+        `SELECT id FROM entries WHERE student_id = $1 AND level_id = $2
+         AND source_type = 'checkpoint' AND status IN ('pending', 'assigned', 'in_review') LIMIT 1`,
+        [studentId, level.id]
+      );
+      if (activeRows[0]) return reply.code(409).send({ error: 'This level already has an entry awaiting teacher review' });
+
       const { rows: submissionRows } = await pool.query(
         `INSERT INTO level_submissions (student_id, level_id, time_spent_minutes, file_storage_key, original_filename)
          VALUES ($1, $2, $3, $4, $5) RETURNING *`,
         [studentId, level.id, timeSpentMinutes, fileStorageKey, originalFilename ?? null]
       );
+      const { rows: entryRows } = await pool.query(
+        `INSERT INTO entries (student_id, source_type, level_id, khat_image_storage_key, original_filename)
+         VALUES ($1, 'checkpoint', $2, $3, $4) RETURNING *`,
+        [studentId, level.id, fileStorageKey, originalFilename ?? null]
+      );
+      await autoAssignEntry(entryRows[0].id);
 
-      // Only advance the unlock pointer if this was the next expected level —
-      // resubmitting an earlier (already-passed) level shouldn't move it backward.
-      const { rows: totalRows } = await pool.query(`SELECT COUNT(*) AS total FROM levels WHERE course_id = $1`, [
-        level.course_id,
-      ]);
-      const totalLevels = Number(totalRows[0].total);
-
-      if (level.order_index === enrollment.current_level_index) {
-        const newIndex = level.order_index + 1;
-        const percentComplete = totalLevels > 0 ? Math.min(100, (newIndex / totalLevels) * 100) : 0;
-        const justCompleted = newIndex >= totalLevels;
-
-        await pool.query(
-          `UPDATE enrollments SET current_level_index = $1, percent_complete = $2, status = $3 WHERE id = $4`,
-          [newIndex, percentComplete, justCompleted ? 'completed' : 'active', enrollment.id]
-        );
-
-        // Primary certification courses can award at any configured level.
-        // Secondary courses only award their configured certificate on completion.
-        if (!isSecondary) {
-          const { rows: templateRows } = await pool.query(
-            `SELECT * FROM certificate_templates WHERE level_id = $1`,
-            [level.id]
-          );
-          const template = templateRows[0];
-          if (template) {
-            const { rows: certificateRows } = await pool.query(
-              `INSERT INTO certificates (student_id, khat_type_id, level_id, title, file_storage_key, status, template_id)
-               SELECT $1, $2, $3, $4, $5, 'pending', $6
-               WHERE NOT EXISTS (
-                 SELECT 1 FROM certificates WHERE student_id = $1 AND template_id = $6
-               ) RETURNING id, title`,
-              [studentId, template.khat_type_id, level.id, template.title, template.file_storage_key, template.id]
-            );
-            const certificate = certificateRows[0];
-            if (certificate) {
-              await Promise.all([
-                notify(studentId, 'certificate_pending_review', { certificateId: certificate.id, title: certificate.title }),
-                notifyAllAdmins('certificate_pending_review', { certificateId: certificate.id, studentId, title: certificate.title }),
-              ]);
-            }
-          }
-        }
-
-        if (justCompleted && isSecondary) {
-          const { rows: templateRows } = await pool.query(
-            `SELECT * FROM certificate_templates WHERE course_id = $1`,
-            [level.course_id]
-          );
-          const template = templateRows[0];
-          if (template) {
-            const { rows: certificateRows } = await pool.query(
-              `INSERT INTO certificates (student_id, khat_type_id, course_id, title, file_storage_key, status, template_id)
-               SELECT $1, $2, $3, $4, $5, 'pending', $6
-               WHERE NOT EXISTS (
-                 SELECT 1 FROM certificates WHERE student_id = $1 AND template_id = $6
-               ) RETURNING id, title`,
-              [studentId, template.khat_type_id, level.course_id, template.title, template.file_storage_key, template.id]
-            );
-            const certificate = certificateRows[0];
-            if (certificate) {
-              await Promise.all([
-                notify(studentId, 'certificate_pending_review', { certificateId: certificate.id, title: certificate.title }),
-                notifyAllAdmins('certificate_pending_review', { certificateId: certificate.id, studentId, title: certificate.title }),
-              ]);
-            }
-          }
-        }
-      }
-
-      return reply.code(201).send(submissionRows[0]);
+      return reply.code(201).send({ ...entryRows[0], level_submission_id: submissionRows[0].id });
     }
   );
 }

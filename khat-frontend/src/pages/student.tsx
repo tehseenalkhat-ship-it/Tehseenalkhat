@@ -6,13 +6,13 @@ import {
 } from 'lucide-react';
 import type { Script } from '@/data/types';
 import {
-  khatTypes, scriptList,
+  khatTypes, scriptList, certificationScriptList,
   scriptToCode, scriptFromCode,
-  encouragementQuotes, galleryWorks,
+  galleryWorks,
 } from '@/data/mock';
 import {
   navigate, Button, SectionHeading, StatusChip, BadgeIcon, ActivityHeatmap,
-  StatCard, ScriptTabs, UploadBox, Modal, BackLink, ShowcaseSections, ShowcaseFeedSections, DashboardShowcaseCarousels, ShowcaseHeading, Footer, PenLoader,
+  StatCard, UploadBox, Modal, ShowcaseSections, DashboardShowcaseCarousels, ShowcaseHeading, Footer, PenLoader,
 } from '@/components/ui';
 import {
   apiFetch,
@@ -59,11 +59,13 @@ type ApiEvent = {
 
 type ApiCheckpoint = {
   id: string;
-  source_type: 'checkpoint';
+  source_type: 'checkpoint' | 'level_practice';
   level_id: string | null;
+  level_type?: 'mufradat' | 'writing' | 'test' | null;
   khat_image_storage_key: string;
   original_filename?: string | null;
   status: 'pending' | 'assigned' | 'in_review' | 'reviewed' | 'redo_needed';
+  score?: number | null;
   feedback?: string | null;
   reviewed_at?: string | null;
   reviewed_by_name?: string | null;
@@ -154,16 +156,9 @@ function scriptCode(script: Script): string {
 }
 
 const CATALOG_SCRIPT_KEY = 'khat_catalog_script';
-const dashboardScriptOrder: Script[] = ['Naskh', 'Sulus', 'Nastaaleeq', 'Naskh (Normal Pen)'];
-
-function navigateToCatalogForScript(script: Script) {
-  window.sessionStorage.setItem(CATALOG_SCRIPT_KEY, script);
-  navigate('catalog');
-}
-
 function preferredCatalogScript(): Script {
   const requested = window.sessionStorage.getItem(CATALOG_SCRIPT_KEY);
-  return requested && scriptList.includes(requested as Script) ? requested as Script : 'Naskh';
+  return requested && certificationScriptList.includes(requested as Script) ? requested as Script : 'Naskh';
 }
 
 export function StudentLandingPage() {
@@ -201,19 +196,13 @@ export function StudentLandingPage() {
 export function StudentDashboard() {
   type DashboardCourse = {
     course: ApiCourse;
+    script: Script;
     enrollment: ApiEnrollment | null;
     progress: number;
     levels: ApiLevel[];
   };
 
-  const [courses, setCourses] = useState<
-    Record<Script, DashboardCourse | null>
-  >({
-    Naskh: null,
-    'Naskh (Normal Pen)': null,
-    Sulus: null,
-    Nastaaleeq: null,
-  });
+  const [courses, setCourses] = useState<DashboardCourse[]>([]);
   const [secondaryCourses, setSecondaryCourses] = useState<ApiSecondaryCourse[]>([]);
   const [secondaryFilter, setSecondaryFilter] = useState<Script | 'all'>('all');
   const [secondaryLoading, setSecondaryLoading] = useState(true);
@@ -267,10 +256,9 @@ export function StudentDashboard() {
   }, []);
 
   const [khatTypesList, setKhatTypesList] = useState<ApiKhatType[]>([]);
-
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [enrolling, setEnrolling] = useState<Script | null>(null);
+  const [enrolling, setEnrolling] = useState<string | null>(null);
 
   // Dashboard events
   const [events, setEvents] = useState<ApiEvent[]>([]);
@@ -370,86 +358,24 @@ export function StudentDashboard() {
       setError(null);
 
       try {
-        const fetchedKhatTypes =
-          await apiFetch<ApiKhatType[]>('/khat-types');
+        const [fetchedKhatTypes, availableCourses] = await Promise.all([
+          apiFetch<ApiKhatType[]>('/khat-types'),
+          apiFetch<ApiCourse[]>('/courses?category=certification'),
+        ]);
+        if (!cancelled) setKhatTypesList(fetchedKhatTypes);
 
-        if (!cancelled) {
-          setKhatTypesList(fetchedKhatTypes);
-        }
-
-        const results = await Promise.all(
-          scriptList.map(async (script) => {
-            const khatType = fetchedKhatTypes.find(
-              k => k.code === scriptCode(script)
-            );
-
-            if (!khatType) {
-              return [script, null] as const;
-            }
-
-            const certCourses =
-              await apiFetch<ApiCourse[]>(
-                `/courses?khatTypeId=${khatType.id}&category=certification`
-              );
-
-            const course = certCourses[0];
-
-            if (!course) {
-              return [script, null] as const;
-            }
-
-            const authoredLevels = await apiFetch<ApiLevel[]>(`/courses/${course.id}/levels`);
-
-            /*
-             * IMPORTANT:
-             * We only READ progress here.
-             * We do NOT automatically enroll the student.
-             *
-             * If the student is not enrolled, the progress endpoint
-             * will fail and we treat it as "not enrolled".
-             */
-            try {
-              const progress =
-                await apiFetch<{
-                  enrollment: ApiEnrollment;
-                  levels: ApiLevel[];
-                }>(
-                  `/levels/courses/${course.id}/progress`
-                );
-
-              return [
-                script,
-                {
-                  course,
-                  enrollment: progress.enrollment,
-                  progress: Number(
-                    progress.enrollment?.percent_complete ?? 0
-                  ),
-                  levels: progress.levels,
-                },
-              ] as const;
-            } catch {
-              return [
-                script,
-                {
-                  course,
-                  enrollment: null,
-                  progress: 0,
-                  levels: [],
-                },
-              ] as const;
-            }
-          })
-        );
-
-        if (!cancelled) {
-          setCourses(
-            Object.fromEntries(results) as Record<
-              Script,
-              DashboardCourse | null
-            >
-          );
-        }
+        const results = await Promise.all(availableCourses.map(async course => {
+          const script = scriptFromCode(fetchedKhatTypes.find(type => type.id === course.khat_type_id)?.code ?? '');
+          if (!script) return null;
+          const authoredLevels = await apiFetch<ApiLevel[]>(`/courses/${course.id}/levels`);
+          try {
+            const progress = await apiFetch<{ enrollment: ApiEnrollment; levels: ApiLevel[] }>(`/levels/courses/${course.id}/progress`);
+            return { course, script, enrollment: progress.enrollment, progress: Number(progress.enrollment?.percent_complete ?? 0), levels: progress.levels };
+          } catch {
+            return { course, script, enrollment: null, progress: 0, levels: authoredLevels };
+          }
+        }));
+        if (!cancelled) setCourses(results.filter((item): item is DashboardCourse => item !== null));
       } catch (err) {
         if (!cancelled) {
           setError(
@@ -546,7 +472,7 @@ export function StudentDashboard() {
          * We only need the first checkpoint entry.
          */
         const entries = await apiFetch<ApiCheckpoint[]>('/entries/mine');
-        const checkpoints = entries.filter(entry => entry.source_type === 'checkpoint');
+        const checkpoints = entries.filter(entry => entry.source_type === 'checkpoint' && entry.level_type === 'test');
         const checkpoint = checkpoints[0] ?? null;
         const reviewedCheckpoint = checkpoints.find(entry => entry.level_id === checkpoint?.level_id && (entry.status === 'reviewed' || entry.status === 'redo_needed')) ?? null;
         const resolveCheckpointFiles = async (item: ApiCheckpoint | null): Promise<ApiCheckpoint | null> => {
@@ -621,47 +547,17 @@ export function StudentDashboard() {
     };
   }, []);
 
-  const enroll = async (script: Script) => {
-    const dashboardCourse = courses[script];
-
-    if (!dashboardCourse?.course) return;
-
-    setEnrolling(script);
+  const enroll = async (item: DashboardCourse) => {
+    setEnrolling(item.course.id);
     setError(null);
-
     try {
-      await apiFetch('/levels/enroll', {
-        method: 'POST',
-        body: {
-          courseId: dashboardCourse.course.id,
-        },
-      });
-
-      const progress =
-        await apiFetch<{
-          enrollment: ApiEnrollment;
-          levels: ApiLevel[];
-        }>(
-          `/levels/courses/${dashboardCourse.course.id}/progress`
-        );
-
-      setCourses(prev => ({
-        ...prev,
-        [script]: {
-          ...dashboardCourse,
-          enrollment: progress.enrollment,
-          progress: Number(
-            progress.enrollment?.percent_complete ?? 0
-          ),
-          levels: progress.levels,
-        },
-      }));
+      await apiFetch('/levels/enroll', { method: 'POST', body: { courseId: item.course.id } });
+      const progress = await apiFetch<{ enrollment: ApiEnrollment; levels: ApiLevel[] }>(`/levels/courses/${item.course.id}/progress`);
+      setCourses(prev => prev.map(course => course.course.id === item.course.id
+        ? { ...course, enrollment: progress.enrollment, progress: Number(progress.enrollment?.percent_complete ?? 0), levels: progress.levels }
+        : course));
     } catch (err) {
-      setError(
-        err instanceof ApiError
-          ? err.message
-          : `Could not enroll in ${script}.`
-      );
+      setError(err instanceof ApiError ? err.message : `Could not enroll in ${item.course.title}.`);
     } finally {
       setEnrolling(null);
     }
@@ -766,145 +662,54 @@ export function StudentDashboard() {
       <div className="certification-section-heading">
         <span className="certification-course-badge"><Award size={13} /> Certification courses</span>
       </div>
-      <div className="script-progress-grid">
-        {dashboardScriptOrder.map(script => {
-          const dashboardCourse =
-            courses[script];
-
-          const active = Boolean(dashboardCourse?.enrollment && dashboardCourse.levels.length > 0);
-
-          const progress =
-            dashboardCourse?.progress ?? 0;
-
-          const levels =
-            dashboardCourse?.levels ?? [];
-
-          const currentLevelIndex =
-            dashboardCourse?.enrollment
-              ?.current_level_index ?? 0;
-
-          const currentLevel =
-            levels[currentLevelIndex] ?? null;
-
-          const nextLevel =
-            levels[currentLevelIndex + 1] ?? null;
-
-          return (
-            <div
-              className={`progress-card ${!active ? 'not-enrolled' : ''} ${script === 'Naskh (Normal Pen)' ? 'normal-pen-progress-card' : ''}`}
-              key={script}
-              style={
-                {
-                  '--script':
-                    khatTypes[script].color,
-                } as React.CSSProperties
-              }
-            >
-              <div className="card-top">
-                <strong
-                  style={{
-                    color:
-                      khatTypes[script].color,
-                  }}
-                >
-                  {khatTypes[script].arabic}
-                </strong>
-
-                <span>
-                  {khatTypes[script].name}
-                </span>
-
-                {script === 'Naskh (Normal Pen)' && <small className="normal-pen-card-label">Ordinary pen · no cut qalam</small>}
-
-                {active && (
-                  <small>
-                    <Flame size={13} />
-                    Active
-                  </small>
-                )}
-              </div>
-
-              <div className={script === 'Naskh (Normal Pen)' ? 'normal-pen-card-body' : undefined}>
-              {active ? (
-                <>
-                  <p>
-                    Level:{' '}
-                    <b>
-                      {currentLevel?.title ??
-                        'Getting started'}
-                    </b>{' '}
-                    · {Math.round(progress)}%
-                  </p>
-
-                  <div className="progress">
-                    <i
-                      style={{
-                        width: `${Math.min(
-                          100,
-                          Math.max(0, progress)
-                        )}%`,
-                      }}
-                    />
-                  </div>
-
-                  <small className="next">
-                    {nextLevel
-                      ? `Next: ${nextLevel.title}`
-                      : 'You have reached the current final level.'}
-                  </small>
-
-                  <div className="card-actions">
-                    <Button
-                      onClick={() =>
-                        navigateToCatalogForScript(script)
-                      }
-                    >
-                      Continue
-                      <ArrowRight size={14} />
-                    </Button>
-
-                    <Button
-                      outline
-                      onClick={() =>
-                        navigateToCatalogForScript(script)
-                      }
-                    >
-                      Submit practice
-                    </Button>
-                  </div>
-                </>
-              ) : (
-                <>
-                  <p>
-                    {script === 'Naskh (Normal Pen)'
-                      ? 'A dedicated Naskh certification path for everyday pen practice, separate from the three cut-qalam courses.'
-                      : "Not yet enrolled. Start whenever you're ready — no prerequisite from your other tracks."}
-                  </p>
-
-                  {dashboardCourse?.course ? (
-                    dashboardCourse.levels.length > 0 ? (
-                      <Button
-                        outline
-                        onClick={() => enroll(script)}
-                      >
-                        {enrolling === script ? 'Enrolling…' : 'Enroll free'}
-                        <ArrowRight size={14} />
-                      </Button>
+      {(['cut', 'normal'] as const).map(group => {
+        const groupCourses = courses.filter(item => {
+          const normalPen = item.script === 'Naskh (Normal Pen)' || item.script === 'Istinsaakh (Normal Pen)';
+          return group === 'normal' ? normalPen : !normalPen;
+        });
+        return (
+          <section className="certification-course-group" key={group} aria-labelledby={`cert-${group}-title`}>
+            <div className="certification-course-group-heading"><h2 id={`cert-${group}-title`}>{group === 'cut' ? 'Cut Pen Courses' : 'Normal Pen Courses'}</h2><span>{groupCourses.length} courses</span></div>
+            <div className="script-progress-grid">
+              {groupCourses.map(item => {
+                const { course, script, enrollment: courseEnrollment, levels } = item;
+                const active = Boolean(courseEnrollment && levels.length > 0);
+                const progress = item.progress;
+                const currentIndex = courseEnrollment?.current_level_index ?? 0;
+                const currentLevel = levels[currentIndex] ?? levels.find(level => !level.locked) ?? null;
+                const nextLevel = levels[currentIndex + 1] ?? null;
+                const displayTitle = course.title || khatTypes[script].name;
+                return (
+                  <article className={`progress-card ${!active ? 'not-enrolled' : ''} ${group === 'normal' ? 'normal-pen-progress-card' : ''}`} key={course.id} style={{ '--script': khatTypes[script].color } as React.CSSProperties}>
+                    <div className="card-top">
+                      <strong style={{ color: khatTypes[script].color }}>{khatTypes[script].arabic}</strong>
+                      <span>{displayTitle}</span>
+                      {group === 'normal' && <small className="normal-pen-card-label">Ordinary pen · no cut qalam</small>}
+                      {active && <small><Flame size={13} /> Active</small>}
+                    </div>
+                    {active ? (
+                      <>
+                        <p>Level: <b>{currentLevel?.title ?? 'Getting started'}</b> · {Math.round(progress)}%</p>
+                        <div className="progress"><i style={{ width: `${Math.min(100, Math.max(0, progress))}%` }} /></div>
+                        <small className="next">{nextLevel ? `Next: ${nextLevel.title}` : 'You have reached the current final level.'}</small>
+                        <div className="card-actions">
+                          <Button disabled={!currentLevel} onClick={() => currentLevel && (openCourseLevel(course.id, currentLevel.id), navigate('course'))}>Continue <ArrowRight size={14} /></Button>
+                          <Button outline disabled={!currentLevel} onClick={() => currentLevel && (openCourseLevel(course.id, currentLevel.id), navigate('course'))}>Submit practice</Button>
+                        </div>
+                      </>
                     ) : (
-                      <small className="muted">Course design in progress · enrollment opens when lessons are ready.</small>
-                    )
-                  ) : (
-                    <small className="muted">
-                      This course is not available yet.
-                    </small>
-                  )}
-                </>
-              )}
-              </div>
+                      <>
+                        <p>Not yet enrolled. Start whenever you’re ready — each course is its own learning path.</p>
+                        {levels.length > 0 ? <Button outline onClick={() => void enroll(item)}>{enrolling === course.id ? 'Enrolling…' : 'Enroll free'} <ArrowRight size={14} /></Button> : <small className="muted">Course design in progress · enrollment opens when lessons are ready.</small>}
+                      </>
+                    )}
+                  </article>
+                );
+              })}
             </div>
-          );
-        })}
-      </div>
+          </section>
+        );
+      })}
 
       <section className="dashboard-secondary-section" aria-labelledby="dashboard-secondary-title">
         <div className="dashboard-secondary-heading">
@@ -916,7 +721,7 @@ export function StudentDashboard() {
           <span className="dashboard-secondary-count">{secondaryCourses.length} {secondaryCourses.length === 1 ? 'course' : 'courses'}</span>
         </div>
         <div className="dashboard-secondary-filters" role="group" aria-label="Filter secondary courses by script">
-          {(['all', ...scriptList] as (Script | 'all')[]).map(filter => (
+          {(['all', ...certificationScriptList] as (Script | 'all')[]).map(filter => (
             <button
               type="button"
               key={filter}
@@ -1296,7 +1101,7 @@ export function Catalog() {
 
   return (
     <main className="page portal-page">
-      <SectionHeading eyebrow="Course catalog" title={`${khatTypes[script].name} curriculum`} text="Build the hand one measured exercise at a time." action={<ScriptTabs script={script} setScript={setScript} />} />
+      <SectionHeading eyebrow="Course catalog" title={`${khatTypes[script].name} curriculum`} text="Build the hand one measured exercise at a time." action={<div className="tabs course-script-tabs" role="group" aria-label="Choose a certification script">{certificationScriptList.map(item => <button key={item} className={script === item ? 'active' : ''} onClick={() => setScript(item)}>{khatTypes[item].name}</button>)}</div>} />
       {loading && <PenLoader label="Loading course…" />}
       {error && <p className="error-text">{error}</p>}
 
@@ -1306,7 +1111,7 @@ export function Catalog() {
             <div>
               <p className="eyebrow">Certification course</p>
               <h2>{khatTypes[script].name} · The complete hand</h2>
-              <p>{levels.length > 0 ? `${levels.length} levels. Regular practice levels unlock immediately on upload — only checkpoint tests are teacher-reviewed.` : 'This certification path is being prepared. Enrollment opens once its lessons and teacher-reviewed checkpoints are ready.'}</p>
+              <p>{levels.length > 0 ? `${levels.length} levels. Each regular level is teacher-marked out of 10; checkpoint tests receive a thorough assessment. A score of 5 or higher is needed to pass.` : 'This certification path is being prepared. Enrollment opens once its lessons and teacher-reviewed checkpoints are ready.'}</p>
             </div>
             <StatusChip>{levels.length > 0 ? `${Math.round(Number(enrollment?.percent_complete ?? 0))}% complete` : 'In preparation'}</StatusChip>
           </div>
@@ -1320,7 +1125,7 @@ export function Catalog() {
                 <span className="level-number">{String(i + 1).padStart(2, '0')}</span>
                 <div>
                   <strong>{level.title}</strong>
-                  <small>{level.level_type === 'test' ? 'Checkpoint test · teacher reviewed' : 'Practice level · instant unlock'}</small>
+                  <small>{level.level_type === 'test' ? 'Checkpoint test · thorough teacher assessment' : 'Practice level · teacher marking required'}</small>
                 </div>
                 <span>{level.locked ? <Lock size={16} /> : level.level_type === 'test' ? <StatusChip tone="amber">Test</StatusChip> : <Check size={16} />}</span>
                 <ChevronRight size={16} />
@@ -1409,11 +1214,10 @@ export function CourseEnvironment() {
   const [uploading, setUploading] = useState(false);
   const [pickedFile, setPickedFile] = useState<File | null>(null);
   const [saved, setSaved] = useState(false);
-  const [quote] = useState(() => encouragementQuotes[Math.floor(Math.random() * encouragementQuotes.length)]);
 
   // Checkpoint-specific state — the student's most recent entry for this level, if any.
-  const [myEntry, setMyEntry] = useState<{ id: string; status: string; feedback?: string | null; correction_image_storage_key?: string | null; correction_voice_storage_key?: string | null } | null>(null);
-  const [reviewFeedbackEntry, setReviewFeedbackEntry] = useState<{ feedback?: string | null; correction_image_storage_key?: string | null; correction_voice_storage_key?: string | null } | null>(null);
+  const [myEntry, setMyEntry] = useState<ApiCheckpoint | null>(null);
+  const [reviewFeedbackEntry, setReviewFeedbackEntry] = useState<ApiCheckpoint | null>(null);
   const [teacherVoiceUrl, setTeacherVoiceUrl] = useState<string | null>(null);
   const [teacherCorrectionUrl, setTeacherCorrectionUrl] = useState<string | null>(null);
 
@@ -1445,8 +1249,8 @@ export function CourseEnvironment() {
     setReviewFeedbackEntry(null);
     setTeacherVoiceUrl(null);
     setTeacherCorrectionUrl(null);
-    if (level && level.level_type === 'test') {
-      apiFetch<{ id: string; level_id: string; status: string; feedback?: string | null; correction_image_storage_key?: string | null; correction_voice_storage_key?: string | null; created_at?: string }[]>('/entries/mine')
+    if (level) {
+      apiFetch<ApiCheckpoint[]>('/entries/mine')
         .then(async entries => {
           const levelEntries = entries.filter(e => e.level_id === level.id);
           const latest = levelEntries[0];
@@ -1482,10 +1286,11 @@ export function CourseEnvironment() {
     setUploading(true);
     try {
       const { storageKey, originalFilename } = await uploadFile('level-submissions', pickedFile);
-      await apiFetch(`/levels/${level.id}/submissions`, {
+      const submitted = await apiFetch<ApiCheckpoint>(`/levels/${level.id}/submissions`, {
         method: 'POST',
         body: { fileStorageKey: storageKey, originalFilename, timeSpentMinutes: Number(minutes) || 0 },
       });
+      setMyEntry(submitted);
       setSaved(true);
       await loadLevels();
     } catch (err) {
@@ -1512,21 +1317,13 @@ export function CourseEnvironment() {
         });
       }
       setSaved(true);
-      const entries = await apiFetch<{ id: string; level_id: string; status: string }[]>('/entries/mine');
-      setMyEntry(entries.filter(e => e.level_id === level.id).sort((a, b) => (a.id < b.id ? 1 : -1))[0] ?? null);
+      const entries = await apiFetch<ApiCheckpoint[]>('/entries/mine');
+      setMyEntry(entries.find(e => e.level_id === level.id) ?? null);
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Could not submit your test.');
     } finally {
       setUploading(false);
     }
-  };
-
-  const nextUnlockedLevel = () => {
-    if (!level) return;
-    const idx = levels.findIndex(l => l.id === level.id);
-    const next = levels[idx + 1];
-    if (next) openCourseLevel(session.courseId, next.id);
-    else navigate('catalog');
   };
 
   return (
@@ -1571,9 +1368,9 @@ export function CourseEnvironment() {
                 <div>
                   <p className="eyebrow">Level {levels.findIndex(l => l.id === level.id) + 1}</p>
                   <h1>{level.title}</h1>
-                  <p>{isCheckpoint ? 'Checkpoint test — teacher reviewed. Upload a clear photo of your completed sheet.' : 'Practice at your own pace. Uploading your practice immediately unlocks the next level.'}</p>
+                  <p>{isCheckpoint ? 'Checkpoint test — a teacher will assess your sheet and score it out of 10.' : 'Upload a clear photo of your completed work. A teacher will mark it out of 10; a score of 5 or higher unlocks the next certification level.'}</p>
                 </div>
-                <StatusChip tone={isCheckpoint ? 'amber' : 'green'}>{isCheckpoint ? 'Test · Teacher reviewed' : 'Practice · Instant unlock'}</StatusChip>
+                <StatusChip tone="amber">{isCheckpoint ? 'Thorough assessment' : 'Teacher marking · /10'}</StatusChip>
               </div>
 
               {isCheckpoint ? (
@@ -1596,7 +1393,7 @@ export function CourseEnvironment() {
                     </div>
                   ) : myEntry?.status === 'reviewed' ? (
                     <div className="course-checkpoint-result">
-                      <div className="course-checkpoint-result-heading"><div><Check size={17} /><strong>Checkpoint passed</strong></div><StatusChip tone="green">Passed</StatusChip></div>
+                      <div className="course-checkpoint-result-heading"><div><Check size={17} /><strong>Checkpoint passed</strong></div><StatusChip tone="green">{reviewFeedbackEntry?.score != null ? `${reviewFeedbackEntry.score}/10 · Passed` : 'Passed'}</StatusChip></div>
                       {reviewFeedbackEntry?.feedback && <p className="course-checkpoint-feedback-text">{reviewFeedbackEntry.feedback}</p>}
                       {teacherCorrectionUrl && <a className="student-correction-preview" href={teacherCorrectionUrl} target="_blank" rel="noreferrer"><img src={teacherCorrectionUrl} alt="Teacher's annotated checkpoint feedback" /><span>View teacher’s annotated feedback</span></a>}
                       {teacherVoiceUrl && <StudentVoicePlayer src={teacherVoiceUrl} />}
@@ -1608,7 +1405,7 @@ export function CourseEnvironment() {
                         title={myEntry?.status === 'redo_needed' ? 'Redo — same letters and text' : 'Upload your checkpoint sheet'}
                         text="This will be sent to a teacher for review. If a redo is needed, you'll re-attempt with the same letters and text, submitted as a new entry."
                       />
-                      {reviewFeedbackEntry && (reviewFeedbackEntry.feedback || teacherVoiceUrl || teacherCorrectionUrl) && <div className="course-checkpoint-result course-checkpoint-result-previous"><div className="course-checkpoint-result-heading"><div><strong>Previous teacher feedback</strong></div><StatusChip tone="red">Needs redo</StatusChip></div>{reviewFeedbackEntry.feedback && <p className="course-checkpoint-feedback-text">{reviewFeedbackEntry.feedback}</p>}{teacherCorrectionUrl && <a className="student-correction-preview" href={teacherCorrectionUrl} target="_blank" rel="noreferrer"><img src={teacherCorrectionUrl} alt="Teacher's annotated checkpoint feedback" /><span>View teacher’s annotated feedback</span></a>}{teacherVoiceUrl && <StudentVoicePlayer src={teacherVoiceUrl} />}</div>}
+                      {reviewFeedbackEntry && (reviewFeedbackEntry.feedback || teacherVoiceUrl || teacherCorrectionUrl || reviewFeedbackEntry.score != null) && <div className="course-checkpoint-result course-checkpoint-result-previous"><div className="course-checkpoint-result-heading"><div><strong>Previous teacher feedback</strong></div><StatusChip tone="red">{reviewFeedbackEntry.score != null ? `${reviewFeedbackEntry.score}/10 · Needs redo` : 'Needs redo'}</StatusChip></div>{reviewFeedbackEntry.feedback && <p className="course-checkpoint-feedback-text">{reviewFeedbackEntry.feedback}</p>}{teacherCorrectionUrl && <a className="student-correction-preview" href={teacherCorrectionUrl} target="_blank" rel="noreferrer"><img src={teacherCorrectionUrl} alt="Teacher's annotated checkpoint feedback" /><span>View teacher’s annotated feedback</span></a>}{teacherVoiceUrl && <StudentVoicePlayer src={teacherVoiceUrl} />}</div>}
                       <UploadBox tall label={pickedFile?.name || 'Upload your test sheet'} sublabel={pickedFile ? 'Ready to submit' : 'PNG, JPG up to 10 MB'} onChange={setPickedFile} />
                       <div className="practice-actions">
                         <Button onClick={submitTest}>{uploading ? <PenLoader label="Submitting entry" compact tiny /> : saved ? 'Submitted' : 'Submit for review'} {!uploading && <ArrowRight size={15} />}</Button>
@@ -1616,6 +1413,12 @@ export function CourseEnvironment() {
                     </div>
                   )}
                 </>
+              ) : myEntry && ['pending', 'assigned', 'in_review'].includes(myEntry.status) ? (
+                <div className="submission-result-card">
+                  <Clock size={23} />
+                  <div><h3>Sent to a teacher for marking</h3><p>Your next certification level stays locked until this level is passed.</p></div>
+                  <StatusChip tone="amber">Awaiting mark</StatusChip>
+                </div>
               ) : (
                 <>
                   <div className="lesson-grid">
@@ -1623,25 +1426,23 @@ export function CourseEnvironment() {
                     {level.media.map((m, i) => <CourseReferenceCard key={`${m.storageKey}-${i}`} media={m} />)}
                   </div>
                   <div className="practice-panel">
-                    <SectionHeading eyebrow="Make it yours" title="Submit your practice" text="A clear photo in natural light is best. Your practice is saved to your profile and the next level unlocks immediately — no review needed." />
+                    <SectionHeading eyebrow="Make it yours" title={myEntry?.status === 'redo_needed' ? 'Redo this level' : 'Submit your practice'} text="A clear photo in natural light is best. Your teacher will mark this level out of 10. You need at least 5 to pass and unlock the next certification level." />
                     <div className="practice-form">
                       <label className="field-label">Minutes practiced<input className="field" type="number" value={minutes} onChange={e => setMinutes(e.target.value)} placeholder="e.g. 25" /></label>
                       <UploadBox label={pickedFile?.name || 'Drop your practice sheet here'} sublabel={pickedFile ? 'Ready to save' : 'PNG, JPG up to 10 MB · tap to browse'} onChange={setPickedFile} />
                     </div>
                     <div className="practice-actions">
                       <SheetDownloadMenu files={level.sheet_files} label="Practice sheets" />
-                      <Button onClick={submitPractice}>{uploading ? <PenLoader label="Saving practice" compact tiny /> : saved ? 'Saved' : 'Save practice'} {!uploading && <ArrowRight size={15} />}</Button>
+                      <Button onClick={submitPractice}>{uploading ? <PenLoader label="Sending for marking" compact tiny /> : saved ? 'Sent for marking' : myEntry?.status === 'redo_needed' ? 'Resubmit level' : 'Submit for marking'} {!uploading && <ArrowRight size={15} />}</Button>
                     </div>
                   </div>
-                  {saved && (
-                    <Modal onClose={nextUnlockedLevel}>
-                      <Sparkles size={30} className="gold-icon" />
-                      <p className="eyebrow">A note for your desk</p>
-                      <h2>"{quote}"</h2>
-                      <p>Practice saved — next level unlocked. Your upload is on your profile for your teacher to see, but it's never queued for review.</p>
-                      <Button onClick={nextUnlockedLevel}>Continue</Button>
-                    </Modal>
-                  )}
+                  {reviewFeedbackEntry && <div className={`course-checkpoint-result ${reviewFeedbackEntry.status === 'reviewed' ? '' : 'course-checkpoint-result-previous'}`}>
+                    <div className="course-checkpoint-result-heading"><div><strong>{reviewFeedbackEntry.status === 'reviewed' ? 'Level passed' : 'Please redo this level'}</strong></div><StatusChip tone={reviewFeedbackEntry.status === 'reviewed' ? 'green' : 'red'}>{reviewFeedbackEntry.score != null ? `${reviewFeedbackEntry.score}/10` : reviewFeedbackEntry.status === 'reviewed' ? 'Passed' : 'Needs redo'}</StatusChip></div>
+                    {reviewFeedbackEntry.feedback && <p className="course-checkpoint-feedback-text">{reviewFeedbackEntry.feedback}</p>}
+                    {teacherCorrectionUrl && <a className="student-correction-preview" href={teacherCorrectionUrl} target="_blank" rel="noreferrer"><img src={teacherCorrectionUrl} alt="Teacher's annotated feedback" /><span>View teacher’s annotated feedback</span></a>}
+                    {teacherVoiceUrl && <StudentVoicePlayer src={teacherVoiceUrl} />}
+                    {reviewFeedbackEntry.score != null && <p className="muted">A score of 5 or higher passes this level.</p>}
+                  </div>}
                 </>
               )}
             </>
@@ -2507,6 +2308,7 @@ function notificationCopy(n: ApiNotification): { title: string; body: string } {
 
 export function Notifications() {
   const [items, setItems] = useState<ApiNotification[]>([]);
+  const [loading, setLoading] = useState(true);
 
   const load = () => apiFetch<ApiNotification[]>('/notifications').then(setItems).catch(() => {});
   useEffect(() => { load(); }, []);

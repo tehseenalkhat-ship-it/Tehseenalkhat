@@ -5,9 +5,9 @@ import {
   MapPin, Play, Plus, RefreshCw, Search, Settings, ShieldCheck, Sparkles, Trash2, Trophy, Upload, Users, Download, Copy,
 } from 'lucide-react';
 import type { Script, LevelType } from '@/data/types';
-import { khatTypes, scriptList, scriptToCode, scriptFromCode as mapScriptFromCode } from '@/data/mock';
+import { khatTypes, certificationScriptList, teacherScriptList, scriptToCode, scriptFromCode as mapScriptFromCode } from '@/data/mock';
 import {
-  navigate, Button, SectionHeading, StatusChip, StatCard, ScriptTabs,
+  navigate, Button, SectionHeading, StatusChip, StatCard,
   Modal, UploadBox, PenLoader,
 } from '@/components/ui';
 import { apiFetch, uploadFile, ApiError, clearSession, getSessionUser, getViewUrl } from '@/api';
@@ -749,7 +749,9 @@ function CourseBuilder() {
     <>
       <SectionHeading eyebrow="Curriculum control" title="Course Builder" text="Shape the levels, references, and practice sheets for every hand." />
       <div className="builder-toolbar">
-        <ScriptTabs script={script} setScript={setScript} />
+        <div className="tabs course-script-tabs" role="group" aria-label="Choose certification course">
+          {certificationScriptList.map(item => <button key={item} className={script === item ? 'active' : ''} onClick={() => setScript(item)}>{khatTypes[item].name}</button>)}
+        </div>
         <div className="tabs small">
           <button className={courseType === 'certification' ? 'active' : ''} onClick={() => { setShowNewCourse(false); setCourseType('certification'); }}>Certification</button>
           <button className={courseType === 'secondary' ? 'active' : ''} onClick={() => setCourseType('secondary')}>Secondary</button>
@@ -1149,7 +1151,7 @@ function TeacherLoadManagement() {
             <span>{branchMap[t.branch_id] ?? '—'}</span>
             <span>
               <div className="script-toggle-group">
-                {scriptList.map(s => (
+                {teacherScriptList.map(s => (
                   <button
                     key={s}
                     className={`script-toggle-chip ${(assignedScripts[t.id] ?? []).includes(s) ? 'active' : ''}`}

@@ -1,4 +1,4 @@
-export type Script = 'Naskh' | 'Naskh (Normal Pen)' | 'Sulus' | 'Nastaaleeq';
+export type Script = 'Naskh' | 'Naskh (Normal Pen)' | 'Sulus' | 'Nastaaleeq' | 'Istinsaakh' | 'Tehseen Al Khat' | 'Istinsaakh (Normal Pen)';
 export type Role = 'student' | 'teacher' | 'coordinator' | 'admin';
 export type Page = string;
 

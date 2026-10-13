@@ -5,15 +5,23 @@ export type Branch = (typeof branches)[number];
 
 export const khatTypes: Record<Script, KhatType> = {
   Naskh: { name: 'Naskh', arabic: 'نسخ', color: '#a9791f', soft: '#f1e6ca', desc: 'Clear, disciplined, built to be read — the script of the Qur’an and the page.', tagline: 'clarity you can read at a glance.' },
-  'Naskh (Normal Pen)': { name: 'Naskh · Normal pen', arabic: 'نسخ', color: '#607a69', soft: '#dce8df', desc: 'Naskh forms and proportions practised with an ordinary pen.', tagline: 'Naskh, practised with the everyday pen.' },
+  'Naskh (Normal Pen)': { name: 'Tehseen Al Khat', arabic: 'تحسین الخط', color: '#607a69', soft: '#dce8df', desc: 'Tehseen Al Khat forms and proportions practised with an ordinary pen.', tagline: 'Tehseen Al Khat, practised with the everyday pen.' },
   Sulus: { name: 'Sulus (Thuluth)', arabic: 'ثلث', color: '#8d3327', soft: '#f0dbd2', desc: 'Monumental and dramatic — the script of titles, domes, and inscriptions.', tagline: 'the script built to be seen.' },
   Nastaaleeq: { name: 'Nastaaleeq', arabic: 'نستعلیق', color: '#496052', soft: '#dce4da', desc: 'Flowing and suspended — the script of Persian and Urdu poetry.', tagline: 'the hand that carries poetry.' },
+  Istinsaakh: { name: 'Istinsaakh', arabic: 'استنساخ', color: '#8b6a3e', soft: '#eee2cd', desc: 'A cut-pen certification course in Istinsaakh.', tagline: 'a measured hand in Istinsaakh.' },
+  'Tehseen Al Khat': { name: 'Tehseen Al Khat', arabic: 'تحسین الخط', color: '#765d47', soft: '#e9dfd2', desc: 'A cut-pen certification course in Tehseen Al Khat.', tagline: 'beauty shaped by the pen.' },
+  'Istinsaakh (Normal Pen)': { name: 'Istinsaakh · Normal pen', arabic: 'استنساخ', color: '#607a69', soft: '#dce8df', desc: 'Istinsaakh forms and proportions practised with an ordinary pen.', tagline: 'Istinsaakh, practised with the everyday pen.' },
 };
 
 export const scriptList: Script[] = ['Naskh', 'Naskh (Normal Pen)', 'Sulus', 'Nastaaleeq'];
+export const certificationScriptList: Script[] = ['Naskh', 'Sulus', 'Nastaaleeq', 'Istinsaakh', 'Tehseen Al Khat', 'Naskh (Normal Pen)', 'Istinsaakh (Normal Pen)'];
+export const teacherScriptList: Script[] = [...scriptList, 'Istinsaakh', 'Tehseen Al Khat', 'Istinsaakh (Normal Pen)'];
 
 export function scriptToCode(script: Script): string {
-  return script === 'Naskh (Normal Pen)' ? 'naskh_normal_pen' : script.toLowerCase();
+  if (script === 'Naskh (Normal Pen)') return 'naskh_normal_pen';
+  if (script === 'Istinsaakh (Normal Pen)') return 'istinsaakh_normal_pen';
+  if (script === 'Tehseen Al Khat') return 'tehseen_al_khat';
+  return script.toLowerCase();
 }
 
 export function scriptFromCode(code: string): Script | null {
@@ -21,6 +29,9 @@ export function scriptFromCode(code: string): Script | null {
   if (code === 'naskh_normal_pen') return 'Naskh (Normal Pen)';
   if (code === 'sulus') return 'Sulus';
   if (code === 'nastaaleeq') return 'Nastaaleeq';
+  if (code === 'istinsaakh') return 'Istinsaakh';
+  if (code === 'tehseen_al_khat') return 'Tehseen Al Khat';
+  if (code === 'istinsaakh_normal_pen') return 'Istinsaakh (Normal Pen)';
   return null;
 }
 
@@ -37,7 +48,7 @@ export type MockStudent = {
   name: string; branch: Branch; script: Script; level: string; hours: string;
   tr: string; tier: string; progress: number; lastPractice: string; streak: number;
   practiceUploads: PracticeUpload[];
-  scriptProgress: Record<Script, { enrolled: boolean; level: string; progress: number; tier: string; timeSpent: string; certificate?: string }>;
+  scriptProgress: Record<Extract<Script, 'Naskh' | 'Naskh (Normal Pen)' | 'Sulus' | 'Nastaaleeq'>, { enrolled: boolean; level: string; progress: number; tier: string; timeSpent: string; certificate?: string }>;
 };
 export type PracticeUpload = {
   id: string; levelName: string; script: Script; minutes: number; date: string; thumb: string;

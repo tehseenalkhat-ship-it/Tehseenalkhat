@@ -14,7 +14,8 @@ type CreateEntryBody = {
   originalFilename?: string;
 };
 type ReviewDecisionBody = {
-  decision: 'pass' | 'redo';
+  decision?: 'pass' | 'redo';
+  score?: number;
   feedback?: string;
   correctionImageStorageKey?: string;
   correctionVoiceStorageKey?: string;
@@ -133,7 +134,7 @@ export async function entryRoutes(app: FastifyInstance) {
   app.get('/mine', { preHandler: [app.authenticate, app.requireRole('student')] }, async (request) => {
     const studentId = (request.user as AuthUser).id;
     const { rows } = await pool.query(
-      `SELECT e.*, l.title AS level_title, c.khat_type_id, reviewer.name AS reviewed_by_name
+      `SELECT e.*, l.title AS level_title, l.level_type, c.khat_type_id, reviewer.name AS reviewed_by_name
        FROM entries e
        LEFT JOIN levels l ON l.id = e.level_id
        LEFT JOIN courses c ON c.id = l.course_id
@@ -154,7 +155,7 @@ export async function entryRoutes(app: FastifyInstance) {
     if (user.role === 'admin') {
       const { rows } = await pool.query(
         `SELECT e.id, e.source_type, e.status, e.created_at, e.locked_at,
-            l.title AS level_title, c.khat_type_id, kt.code AS khat_type_code, kt.display_name AS khat_type_name,
+            l.title AS level_title, l.level_type, c.category AS course_category, c.khat_type_id, kt.code AS khat_type_code, kt.display_name AS khat_type_name,
             u.name AS student_name, u.branch_id AS student_branch_id
          FROM entries e
          LEFT JOIN levels l ON l.id = e.level_id
@@ -169,7 +170,7 @@ export async function entryRoutes(app: FastifyInstance) {
     const teacherId = user.id;
     const { rows } = await pool.query(
       `SELECT e.id, e.source_type, e.status, e.created_at, e.locked_at,
-        l.title AS level_title, c.khat_type_id, kt.code AS khat_type_code, kt.display_name AS khat_type_name,
+        l.title AS level_title, l.level_type, c.category AS course_category, c.khat_type_id, kt.code AS khat_type_code, kt.display_name AS khat_type_name,
         u.name AS student_name, u.branch_id AS student_branch_id
        FROM entries e
        LEFT JOIN levels l ON l.id = e.level_id
@@ -233,7 +234,11 @@ export async function entryRoutes(app: FastifyInstance) {
   app.get<{ Params: { id: string } }>('/:id', { preHandler: [app.authenticate] }, async (request, reply) => {
     const user = request.user as AuthUser;
     const { rows } = await pool.query(
-      `SELECT e.*, u.name AS student_name FROM entries e JOIN users u ON u.id = e.student_id WHERE e.id = $1`,
+      `SELECT e.*, u.name AS student_name, l.title AS level_title, l.level_type,
+        c.title AS course_title, c.category AS course_category
+       FROM entries e JOIN users u ON u.id = e.student_id
+       LEFT JOIN levels l ON l.id = e.level_id LEFT JOIN courses c ON c.id = l.course_id
+       WHERE e.id = $1`,
       [request.params.id]
     );
     const entry = rows[0];
@@ -246,7 +251,7 @@ export async function entryRoutes(app: FastifyInstance) {
     }
 
     let scopedSubmissions: unknown[] = [];
-    if (entry.source_type === 'checkpoint' && entry.level_id) {
+    if (entry.source_type === 'checkpoint' && entry.level_type === 'test' && entry.level_id) {
       const { rows: levelRows } = await pool.query(
         `SELECT l.order_index, l.course_id FROM levels l WHERE l.id = $1`,
         [entry.level_id]
@@ -323,10 +328,7 @@ export async function entryRoutes(app: FastifyInstance) {
         return reply.code(403).send({ error: 'Not authorized to review entries' });
       }
       const teacherId = user.id;
-      const { decision, feedback, correctionImageStorageKey, correctionVoiceStorageKey } = request.body;
-      if (decision !== 'pass' && decision !== 'redo') {
-        return reply.code(400).send({ error: "decision must be 'pass' or 'redo'" });
-      }
+      const { decision, score, feedback, correctionImageStorageKey, correctionVoiceStorageKey } = request.body;
 
       const { rows } = await pool.query('SELECT * FROM entries WHERE id = $1', [request.params.id]);
       const entry = rows[0];
@@ -335,25 +337,34 @@ export async function entryRoutes(app: FastifyInstance) {
         return reply.code(403).send({ error: 'You do not have this entry locked for review' });
       }
 
-      const newStatus = decision === 'pass' ? 'reviewed' : 'redo_needed';
+      const requiresScore = entry.source_type === 'level_practice' || (entry.source_type === 'checkpoint' && entry.level_type != null);
+      if (requiresScore && (!Number.isInteger(score) || Number(score) < 1 || Number(score) > 10)) {
+        return reply.code(400).send({ error: 'A whole-number score from 1 to 10 is required for this level entry' });
+      }
+      if (!requiresScore && decision !== 'pass' && decision !== 'redo') {
+        return reply.code(400).send({ error: "decision must be 'pass' or 'redo'" });
+      }
+
+      const effectiveDecision = requiresScore ? (Number(score) >= 5 ? 'pass' : 'redo') : decision!;
+      const newStatus = effectiveDecision === 'pass' ? 'reviewed' : 'redo_needed';
       const { rows: updated } = await pool.query(
         `UPDATE entries
-         SET status = $1, feedback = $2, correction_image_storage_key = $3,
-           correction_voice_storage_key = $4, reviewed_at = now(), reviewed_by = $5
-         WHERE id = $6 RETURNING *`,
-        [newStatus, feedback ?? null, correctionImageStorageKey ?? null, correctionVoiceStorageKey ?? null, teacherId, entry.id]
+         SET status = $1, score = $2, feedback = $3, correction_image_storage_key = $4,
+           correction_voice_storage_key = $5, reviewed_at = now(), reviewed_by = $6
+         WHERE id = $7 RETURNING *`,
+        [newStatus, requiresScore ? Number(score) : null, feedback ?? null, correctionImageStorageKey ?? null, correctionVoiceStorageKey ?? null, teacherId, entry.id]
       );
       await pool.query(`INSERT INTO entry_logs (entry_id, action, actor_id, notes) VALUES ($1, 'reviewed', $2, $3)`, [
         entry.id,
         teacherId,
-        `Decision: ${decision}`,
+        requiresScore ? `Score: ${score}/10 — ${effectiveDecision}` : `Decision: ${effectiveDecision}`,
       ]);
 
       // On a pass: unlock the next block of levels, recompute progress,
       // auto-allocate a certificate (pending admin approval) if a template
       // exists for this checkpoint, and auto-award the badge tier if
       // configured — badges are NOT gated on admin approval, certificates are.
-      if (decision === 'pass' && entry.level_id) {
+      if (effectiveDecision === 'pass' && entry.level_id) {
         const { rows: levelRows } = await pool.query(
           `SELECT l.course_id, l.order_index, l.badge_tier, c.category
            FROM levels l JOIN courses c ON c.id = l.course_id WHERE l.id = $1`,
@@ -450,7 +461,27 @@ export async function entryRoutes(app: FastifyInstance) {
         }
       }
 
-      await notify(entry.student_id, 'test_result', { entryId: entry.id, decision });
+      if (effectiveDecision === 'redo' && entry.level_id) {
+        const { rows: levelRows } = await pool.query(
+          `SELECT l.course_id, l.order_index, c.category FROM levels l
+           JOIN courses c ON c.id = l.course_id WHERE l.id = $1`,
+          [entry.level_id]
+        );
+        const level = levelRows[0];
+        if (level?.category === 'certification') {
+          await pool.query(
+            `UPDATE enrollments SET current_level_index = LEAST(current_level_index, $1),
+               percent_complete = CASE WHEN $2 > 0
+                 THEN LEAST(100, (LEAST(current_level_index, $1)::numeric / $2) * 100)
+                 ELSE 0 END,
+               status = 'active'
+             WHERE student_id = $3 AND course_id = $4`,
+            [level.order_index, (await pool.query('SELECT COUNT(*) AS total FROM levels WHERE course_id = $1', [level.course_id])).rows[0].total, entry.student_id, level.course_id]
+          );
+        }
+      }
+
+      await notify(entry.student_id, 'test_result', { entryId: entry.id, decision: effectiveDecision, score: requiresScore ? Number(score) : null });
 
       return updated[0];
     }
@@ -469,7 +500,7 @@ export async function entryRoutes(app: FastifyInstance) {
       const original = rows[0];
       if (!original) return reply.code(404).send({ error: 'Entry not found' });
       if (original.student_id !== studentId) return reply.code(403).send({ error: 'Not your entry' });
-      if (original.status !== 'redo_needed') {
+      if (original.status !== 'redo_needed' || !['checkpoint', 'level_practice'].includes(original.source_type)) {
         return reply.code(409).send({ error: 'This entry is not awaiting a redo' });
       }
 
@@ -480,8 +511,8 @@ export async function entryRoutes(app: FastifyInstance) {
         `INSERT INTO entries (
            student_id, source_type, level_id, khat_image_storage_key, original_filename, redo_of_entry_id,
            correction_image_storage_key, correction_voice_storage_key
-         ) VALUES ($1, 'checkpoint', $2, $3, $4, $5, NULL, NULL) RETURNING *`,
-        [studentId, original.level_id, khatImageStorageKey, originalFilename ?? null, original.id]
+         ) VALUES ($1, $2, $3, $4, $5, $6, NULL, NULL) RETURNING *`,
+        [studentId, original.source_type, original.level_id, khatImageStorageKey, originalFilename ?? null, original.id]
       );
       const newEntry = created[0];
       await autoAssignEntry(newEntry.id);
