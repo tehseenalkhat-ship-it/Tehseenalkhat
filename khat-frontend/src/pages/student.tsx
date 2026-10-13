@@ -684,7 +684,6 @@ export function StudentDashboard() {
                     <div className="card-top">
                       <strong style={{ color: khatTypes[script].color }}>{khatTypes[script].arabic}</strong>
                       <span>{displayTitle}</span>
-                      {group === 'normal' && <small className="normal-pen-card-label">Ordinary pen · no cut qalam</small>}
                       {active && <small><Flame size={13} /> Active</small>}
                     </div>
                     {active ? (
