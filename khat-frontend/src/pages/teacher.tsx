@@ -29,7 +29,7 @@ const LiveKitEventRoom = lazy(() => import('@/components/LiveKitEventRoom').then
 
 type ApiQueueRow = {
   id: string; source_type: string; status: string; created_at: string; locked_at: string | null;
-  level_title: string | null; khat_type_id: string | null; khat_type_code?: string | null; khat_type_name?: string | null;
+  level_title: string | null; level_type?: string | null; course_category?: string | null; khat_type_id: string | null; khat_type_code?: string | null; khat_type_name?: string | null;
   student_name: string; student_branch_id: string;
 };
 type ApiKhatType = { id: string; code: string; display_name: string };
@@ -449,9 +449,10 @@ export function TeacherQueue({ coordinator = false }: { coordinator?: boolean })
             const scriptName = row.khat_type_name ?? script?.display_name ?? 'Unknown script';
             const scriptType = scriptFromCode(row.khat_type_code ?? script?.code);
             const hrs = hoursRemaining(row.created_at);
+            const reviewType = row.source_type === 'checkpoint' ? row.level_type === 'test' ? 'Thorough assessment' : 'Marking only' : row.source_type;
             return (
               <div className="entry-row" key={row.id}>
-                <div><strong>{row.student_name}</strong><small>Submitted {new Date(row.created_at).toLocaleDateString()} · {row.source_type}</small></div>
+                <div><strong>{row.student_name}</strong><small>Submitted {new Date(row.created_at).toLocaleDateString()} · {reviewType}</small></div>
                 <span style={{ color: scriptType ? khatTypes[scriptType].color : undefined }}>{scriptName}</span>
                 <span>{row.level_title ?? '—'}</span>
                 <span>{branchMap[row.student_branch_id] ?? '—'}</span>
@@ -472,6 +473,7 @@ export function TeacherQueue({ coordinator = false }: { coordinator?: boolean })
 
 type ApiEntryDetail = {
   id: string; student_id: string; status: string; khat_image_storage_key: string; original_filename?: string | null;
+  source_type: string; level_type?: string | null; course_category?: string | null; level_title?: string | null; score?: number | null;
   scopedSubmissions: { id: string; file_storage_key: string; original_filename?: string | null; time_spent_minutes: number; submitted_at: string }[];
 };
 
@@ -500,6 +502,7 @@ export function ReviewPage() {
   const [uploadedCorrectionName, setUploadedCorrectionName] = useState<string | null>(null);
   const [showAnnotator, setShowAnnotator] = useState(false);
   const [decision, setDecision] = useState<'pass' | 'redo' | ''>('');
+  const [markScore, setMarkScore] = useState<number | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [reviewSidebarOpen, setReviewSidebarOpen] = useState(false);
@@ -554,8 +557,16 @@ export function ReviewPage() {
       .catch(err => setError(err instanceof ApiError ? err.message : 'Failed to load this entry.'));
   }, [entryId]);
 
-  const submitDecision = async (choice: 'pass' | 'redo') => {
+  const submitDecision = async (choice?: 'pass' | 'redo', selectedScore?: number) => {
     if (!entry) return;
+    const scoredEntry = entry.source_type === 'checkpoint' || entry.source_type === 'level_practice';
+    const finalScore = selectedScore ?? markScore;
+    if (scoredEntry && finalScore == null) {
+      setError('Choose a mark from 1 to 10 before submitting.');
+      return;
+    }
+    const finalDecision = scoredEntry ? (Number(finalScore) >= 5 ? 'pass' : 'redo') : choice;
+    if (!finalDecision) return;
     setSubmitting(true);
     setError(null);
     try {
@@ -571,9 +582,9 @@ export function ReviewPage() {
       }
         await apiFetch(`/entries/${entry.id}/review`, {
         method: 'POST',
-        body: { decision: choice, feedback, correctionImageStorageKey, correctionVoiceStorageKey },
+        body: { decision: finalDecision, ...(scoredEntry ? { score: finalScore } : {}), feedback, correctionImageStorageKey, correctionVoiceStorageKey },
       });
-      setDecision(choice);
+      setDecision(finalDecision);
       // Close mobile sidebar after submitting decision for a smoother mobile flow
       setReviewSidebarOpen(false);
     } catch (err) {
@@ -697,18 +708,21 @@ export function ReviewPage() {
     );
   }
 
+  const scoredEntry = entry.source_type === 'level_practice' || (entry.source_type === 'checkpoint' && Boolean(entry.level_type));
+  const markingOnly = entry.source_type === 'level_practice' || (entry.source_type === 'checkpoint' && entry.level_type !== 'test');
+
   return (
     <main className="page portal-page review-page">
       <BackLink to="queue" label="Back to Review Queue" />
       <div className="review-context">
         <div>
-          <p className="eyebrow">Checkpoint review</p>
+          <p className="eyebrow">{markingOnly ? 'Level marking' : scoredEntry ? 'Thorough checkpoint assessment' : 'Submission review'}</p>
           <h1>{studentName || 'Student'}</h1>
-          <p className="review-context-note">Review the submitted checkpoint and course-specific practice uploads below.</p>
+          <p className="review-context-note">{markingOnly ? `Mark ${entry.level_title ?? 'this level'} out of 10. A mark of 5 or higher passes.` : scoredEntry ? 'Assess the checkpoint, give a mark out of 10, and add written, annotated, or optional voice feedback.' : 'Review this submission and provide your decision.'}</p>
         </div>
         <StatusChip tone="blue"><Lock size={13} /> Locked by you — won't be reassigned while open</StatusChip>
       </div>
-      <div className="info-banner"><Eye size={16} /><span>Only practice uploads from this student's course and the levels covered by this checkpoint are shown here. Other course uploads and profile/activity information are not included.</span></div>
+      {scoredEntry && <div className="info-banner"><Eye size={16} /><span>{markingOnly ? 'This is a marking-only level entry. Give a mark out of 10; 5 or higher passes. Voice feedback is optional.' : 'This checkpoint receives a mark out of 10 as well as thorough teacher feedback. A mark of 5 or higher passes.'}</span></div>}
       {error && <p className="error-text">{error}</p>}
       <div className="review-grid">
         <div>
@@ -727,10 +741,11 @@ export function ReviewPage() {
 
       <aside className={`rubric ${reviewSidebarOpen ? 'mobile-open' : ''}`}>
         <p className="eyebrow">Feedback</p>
-        <div className="review-feedback-box">
-          <label className="field-label">Feedback<textarea className="field textarea" value={feedback} onChange={e => setFeedback(e.target.value)} placeholder="Write feedback here..." /></label>
+          <div className="review-feedback-box">
+          {scoredEntry && <fieldset className="review-score-picker"><legend>Choose a mark out of 10</legend><div className="review-score-options" role="group" aria-label="Mark out of 10">{Array.from({ length: 10 }, (_, index) => index + 1).map(score => <button type="button" key={score} className={markScore === score ? 'active' : ''} aria-pressed={markScore === score} onClick={() => setMarkScore(score)}>{score}</button>)}</div><small>{markScore == null ? 'Select one mark' : `${markScore} / 10 · ${markScore >= 5 ? 'Pass' : 'Redo required'}`}</small></fieldset>}
+          {!markingOnly && <label className="field-label">Feedback<textarea className="field textarea" value={feedback} onChange={e => setFeedback(e.target.value)} placeholder="Write feedback here..." /></label>}
           <div className="review-voice-note">
-            <div className="review-voice-heading"><div><strong>Voice note</strong><small>Add a spoken explanation with your written feedback</small></div><Mic size={16} /></div>
+            <div className="review-voice-heading"><div><strong>Voice note · optional</strong><small>{markingOnly ? 'Add an optional spoken note for the student' : 'Add a spoken explanation with your written feedback'}</small></div><Mic size={16} /></div>
             {recording ? (
               <div className={`voice-message-bar is-recording${recordingPaused ? ' is-paused' : ''}`}>
                 <button type="button" className="voice-message-delete" onClick={cancelVoiceRecording} aria-label="Discard recording"><Trash2 size={18} /></button>
@@ -763,7 +778,7 @@ export function ReviewPage() {
             {recordingError && <p className="review-voice-error" role="alert">{recordingError}</p>}
           </div>
         </div>
-        <div className="review-annotation-tools">
+        {!markingOnly && <div className="review-annotation-tools">
           <Button outline disabled={!submissionImageUrl} onClick={() => setShowAnnotator(true)}><PenTool size={15} /> Annotate submitted sheet</Button>
           <p>Use touch, Apple Pencil, mouse, or trackpad to mark directly on the student's sheet.</p>
           {(uploadedCorrectionName || correctionFile) && <div className="review-annotation-attached"><Check size={14} /><span>{uploadedCorrectionName ?? correctionFile?.name} attached as correction</span><button type="button" className="text-link danger" onClick={() => { setCorrectionFile(null); setUploadedCorrectionKey(null); setUploadedCorrectionName(null); }}>Remove</button></div>}
@@ -771,14 +786,13 @@ export function ReviewPage() {
             <summary>Upload an existing annotated image instead</summary>
             <UploadBox label={correctionFile?.name ?? 'Choose annotated image'} sublabel="For this student's reference only" icon={FileImage} accept="image/*" onChange={file => { setCorrectionFile(file); setUploadedCorrectionKey(null); setUploadedCorrectionName(null); }} />
           </details>
-        </div>
+        </div>}
         <div className="review-actions">
-          <Button disabled={submitting || recording} onClick={() => submitDecision('pass')}>{submitting ? <PenLoader label="Submitting review" compact tiny /> : 'Pass'} {!submitting && <Check size={15} />}</Button>
-          <Button outline disabled={submitting || recording} onClick={() => submitDecision('redo')}>{submitting ? <PenLoader label="Submitting review" compact tiny /> : 'Needs redo'}</Button>
+          {scoredEntry ? <Button disabled={submitting || recording || markScore == null} onClick={() => void submitDecision(undefined, markScore ?? undefined)}>{submitting ? <PenLoader label="Submitting mark" compact tiny /> : 'Submit mark'} {!submitting && <Check size={15} />}</Button> : <><Button disabled={submitting || recording} onClick={() => void submitDecision('pass')}>{submitting ? <PenLoader label="Submitting review" compact tiny /> : 'Pass'} {!submitting && <Check size={15} />}</Button><Button outline disabled={submitting || recording} onClick={() => void submitDecision('redo')}>{submitting ? <PenLoader label="Submitting review" compact tiny /> : 'Needs redo'}</Button></>}
         </div>
         {decision && (
           <div className="review-result">
-            <StatusChip tone={decision === 'pass' ? 'green' : 'red'}>{decision === 'pass' ? 'Passed' : 'Needs redo'} · student notified</StatusChip>
+            <StatusChip tone={decision === 'pass' ? 'green' : 'red'}>{scoredEntry ? `${markScore}/10 · ` : ''}{decision === 'pass' ? 'Passed' : 'Needs redo'} · student notified</StatusChip>
             {decision === 'pass' && <p>Next levels are now unlocked for this student. If a certificate template exists for this checkpoint, it's now pending your approval in Certificates & Data.</p>}
             {decision === 'redo' && <p>The student will re-attempt with the same letters and text, submitted as a brand-new entry. It will go through normal routing and may land with a different teacher. Your annotated sheet is for the student's reference only — it will NOT be shown to whoever reviews the redo.</p>}
           </div>
@@ -787,7 +801,7 @@ export function ReviewPage() {
 
       {reviewSidebarOpen && <div className="rubric-backdrop" onClick={() => setReviewSidebarOpen(false)} /> }
       </div>
-      {entry.scopedSubmissions.length > 0 ? (
+      {!markingOnly && (entry.scopedSubmissions.length > 0 ? (
         <section className="scoped-submissions review-practice-gallery">
           <div className="scoped-submissions-heading"><div><p className="eyebrow">Course practice uploads</p><span>{entry.scopedSubmissions.length} upload{entry.scopedSubmissions.length === 1 ? '' : 's'} from this checkpoint range</span></div></div>
           <div className="scoped-submission-grid">
@@ -803,7 +817,7 @@ export function ReviewPage() {
             ))}
           </div>
         </section>
-      ) : <section className="scoped-submissions scoped-submissions-empty review-practice-gallery"><p className="eyebrow">Course practice uploads</p><p>No regular practice uploads were submitted in the levels covered by this checkpoint.</p></section>}
+      ) : <section className="scoped-submissions scoped-submissions-empty review-practice-gallery"><p className="eyebrow">Course practice uploads</p><p>No regular practice uploads were submitted in the levels covered by this checkpoint.</p></section>)}
       {showAnnotator && submissionImageUrl && <SubmissionAnnotator
         imageStorageKey={entry.khat_image_storage_key}
         fallbackImageUrl={submissionImageUrl}
