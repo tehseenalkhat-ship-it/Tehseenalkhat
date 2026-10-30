@@ -2892,3 +2892,10 @@ html[data-theme] .reference-landing .landing-panel .reference-role-card:hover{ba
 .phone-field{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.3fr);gap:8px}.field-label .phone-field{margin-top:8px}.field-label .phone-field .field{margin-top:0}
 .admin-details-form{display:grid;gap:14px;text-align:left;margin-top:10px}
 @media (max-width:560px){.phone-field{grid-template-columns:1fr}}
+
+/* Student dashboard: Certification / Crash / Mashq switch */
+.student-course-tabs{display:flex;flex-wrap:wrap;gap:8px;margin:6px 0 22px;padding:5px;border:1px solid var(--line);border-radius:999px;background:var(--card);width:max-content;max-width:100%}
+.student-course-tabs button{padding:9px 18px;border-radius:999px;font-size:13px;font-weight:700;color:var(--muted);background:transparent;border:0}
+.student-course-tabs button:hover{color:var(--gold)}
+.student-course-tabs button.active{background:var(--ink);color:#fff}
+@media (max-width:560px){.student-course-tabs{width:100%;border-radius:14px}.student-course-tabs button{flex:1 1 auto;padding:9px 10px;font-size:12px}}

@@ -9,6 +9,7 @@ import {
   khatTypes, scriptList,
   scriptToCode, scriptFromCode,
   galleryWorks,
+  displayCourseTitle,
 } from '@/data/mock';
 import {
   navigate, Button, SectionHeading, StatusChip, BadgeIcon, ActivityHeatmap,
@@ -221,6 +222,14 @@ const CATALOG_SCRIPT_KEY = 'khat_catalog_script';
 const CATALOG_COURSE_KEY = 'khat_catalog_course';
 const CHAT_COURSE_REQUEST_KEY = 'khat_chat_course_request';
 const MASHQ_FILTER_KEY = 'khat_mashq_filter';
+// Dashboard shows one course group at a time; the student's last choice is remembered on this device.
+const COURSE_TAB_KEY = 'khat_course_tab';
+const COURSE_TABS = [
+  { id: 'certification', label: 'Certification courses' },
+  { id: 'crash', label: 'Crash courses' },
+  { id: 'mashq', label: 'Mashq worksheets' },
+] as const;
+type CourseTab = (typeof COURSE_TABS)[number]['id'];
 const dashboardScriptOrder: Script[] = ['Naskh', 'Sulus', 'Nastaaleeq', 'Istinsaakh', 'Tehseen Al Khat', 'Naskh (Normal Pen)'];
 
 function navigateToCatalogForCourse(courseId: string, script: Script = 'Naskh') {
@@ -294,6 +303,13 @@ export function StudentDashboard() {
   const [penTrack, setPenTrack] = useState<'cut' | 'normal'>('cut');
   const [selectedCutStyles, setSelectedCutStyles] = useState<Record<'naskh' | 'istinsaakh', 1 | 2>>({ naskh: 1, istinsaakh: 1 });
   const [secondaryFilter, setSecondaryFilter] = useState<string | 'all'>('all');
+  const [courseTab, setCourseTab] = useState<CourseTab>(() => {
+    try { return COURSE_TABS.some(tab => tab.id === localStorage.getItem(COURSE_TAB_KEY)) ? localStorage.getItem(COURSE_TAB_KEY) as CourseTab : 'certification'; } catch { return 'certification'; }
+  });
+  const chooseCourseTab = (tab: CourseTab) => {
+    setCourseTab(tab);
+    try { localStorage.setItem(COURSE_TAB_KEY, tab); } catch { /* storage blocked: just don't remember it */ }
+  };
   const [secondaryLoading, setSecondaryLoading] = useState(true);
   const [secondaryError, setSecondaryError] = useState<string | null>(null);
 
@@ -823,7 +839,11 @@ export function StudentDashboard() {
 
       <div className="student-home-key" aria-label={t('Course card guide')}><strong>{t('Every card reads the same way:')}</strong><span className="home-key-q">{t('1 · Is this for you?')}</span><span className="home-key-levels">{t('2 · Levels')}</span><span className="home-key-progress">{t('3 · Your progress')}</span><span className="home-key-assessment">{t('4 · Assessment')}</span></div>
       <span className="student-home-step">{t('Step 2 · Pick a course')}</span>
+      <div className="student-course-tabs" role="tablist" aria-label={t('Course type')}>
+        {COURSE_TABS.map(tab => <button key={tab.id} type="button" role="tab" id={`course-tab-${tab.id}`} aria-selected={courseTab === tab.id} className={courseTab === tab.id ? 'active' : ''} onClick={() => chooseCourseTab(tab.id)}>{t(tab.label)}</button>)}
+      </div>
 
+      {courseTab === 'certification' && (
       <section className="student-home-course-section" aria-labelledby="certification-courses-heading">
         <div className="student-home-section-title"><div><h2 id="certification-courses-heading">{t('Certification courses')}</h2><p>{t('Complete every level to earn a certificate.')}</p></div></div>
         <div className="student-home-course-grid">
@@ -834,8 +854,8 @@ export function StudentDashboard() {
             const nextAssessment = item.levels.find(level => level.level_type === 'test' && level.order_index >= currentIndex);
             const arabic = scriptFromCode(item.khatType.code) ? khatTypes[scriptFromCode(item.khatType.code)!].arabic : '';
             return <article className="student-course-card" key={item.course.id} role="link" tabIndex={0} aria-label={`Open ${item.course.title} course page`} onClick={() => openDashboardCourse(item.course, item.khatType)} onKeyDown={event => { if (event.target === event.currentTarget && (event.key === 'Enter' || event.key === ' ')) { event.preventDefault(); openDashboardCourse(item.course, item.khatType); } }}>
-              <div className="student-course-card-heading"><span className="student-course-number">{index + 1}</span><span className="student-course-tag">{t('Certification')}</span>{item.khatType.code.endsWith('_normal_pen') && <span className="student-course-tag pen-tag">{t('Normal pen')}</span>}{['naskh', 'istinsaakh'].includes(item.khatType.code) && <div className="student-course-style-toggle" role="group" aria-label={`${khatTypes[scriptFromCode(item.khatType.code)!].name} ${t('Course style')}`} onClick={event => event.stopPropagation()}>{([1, 2] as const).map(style => <button key={style} type="button" className={selectedCutStyles[item.khatType.code as 'naskh' | 'istinsaakh'] === style ? 'active' : ''} aria-pressed={selectedCutStyles[item.khatType.code as 'naskh' | 'istinsaakh'] === style} onClick={() => setSelectedCutStyles(current => ({ ...current, [item.khatType.code]: style }))}>{t(style === 1 ? 'Style One' : 'Style Two')}</button>)}</div>}<span className="student-course-arabic" lang="ar" dir="rtl">{arabic}</span></div>
-              <div className="student-course-name"><h3>{['naskh', 'istinsaakh'].includes(item.khatType.code) ? item.course.title : scriptFromCode(item.khatType.code) ? khatTypes[scriptFromCode(item.khatType.code)!].name.replace(' · Normal pen', '') : item.khatType.display_name}</h3><p>{item.course.description || t('Build confident, measured handwriting with this guided certification path.')}</p></div>
+              <div className="student-course-card-heading"><span className="student-course-number">{index + 1}</span><span className="student-course-tag">{t('Certification')}</span>{item.khatType.code.endsWith('_normal_pen') && <span className="student-course-tag pen-tag">{t('Normal pen')}</span>}{['naskh', 'istinsaakh'].includes(item.khatType.code) && <div className="student-course-style-toggle" role="group" aria-label={`${khatTypes[scriptFromCode(item.khatType.code)!].name} ${t('Course style')}`} onClick={event => event.stopPropagation()}>{([1, 2] as const).map(style => <button key={style} type="button" className={selectedCutStyles[item.khatType.code as 'naskh' | 'istinsaakh'] === style ? 'active' : ''} aria-pressed={selectedCutStyles[item.khatType.code as 'naskh' | 'istinsaakh'] === style} onClick={() => setSelectedCutStyles(current => ({ ...current, [item.khatType.code]: style }))}><span lang="ar" dir="rtl">{style === 1 ? 'الاسلوب الاول' : 'الاسلوب الثاني'}</span></button>)}</div>}<span className="student-course-arabic" lang="ar" dir="rtl">{arabic}</span></div>
+              <div className="student-course-name"><h3>{['naskh', 'istinsaakh'].includes(item.khatType.code) ? displayCourseTitle(item.course.title) : scriptFromCode(item.khatType.code) ? khatTypes[scriptFromCode(item.khatType.code)!].name.replace(' · Normal pen', '') : item.khatType.display_name}</h3><p>{item.course.description || t('Build confident, measured handwriting with this guided certification path.')}</p></div>
               <div className="student-course-info"><small>1 · Is this for you?</small><p>“{courseGuidanceQuestion(item.course, scriptFromCode(item.khatType.code) ?? undefined)}”</p></div>
               <div className="student-course-levels"><div><small>2 · Levels</small><strong>{item.levels.length} levels</strong></div><div className="student-level-pips">{item.levels.map((level, levelIndex) => <i key={level.id} className={`${level.level_type === 'test' ? 'assessment' : ''}${enrolled && levelIndex < currentIndex ? ' complete' : ''}`} title={`${level.title}${level.level_type === 'test' ? ' · assessment' : ''}`} />)}</div><span><i className="student-assessment-diamond" /> marks an online assessment</span></div>
               <div className="student-course-progress"><div className="student-course-progress-copy"><small>3 · Your progress</small><span>{enrolled ? `Started ${courseStartedAt(item.enrollment?.enrolled_at) ?? 'earlier'} · Level ${Math.min(currentIndex, item.levels.length)} of ${item.levels.length}` : `Not started yet · 0 of ${item.levels.length} levels`}</span><strong>{enrolled ? `${Math.round(progress)}%` : '0%'}</strong></div><div className="student-progress-track"><i style={{ width: `${progress}%` }} /></div></div>
@@ -846,7 +866,9 @@ export function StudentDashboard() {
           {!visibleCourses.length && <div className="student-home-empty">{penTrack === 'normal' ? 'Normal-pen certification courses will appear here when available.' : 'No certification courses are available yet.'}</div>}
         </div>
       </section>
+      )}
 
+      {courseTab === 'crash' && (
       <section className="student-home-course-section" aria-labelledby="crash-courses-heading">
         <div className="student-home-section-title"><div><h2 id="crash-courses-heading">{t('Crash courses')}</h2><p>{t('Short, focused courses to learn a new script.')}</p></div></div>
         {secondaryError && <p className="error-text" role="alert">{secondaryError}</p>}
@@ -871,7 +893,9 @@ export function StudentDashboard() {
           {!visibleCrashCourses.length && <div className="student-home-empty">{penTrack === 'normal' ? 'Normal-pen crash courses are coming soon.' : 'More focused script courses will appear here when available.'}</div>}
         </div>}
       </section>
+      )}
 
+      {courseTab === 'mashq' && (
       <section className="student-home-course-section student-mashq-section" aria-labelledby="mashq-worksheets-heading">
         <div className="student-home-section-title"><div><h2 id="mashq-worksheets-heading">{t('Mashq worksheets')}</h2><p>{t('Downloadable practice sheets. Current sets are available in Naskh.')}</p></div></div>
         <div className="student-mashq-filters" role="group" aria-label="Filter Mashq worksheets by khat type">
@@ -892,6 +916,7 @@ export function StudentDashboard() {
           <p className="student-mashq-footnote">More genres will be added soon.</p>
         </div> : <div className="student-home-empty">{penTrack === 'normal' ? 'Normal-pen worksheet sets are being prepared.' : 'No Mashq worksheet sets are available for this khat type yet.'}</div>}
       </section>
+      )}
 
       <section className="student-home-panel student-master-progress" aria-label="Master progress">
         <div className="student-home-panel-heading"><div><p className="eyebrow">{t('Master progress')}</p><h2>{t('All your courses')}</h2></div><strong>{masterProgress}% <small>· {masterCompletedCount} {t('of')} {masterLevelCount} {t('levels')}</small></strong></div>
@@ -1334,7 +1359,7 @@ export function CourseEnvironment() {
       <aside className="course-env-sidebar">
         <div className="course-env-header">
           <p className="eyebrow">{courseCategory === 'secondary' ? 'Self-paced course' : 'Certification course'}</p>
-          <h3>{courseTitle}</h3>
+          <h3>{displayCourseTitle(courseTitle)}</h3>
         </div>
         <div className="course-env-levels">
           {levels.map((l, i) => (
@@ -1363,7 +1388,7 @@ export function CourseEnvironment() {
           {!loading && level && (
             <>
               <div className="lesson-course-progress-row">
-                <button type="button" onClick={() => navigateToCatalogForCourse(session.courseId)}><ChevronLeft size={14} /> {courseTitle}</button>
+                <button type="button" onClick={() => navigateToCatalogForCourse(session.courseId)}><ChevronLeft size={14} /> {displayCourseTitle(courseTitle)}</button>
                 <span>Level {levels.findIndex(item => item.id === level.id) + 1} of {levels.length}</span>
                 <i><b style={{ width: `${Math.max(4, (levels.findIndex(item => item.id === level.id) + 1) / Math.max(1, levels.length) * 100)}%` }} /></i>
               </div>

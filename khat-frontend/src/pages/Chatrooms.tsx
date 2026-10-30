@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { ArrowLeft, BookOpen, Check, MessageCircle, Mic, Search, Send, Square, Users } from 'lucide-react';
 import { ApiError, apiFetch, getSessionUser, getViewUrl, uploadFile } from '@/api';
+import { displayCourseTitle } from '@/data/mock';
 import { CourseJourney } from '@/components/CourseJourney';
 import { SectionHeading } from '@/components/ui';
 import './Chatrooms.css';
@@ -180,7 +181,7 @@ export function Chatrooms({ audience = 'student' }: { audience?: 'student' | 'te
           {loading && <p className="chatrooms-list-state">Loading your courses…</p>}
           {!loading && !courseRows.length && <p className="chatrooms-list-state">No enrolled course chats match this filter.</p>}
           {courseRows.map(item => <button type="button" key={item.course_id} className={`chatrooms-thread${selection?.type === 'course' && selection.id === item.course_id ? ' active' : ''}`} onClick={() => selectChat({ type: 'course', id: item.course_id })}>
-            <span className="chatrooms-thread-icon"><BookOpen size={16} /></span><span className="chatrooms-thread-copy"><strong>{item.course_title}</strong><small>{item.khat_type_name} · Level {Number(item.current_level_index) + 1}</small></span>{Number(item.unread_count) > 0 ? <b className="chatrooms-unread-badge">{item.unread_count}</b> : item.last_message_at ? <time>{new Date(item.last_message_at).toLocaleDateString(undefined, { day: 'numeric', month: 'short' })}</time> : <span className="chatrooms-waiting">Open</span>}
+            <span className="chatrooms-thread-icon"><BookOpen size={16} /></span><span className="chatrooms-thread-copy"><strong>{displayCourseTitle(item.course_title)}</strong><small>{item.khat_type_name} · Level {Number(item.current_level_index) + 1}</small></span>{Number(item.unread_count) > 0 ? <b className="chatrooms-unread-badge">{item.unread_count}</b> : item.last_message_at ? <time>{new Date(item.last_message_at).toLocaleDateString(undefined, { day: 'numeric', month: 'short' })}</time> : <span className="chatrooms-waiting">Open</span>}
           </button>)}
           <div className="chatrooms-list-label"><Users size={14} /> {audience === 'student' ? 'Teachers' : 'Students'} <span>{contacts.length}</span></div>
           {teacherRows.map(item => <button type="button" key={item.id} className={`chatrooms-thread${selection?.type === 'teacher' && selection.id === item.id ? ' active' : ''}`} onClick={() => selectChat({ type: 'teacher', id: item.id })}>

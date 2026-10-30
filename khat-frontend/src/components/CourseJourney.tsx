@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { ArrowLeft, BookOpen, Check, FileImage, Lock, MessageCircle, Mic, RefreshCw, Send, Square } from 'lucide-react';
 import { apiFetch, ApiError, getSessionUser, getViewUrl, uploadFile } from '@/api';
+import { displayCourseTitle } from '@/data/mock';
 import './CourseJourney.css';
 
 type JourneyKind = 'enrolled' | 'practice_submission' | 'teacher_entry';
@@ -333,7 +334,7 @@ export function CourseJourney({ courseId, anchorEntryId, levelId, compact = fals
         {compact && onBack && <button type="button" className="course-journey-back" onClick={onBack} aria-label="Back to chats"><ArrowLeft size={19} /></button>}
         <span className="course-journey-avatar">{levelId ? (viewer?.name.split(/\s+/).map(part => part[0]).slice(0, 2).join('').toUpperCase() || 'S') : <BookOpen size={18} />}</span>
         <div className="course-journey-heading-copy">
-          <strong>{levelId ? viewer?.name ?? 'Your review chat' : data?.course.title ?? 'Course journey'}</strong>
+          <strong>{levelId ? viewer?.name ?? 'Your review chat' : (data ? displayCourseTitle(data.course.title) : 'Course journey')}</strong>
           <small>{levelId && activeLevel ? `Level ${activeLevel.level_order_index !== null ? activeLevel.level_order_index + 1 : ''} · ${activeLevel.level_title ?? 'Practice'} · Upload 1 · Private review chat` : data ? `${data.course.khat_type_name} · private student–teacher chat` : 'Your course conversation'}</small>
         </div>
         {activeLevel?.mark_out_of_ten !== null && activeLevel?.mark_out_of_ten !== undefined && <span className="course-journey-mark">{activeLevel.mark_out_of_ten}/10</span>}

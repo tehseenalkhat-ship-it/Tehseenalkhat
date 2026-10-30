@@ -5,7 +5,7 @@ import {
   MapPin, Play, Plus, RefreshCw, Search, Settings, ShieldCheck, Sparkles, Trash2, Trophy, Upload, Users, Download, Copy,
 } from 'lucide-react';
 import type { Script, LevelType } from '@/data/types';
-import { khatTypes, scriptList, scriptToCode, scriptFromCode as mapScriptFromCode } from '@/data/mock';
+import { khatTypes, scriptList, scriptToCode, scriptFromCode as mapScriptFromCode, displayCourseTitle } from '@/data/mock';
 import {
   navigate, Button, SectionHeading, StatusChip, StatCard, ScriptTabs,
   Modal, UploadBox, PenLoader,
@@ -2319,7 +2319,7 @@ function GovernanceManager({ section }: { section: 'certificates' | 'governance'
           <label className="field-label">Award when this course is completed
             <select className="field" value={awardCourseId} onChange={event => setAwardCourseId(event.target.value)} disabled={!awardCourses.length}>
               <option value="">{awardCourses.length ? 'Choose a course' : 'No secondary courses available'}</option>
-              {awardCourses.map(course => <option key={course.id} value={course.id}>{course.title}</option>)}
+              {awardCourses.map(course => <option key={course.id} value={course.id}>{displayCourseTitle(course.title)}</option>)}
             </select>
           </label>
         )}
@@ -2339,8 +2339,8 @@ function GovernanceManager({ section }: { section: 'certificates' | 'governance'
             <span data-label="Title"><strong>{t.title}</strong></span>
             <span data-label="Khat type">{khatTypesList.find(k => k.id === t.khat_type_id)?.display_name ?? '—'}</span>
             <span data-label="Tied to">{t.level_id
-              ? `${t.course_title ?? 'Primary course'} · Level ${(t.level_order_index ?? 0) + 1}${t.level_title ? ` · ${t.level_title}` : ''}`
-              : `${t.course_title ?? 'Course'} · completion${t.course_category === 'certification' ? ' (legacy assignment)' : ''}`}</span>
+              ? `${t.course_title ? displayCourseTitle(t.course_title) : 'Primary course'} · Level ${(t.level_order_index ?? 0) + 1}${t.level_title ? ` · ${t.level_title}` : ''}`
+              : `${t.course_title ? displayCourseTitle(t.course_title) : 'Course'} · completion${t.course_category === 'certification' ? ' (legacy assignment)' : ''}`}</span>
             <span data-label="Action" className="certificate-template-actions">
               <button className="text-link" onClick={() => viewTemplate(t)}><FileText size={14} /> View</button>
               <button className="text-link danger" onClick={() => deleteTemplate(t.id)}><Trash2 size={14} /> Delete</button>

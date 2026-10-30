@@ -14,6 +14,11 @@ export const khatTypes: Record<Script, KhatType> = {
 
 export const scriptList: Script[] = ['Naskh', 'Sulus', 'Nastaaleeq', 'Istinsaakh', 'Tehseen Al Khat', 'Naskh (Normal Pen)'];
 
+/** Course titles keep "Style One/Two" in the database (the dashboard matches on it); this is what people see. */
+export function displayCourseTitle(title: string): string {
+  return title.replace(/\bstyle\s*(?:one|1)\b/i, 'الاسلوب الاول').replace(/\bstyle\s*(?:two|2)\b/i, 'الاسلوب الثاني');
+}
+
 export function scriptToCode(script: Script): string {
   if (script === 'Naskh (Normal Pen)') return 'naskh_normal_pen';
   if (script === 'Istinsaakh') return 'istinsaakh';

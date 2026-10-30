@@ -1,0 +1,12 @@
+/* Arabic fonts: Al-Kanz for normal text, Kanz-al-Marjaan for headings and large script names.
+   Each face reuses the name of the English font it pairs with and only covers Arabic letters
+   (unicode-range), so Arabic switches font and English text stays exactly as it was. */
+@font-face{font-family:'DM Sans';src:url('/fonts/al-kanz.woff2') format('woff2');font-weight:100 900;font-display:swap;size-adjust:115%;unicode-range:U+0600-06FF,U+0750-077F,U+08A0-08FF,U+FB50-FDFF,U+FE70-FEFF,U+200C-200F}
+@font-face{font-family:'Libre Baskerville';src:url('/fonts/kanz-al-marjaan.woff2') format('woff2');font-weight:100 900;font-display:swap;unicode-range:U+0600-06FF,U+0750-077F,U+08A0-08FF,U+FB50-FDFF,U+FE70-FEFF,U+200C-200F}
+@font-face{font-family:'Kanz al-Marjaan';src:url('/fonts/kanz-al-marjaan.woff2') format('woff2');font-weight:100 900;font-display:swap;unicode-range:U+0600-06FF,U+0750-077F,U+08A0-08FF,U+FB50-FDFF,U+FE70-FEFF,U+200C-200F}
+/* The large decorative Arabic (script names, artwork placeholders) used a plain serif or Amiri. */
+@font-face{font-family:'Amiri';src:url('/fonts/kanz-al-marjaan.woff2') format('woff2');font-weight:100 900;font-display:swap;unicode-range:U+0600-06FF,U+0750-077F,U+08A0-08FF,U+FB50-FDFF,U+FE70-FEFF,U+200C-200F}
+.student-course-arabic,.hero-script,.arabic,.mini-art,.letter-arabic,.detail-arabic,.gallery-art,.card-top>strong,
+.reference-art,.profile-script-head>strong,.row-art,.sheet-preview{font-family:'Kanz al-Marjaan',serif}
+/* "الاسلوب الاول / الثاني" on the course style switch is a label, not a heading. */
+.student-course-style-toggle [lang="ar"]{font-family:'DM Sans',sans-serif;font-size:12px;line-height:1}

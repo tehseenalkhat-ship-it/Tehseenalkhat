@@ -7,7 +7,7 @@ import {
   Radio,
 } from 'lucide-react';
 import type { Script } from '@/data/types';
-import { khatTypes, scriptList, scriptToCode, scriptFromCode as mapScriptFromCode } from '@/data/mock';
+import { khatTypes, scriptList, scriptToCode, scriptFromCode as mapScriptFromCode, displayCourseTitle } from '@/data/mock';
 import {
   navigate, Button, SectionHeading, StatusChip, StatCard, ActivityHeatmap, AlertsPage,
   UploadBox, BackLink, DashboardShowcaseCarousels, ShowcasePostCard, ShowcaseHeading, BadgeIcon, PenLoader, Modal,
@@ -758,7 +758,7 @@ export function ReviewPage() {
         <div>
           <p className="eyebrow">{reviewHeading}</p>
           <h1>{studentName || 'Student'}</h1>
-          <p className="review-context-note">{entry.course_title ?? 'Course'} · {entry.level_title ?? 'Course level'}{entry.time_spent_minutes ? ` · ${entry.time_spent_minutes} minutes practiced` : ''}</p>
+          <p className="review-context-note">{entry.course_title ? displayCourseTitle(entry.course_title) : 'Course'} · {entry.level_title ?? 'Course level'}{entry.time_spent_minutes ? ` · ${entry.time_spent_minutes} minutes practiced` : ''}</p>
         </div>
         <StatusChip tone="blue"><Lock size={13} /> Locked by you — won't be reassigned while open</StatusChip>
       </div>
