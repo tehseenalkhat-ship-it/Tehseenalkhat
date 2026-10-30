@@ -19,6 +19,7 @@ import {
 import { AdminLayout } from '@/pages/admin';
 import { readThemePreference, saveThemePreference, type ThemeName } from '@/theme';
 import { AssistantChat } from '@/components/AssistantChat';
+import { ProblemReporting } from '@/components/ReportProblem';
 import { useLanguage } from '@/language';
 
 const PUBLIC_PAGES = ['landing', 'signup', 'login', 'forgot-password', 'reset-password'];
@@ -179,7 +180,10 @@ function App() {
 
   const loadingOverlay = loaderVisible && <PenLoader label="Loading your workspace…" global />;
 
-  if (isPublicPage) return <>{content}{loadingOverlay}</>;
+  const assistantShown = Boolean(sessionUser) && (role === 'student' || role === 'teacher' || role === 'coordinator');
+  const problemReporting = <ProblemReporting withAssistant={assistantShown} userId={userId} />;
+
+  if (isPublicPage) return <>{content}{loadingOverlay}{problemReporting}</>;
 
   if (page === 'course') {
     return (
@@ -187,6 +191,7 @@ function App() {
         {content}
         {loadingOverlay}
         {sessionUser && (role === 'student' || role === 'teacher' || role === 'coordinator') && <AssistantChat key={userId} user={sessionUser} />}
+        {problemReporting}
       </div>
     );
   }
@@ -204,6 +209,7 @@ function App() {
       </div>
       {loadingOverlay}
       {sessionUser && (role === 'student' || role === 'teacher' || role === 'coordinator') && <AssistantChat key={userId} user={sessionUser} />}
+      {problemReporting}
     </div>
   );
 }

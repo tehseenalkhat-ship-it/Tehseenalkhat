@@ -1,3 +1,4 @@
+import { STATUS_CODES } from 'node:http';
 import fs from 'node:fs';
 import path from 'node:path';
 import Fastify from 'fastify';
@@ -30,14 +31,54 @@ import { badgeRoutes } from './routes/badges.routes.js';
 import { assistantRoutes } from './routes/assistant.routes.js';
 import { journeyRoutes } from './routes/journeys.routes.js';
 import { chatRoutes } from './routes/chat.routes.js';
+import { reportRoutes } from './routes/reports.routes.js';
+import { logsRoutes } from './routes/logs.routes.js';
+import { ensureProblemTables, logError } from './services/problemReports.js';
 
-const app = Fastify({ logger: true });
+// trustProxy: the hosting panel runs the app behind a proxy; this makes request.ip the visitor's real IP.
+const app = Fastify({ logger: true, trustProxy: true });
 
 app.addContentTypeParser('application/octet-stream', { parseAs: 'buffer', bodyLimit: 10 * 1024 * 1024 }, (_request, body, done) => {
   done(null, body);
 });
 
+// Every 5xx goes to error_log: thrown errors here (with their stack), plain `reply.code(500)` answers below.
+app.setErrorHandler((error, request, reply) => {
+  const status = error.statusCode && error.statusCode >= 400 ? error.statusCode : 500;
+  if (status >= 500) {
+    (request as { errorLogged?: boolean }).errorLogged = true;
+    request.log.error(error);
+    const user = (request as { user?: { id?: string; role?: string } }).user;
+    void logError({ source: 'server', message: error.message, stack: error.stack, url: `${request.method} ${request.url}`, person: user?.id ? `${user.role}:${user.id}` : null });
+  }
+  return reply.status(status).send({ statusCode: status, code: error.code, error: STATUS_CODES[status] ?? 'Error', message: error.message });
+});
+
+app.addHook('onResponse', async (request, reply) => {
+  if (reply.statusCode >= 500 && !(request as { errorLogged?: boolean }).errorLogged) {
+    const user = (request as { user?: { id?: string; role?: string } }).user;
+    void logError({ source: 'server', message: `${request.method} ${request.url} answered ${reply.statusCode}`, url: `${request.method} ${request.url}`, person: user?.id ? `${user.role}:${user.id}` : null });
+  }
+});
+
+process.on('unhandledRejection', (reason) => {
+  const err = reason instanceof Error ? reason : new Error(String(reason));
+  console.error('Unhandled promise rejection', err);
+  void logError({ source: 'server', message: `Unhandled rejection: ${err.message}`, stack: err.stack });
+});
+
+process.on('uncaughtException', (err) => {
+  console.error('Uncaught exception', err);
+  // Record it, then exit so the hosting panel restarts a clean process.
+  const timeout = setTimeout(() => process.exit(1), 2000);
+  logError({ source: 'server', message: `Uncaught exception: ${err.message}`, stack: err.stack }).finally(() => {
+    clearTimeout(timeout);
+    process.exit(1);
+  });
+});
+
 async function main() {
+  await ensureProblemTables().catch((err) => app.log.error(err, 'Could not create problem_reports / error_log tables'));
   await app.register(cors, { origin: true }); // tighten this to your real frontend URL before going live
   await app.register(authPlugin);
 
@@ -66,6 +107,8 @@ async function main() {
   await app.register(bookRoutes, { prefix: '/books' });
   await app.register(notificationRoutes, { prefix: '/notifications' });
   await app.register(referenceDataRoutes); // no prefix — /branches, /khat-types
+  await app.register(reportRoutes, { prefix: '/api' }); // /api/reports, /api/clientlog
+  await app.register(logsRoutes, { prefix: '/logs' }); // private developer page
 
   // Serve the built frontend from ./public (copied there by the deploy build) so one Node app hosts
   // both the site and the API. Registered last so every API route above takes precedence.

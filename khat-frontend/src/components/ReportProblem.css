@@ -1,0 +1,46 @@
+/* Report a problem: bottom-right, left of the assistant chat button when that is shown. */
+.report-dock{position:fixed;right:22px;bottom:20px;z-index:4650;display:flex;flex-direction:column;align-items:flex-end;gap:10px;pointer-events:none}
+.report-dock.with-assistant{right:82px}
+.report-dock>*{pointer-events:auto}
+.report-fab{display:inline-flex;align-items:center;gap:7px;min-height:44px;padding:0 15px;border:1px solid var(--line);border-radius:999px;background:var(--card);color:var(--ink);font-size:12px;font-weight:700;box-shadow:0 6px 20px rgba(0,0,0,.14);cursor:pointer;transition:transform .15s,box-shadow .15s}
+.report-fab:hover,.report-fab:focus-visible{transform:translateY(-1px);box-shadow:0 9px 24px rgba(0,0,0,.18)}
+.report-fab svg{color:var(--gold)}
+.fixed-bubble{display:inline-flex;align-items:center;gap:8px;max-width:min(320px,calc(100vw - 32px));padding:11px 15px;border:0;border-radius:14px;background:var(--surface-deep,#2b211b);color:var(--text-on-deep,#f7f0e4);font-size:13px;font-weight:700;text-align:left;box-shadow:0 10px 28px rgba(0,0,0,.24);cursor:pointer;animation:fixed-bubble-in .3s ease-out}
+.fixed-bubble svg{color:var(--gold);flex:none}
+@keyframes fixed-bubble-in{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+
+.modal.report-modal{max-width:480px;width:calc(100vw - 32px);text-align:left;padding:32px 28px;max-height:calc(100dvh - 40px);overflow-y:auto}
+.report-modal h2{display:flex;align-items:center;gap:8px;font-size:21px;margin:0 0 16px}
+.report-form{display:grid;gap:14px}
+.report-field{display:grid;gap:6px;font-size:12px;font-weight:700;color:var(--muted)}
+.report-field textarea{min-height:110px;resize:vertical;padding:10px 12px;border:1px solid var(--line);border-radius:8px;background:var(--card);color:var(--ink);font:inherit;font-weight:400;font-size:14px}
+.report-field input[type=file]{font-size:12px;font-weight:400;color:var(--ink)}
+.report-field small{font-weight:400}
+.report-hint{font-size:11px;color:var(--muted);margin:0}
+.report-error{color:var(--danger,#8d3327);font-size:12px;margin:0}
+.report-primary,.report-secondary{padding:10px 16px;border-radius:8px;font-weight:700;font-size:13px;cursor:pointer}
+.report-primary{background:var(--gold);color:#fff;border:1px solid var(--gold)}
+.report-secondary{background:transparent;color:var(--ink);border:1px solid var(--line)}
+.report-primary:disabled,.report-secondary:disabled{opacity:.6;cursor:default}
+.report-done{text-align:center;display:grid;gap:10px;justify-items:center}
+.report-done svg{color:var(--positive,#496052)}
+.report-done h2{justify-content:center}
+
+.fixed-report{display:grid;gap:10px;padding:14px 0;border-top:1px solid var(--line)}
+.fixed-report:first-of-type{border-top:0;padding-top:0}
+.fixed-report p{margin:0;font-size:14px;white-space:pre-wrap;word-break:break-word}
+.fixed-quote{color:var(--muted)}
+.fixed-actions{display:flex;flex-wrap:wrap;gap:8px}
+.report-thanks{display:flex;align-items:center;gap:7px;color:var(--positive,#496052);font-weight:700;margin:6px 0}
+
+.fixed-reports-card{margin:0 0 24px;padding:20px 22px;border:1px solid color-mix(in srgb,var(--gold) 45%,var(--line));border-left:5px solid var(--gold);border-radius:10px;background:var(--card)}
+.fixed-reports-card h2{display:flex;align-items:center;gap:8px;font-size:18px;margin:0 0 12px}
+.fixed-reports-card h2 svg{color:var(--gold)}
+
+@media(max-width:600px){
+  .report-dock{right:12px;bottom:12px}
+  .report-dock.with-assistant{right:67px}
+  .report-fab{width:44px;padding:0;justify-content:center}
+  .report-fab span{display:none}
+}
+@media print{.report-dock{display:none}}

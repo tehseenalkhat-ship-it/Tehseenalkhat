@@ -87,7 +87,8 @@ function quoteIdentifiers(sql: string): string {
       while (i < sql.length && /[A-Za-z0-9_$]/.test(sql[i])) i++;
       const word = sql.slice(start, i);
       const previousText = sql.slice(0, start).trimEnd();
-      const isDuplicateKeyClause = word.toUpperCase() === 'KEY' && /\bDUPLICATE$/i.test(previousText);
+      // `key` is quoted as a column name, except in the SQL keywords ON DUPLICATE KEY / PRIMARY KEY / UNIQUE KEY / FOREIGN KEY.
+      const isDuplicateKeyClause = word.toUpperCase() === 'KEY' && /\b(DUPLICATE|PRIMARY|UNIQUE|FOREIGN)$/i.test(previousText);
       result += RESERVED_COLUMNS.has(word.toLowerCase()) && !isDuplicateKeyClause ? `\`${word}\`` : word;
       continue;
     }

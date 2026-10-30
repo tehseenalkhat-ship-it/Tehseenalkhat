@@ -11,6 +11,7 @@ import {
   Modal, UploadBox, PenLoader,
 } from '@/components/ui';
 import { apiFetch, uploadFile, ApiError, clearSession, getSessionUser, getViewUrl } from '@/api';
+import { FixedReportsCard } from '@/components/ReportProblem';
 
 type ApiMediaItem = { kind: 'video' | 'image' | 'pdf'; storageKey: string; originalFilename?: string };
 type SheetSize = '1mm' | '2mm' | '3mm';
@@ -472,6 +473,7 @@ function AdminOverview() {
   return (
     <>
       <SectionHeading eyebrow={`${greeting}, ${user?.name?.split(' ')[0] ?? 'administrator'}`} title="Guild overview" text="A clear view of learning, teaching, and the work between." />
+      <FixedReportsCard />
       {loading && <p className="muted">Loading overview…</p>}
       {error && <div className="admin-error-banner" role="alert"><span>{error}</span><Button outline onClick={() => window.location.reload()}>Reload</Button></div>}
       <div className="stats-grid admin-stat-grid admin-overview-stat-grid">

@@ -61,4 +61,6 @@ export const config = {
   resendApiKey: process.env.RESEND_API_KEY,
   emailFrom: process.env.EMAIL_FROM ?? 'no-reply@example.com',
   frontendUrl: process.env.FRONTEND_URL ?? 'http://localhost:5173',
+  // Password for the private /logs page. When unset, /logs is disabled (404).
+  logsPassword: process.env.LOGS_PASSWORD?.trim() || undefined,
 };

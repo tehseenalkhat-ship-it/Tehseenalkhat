@@ -133,7 +133,12 @@ export async function uploadRoutes(app: FastifyInstance) {
     if (!verifySignature('raw', key, exp, sig, filename ?? '')) return reply.code(403).send({ error: 'Link is invalid or expired' });
 
     let stat: fs.Stats;
-    const target = filePath(key);
+    let target: string;
+    try {
+      target = filePath(key);
+    } catch {
+      return reply.code(400).send({ error: 'Invalid file key' });
+    }
     try {
       stat = await fs.promises.stat(target);
     } catch {

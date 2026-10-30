@@ -23,6 +23,7 @@ import {
   getSessionUser,
   ApiError,
 } from '@/api';
+import { FixedReportsCard } from '@/components/ReportProblem';
 import './StudentCourseStyles.css';
 import { useLanguage } from '@/language';
 import { openCourseLevel, useCourseSession } from '@/courseSession';
@@ -796,6 +797,7 @@ export function StudentDashboard() {
 
   return (
     <main className="page portal-page student-home-redesign">
+      <FixedReportsCard />
       <header className="student-home-heading">
         <div>
           <p className="eyebrow">{t('Your learning path')}</p>

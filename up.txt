@@ -1,0 +1,55 @@
+.certification-course-group{margin:0 0 22px}
+.certification-course-group-heading{display:flex;align-items:baseline;justify-content:space-between;gap:12px;margin:0 0 11px}
+.certification-course-group-heading h2{font:700 17px/1.35 'Libre Baskerville',serif;color:var(--ink)}
+.certification-course-group-heading span{color:var(--muted);font-size:9px;font-weight:700}
+.certification-course-group .normal-pen-progress-card{grid-column:auto}
+.course-script-tabs{flex-wrap:wrap;gap:6px}
+.review-score-picker{display:grid;gap:9px;margin:0;padding:0;border:0}
+.review-score-picker legend{margin-bottom:1px;color:var(--ink);font-size:10px;font-weight:750}
+.review-score-options{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:7px}
+.review-score-options button{min-height:42px;border:1px solid var(--line);border-radius:8px;background:var(--surface-tint-2);color:var(--ink);font:700 14px 'DM Sans',sans-serif;transition:transform .14s,border-color .14s,background .14s,color .14s,box-shadow .14s}
+.review-score-options button:hover{transform:translateY(-1px);border-color:var(--gold)}
+.review-score-options button.active{border-color:var(--gold);background:var(--gold);color:#fff;box-shadow:0 4px 12px color-mix(in srgb,var(--gold) 22%,transparent)}
+.review-score-picker>small{color:var(--muted);font-size:9px}
+.course-checkpoint-result-heading .chip{font-variant-numeric:tabular-nums}
+/* Keep normal-pen certification cards visually distinct from cut-qalam courses. */
+.certification-course-group .script-progress-grid .normal-pen-progress-card{grid-column:auto}
+@media(max-width:700px){.certification-course-group .script-progress-grid .normal-pen-progress-card{grid-column:1}}
+/* Certification curriculum: switch between the compact list and five-level cards. */
+.level-view-toolbar{display:flex;align-items:center;justify-content:space-between;gap:14px;margin:0 0 12px}
+.level-view-toolbar>div:first-child{display:grid;gap:3px}
+.level-view-toolbar>div:first-child strong{color:var(--ink);font-size:12px}
+.level-view-toolbar>div:first-child span{color:var(--muted);font-size:9px}
+.level-view-toggle{display:inline-flex;align-items:center;gap:3px;padding:3px;border:1px solid var(--line);border-radius:8px;background:color-mix(in srgb,var(--card) 76%,var(--surface-tint-2))}
+.level-view-toggle button{min-height:33px;display:inline-flex;align-items:center;justify-content:center;gap:6px;padding:6px 10px;border:0;border-radius:6px;background:transparent;color:var(--muted);font:700 9px 'DM Sans',sans-serif;transition:background .15s,color .15s,box-shadow .15s}
+.level-view-toggle button:hover{color:var(--ink)}
+.level-view-toggle button.active{background:var(--card);color:var(--gold);box-shadow:0 1px 4px color-mix(in srgb,var(--theme-deep) 12%,transparent)}
+.level-groups-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));align-items:start;gap:14px;margin-bottom:72px}
+.level-group-card{min-width:0;overflow:hidden;border:1px solid var(--line);border-radius:10px;background:var(--card);box-shadow:0 4px 15px color-mix(in srgb,var(--theme-deep) 4%,transparent)}
+.level-group-card>header{min-height:56px;display:flex;align-items:center;justify-content:space-between;gap:10px;padding:11px 14px;border-bottom:1px solid var(--line);background:color-mix(in srgb,var(--surface-tint-2) 40%,var(--card))}
+.level-group-card>header>div{display:grid;gap:3px}
+.level-group-card>header>div>span{color:var(--gold);font-size:8px;font-weight:800;letter-spacing:.1em}
+.level-group-card>header>div>strong{color:var(--ink);font:700 11px 'DM Sans',sans-serif}
+.level-group-card>header>small{flex:none;color:var(--muted);font-size:8px}
+.level-group-card-items{display:grid;padding:5px 10px}
+.level-group-card .level-row.level-card-row{grid-template-columns:31px minmax(0,1fr) 32px 12px;gap:9px;min-height:58px;padding:9px 4px;border:0;border-bottom:1px solid color-mix(in srgb,var(--line) 70%,transparent);background:transparent;color:var(--ink);transition:background .14s ease,border-radius .14s ease}
+.level-group-card .level-card-row:last-child{border-bottom:0}
+.level-group-card .level-card-row:not(:disabled):hover{border-radius:6px;background:color-mix(in srgb,var(--surface-tint-2) 72%,var(--card))}
+.level-group-card .level-card-row .level-number{font:700 13px 'Libre Baskerville',serif;color:var(--gold)}
+.level-group-card .level-card-row>div{min-width:0}
+.level-group-card .level-card-row>div strong{font-size:10px;line-height:1.4;overflow-wrap:anywhere}
+.level-group-card .level-card-row>div small{margin-top:3px;font-size:8px;line-height:1.35}
+.level-group-card .level-card-row>span:nth-last-of-type(1){justify-content:center}
+.level-group-card .level-card-row>svg:last-child{width:13px;color:var(--muted)}
+.level-group-card .level-card-row .chip{padding:4px 6px;font-size:7px}
+.level-group-card .level-card-row.is-checkpoint{border-radius:5px;background:color-mix(in srgb,var(--gold-soft) 62%,var(--card));box-shadow:inset 3px 0 0 var(--gold)}
+.level-group-card .level-card-row.is-checkpoint>div strong,.level-group-card .level-card-row.is-checkpoint>div small{color:var(--gold)}
+.level-group-card .level-card-row.locked{opacity:.62;cursor:not-allowed}
+@media(max-width:760px){.level-groups-grid{grid-template-columns:minmax(0,1fr);gap:11px}}
+@media(max-width:520px){.level-view-toolbar{align-items:flex-start;flex-direction:column}.level-view-toggle{align-self:flex-end;margin-top:-2px}.level-group-card>header{padding:10px 12px}.level-group-card-items{padding:4px 9px}}
+/* Keep normal-pen certification titles beside their Arabic mark without a pill crowding the header. */
+.certification-course-group .normal-pen-progress-card .card-top{display:grid;grid-template-columns:78px minmax(0,1fr);grid-template-rows:auto auto;align-items:center;column-gap:14px;row-gap:4px;margin-bottom:17px}
+.certification-course-group .normal-pen-progress-card .card-top>strong{grid-column:1;grid-row:1;max-width:100%;font-size:clamp(27px,3vw,36px);line-height:1.35;overflow-wrap:anywhere}
+.certification-course-group .normal-pen-progress-card .card-top>span{grid-column:2;grid-row:1;min-width:0;font:700 clamp(15px,1.7vw,19px)/1.25 'Libre Baskerville',serif;overflow-wrap:anywhere}
+.certification-course-group .normal-pen-progress-card .card-top>small{grid-column:2;grid-row:2;justify-self:start;margin:0;white-space:normal}
+@media(max-width:600px){.certification-course-group .normal-pen-progress-card{padding:19px 17px}.certification-course-group .normal-pen-progress-card .card-top{grid-template-columns:58px minmax(0,1fr);column-gap:11px}.certification-course-group .normal-pen-progress-card .card-top>strong{font-size:28px}.certification-course-group .normal-pen-progress-card .card-top>span{font-size:16px}}

@@ -13,6 +13,7 @@ import {
   UploadBox, BackLink, DashboardShowcaseCarousels, ShowcasePostCard, ShowcaseHeading, BadgeIcon, PenLoader, Modal,
 } from '@/components/ui';
 import { apiFetch, uploadFile, getSessionUser, ApiError, getViewUrl, getDownloadUrl } from '@/api';
+import { FixedReportsCard } from '@/components/ReportProblem';
 import { openEntry, useActiveEntryId } from '@/entrySession';
 import { viewStudentProfile, useActiveStudentId } from '@/studentViewSession';
 import { viewTeacherProfile, useViewedTeacherId, clearViewedTeacher } from '@/teacherViewSession';
@@ -262,6 +263,7 @@ export function TeacherDashboard({ coordinator = false }: { coordinator?: boolea
 
   return (
     <main className="page portal-page">
+      <FixedReportsCard />
       <div className="portal-welcome">
         <div>
           <p className="eyebrow">{coordinator ? `Branch coordinator${coordinatorData?.branchName ? ` · ${coordinatorData.branchName}` : ''}` : 'Faculty workspace'}</p>

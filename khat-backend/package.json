@@ -15,7 +15,8 @@
     "migrate:test-student-chatroom": "tsx scripts/apply-test-student-chatroom-migration.ts",
     "create-admin": "tsx scripts/create-admin.ts",
     "seed-demo": "tsx scripts/seed-demo-data.ts",
-    "bundle": "esbuild src/server.ts --bundle --platform=node --target=node18 --format=cjs --outfile=dist/server.cjs --log-level=warning"
+    "bundle": "esbuild src/server.ts --bundle --platform=node --target=node18 --format=cjs --outfile=dist/server.cjs --log-level=warning",
+    "test:reports": "tsx scripts/test-reports.ts"
   },
   "dependencies": {
     "@fastify/cors": "^9.0.1",
