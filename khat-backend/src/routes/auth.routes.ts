@@ -6,6 +6,7 @@ import { sendEmail } from '../email.js';
 import { config } from '../config.js';
 import type { AuthUser } from '../plugins/auth.js';
 import { notify } from '../services/notify.js';
+import { readUserDetails, updateUserDetails } from '../services/userDetails.js';
 
 type LoginBody = { email: string; password: string };
 type SignupBody = { trNumber: string; name: string; email: string; password: string; branchId: string };
@@ -40,7 +41,13 @@ export async function authRoutes(app: FastifyInstance) {
     if (!valid) return reply.code(401).send({ error: 'Invalid email or password' });
 
     const token = app.jwt.sign(
-      { id: user.id, role: user.role, branchId: user.branch_id, isCoordinator: user.is_coordinator },
+      {
+        id: user.id,
+        role: user.role,
+        branchId: user.branch_id,
+        isCoordinator: user.is_coordinator,
+        ...(user.must_change_password ? { mustChangePassword: true } : {}),
+      },
       { expiresIn: '7d' }
     );
 
@@ -137,8 +144,10 @@ export async function authRoutes(app: FastifyInstance) {
       if (!currentPassword || !newPassword) {
         return reply.code(400).send({ error: 'currentPassword and newPassword are required' });
       }
+      if (newPassword.length < 8) return reply.code(400).send({ error: 'The new password must be at least 8 characters.' });
+      if (newPassword === currentPassword) return reply.code(400).send({ error: 'Choose a new password that is different from the current one.' });
 
-      const { rows } = await pool.query(`SELECT password_hash FROM users WHERE id = $1`, [userId]);
+      const { rows } = await pool.query(`SELECT password_hash, role, branch_id, is_coordinator FROM users WHERE id = $1`, [userId]);
       const valid = await bcrypt.compare(currentPassword, rows[0].password_hash);
       if (!valid) return reply.code(401).send({ error: 'Current password is incorrect' });
 
@@ -148,7 +157,35 @@ export async function authRoutes(app: FastifyInstance) {
         userId,
       ]);
       await notify(userId, 'password_changed', {});
-      return { success: true };
+      // Fresh token without the "must change password" mark, so the portal opens straight away.
+      const token = app.jwt.sign(
+        { id: userId, role: rows[0].role, branchId: rows[0].branch_id, isCoordinator: rows[0].is_coordinator },
+        { expiresIn: '7d' }
+      );
+      return { success: true, token };
+    }
+  );
+
+  // ---- My details (any logged-in role). The email is the sign-in name, so changing it needs the password. ----
+  app.get('/me', { preHandler: [app.authenticate] }, async (request, reply) => {
+    return (await readUserDetails((request.user as AuthUser).id)) ?? reply.code(404).send({ error: 'Account not found' });
+  });
+
+  app.patch<{ Body: { name?: string; email?: string; phone?: string | null; itsNumber?: string | null; currentPassword?: string } }>(
+    '/me',
+    { preHandler: [app.authenticate] },
+    async (request, reply) => {
+      const userId = (request.user as AuthUser).id;
+      const { name, email, phone, itsNumber, currentPassword } = request.body ?? {};
+      if (email !== undefined) {
+        const { rows } = await pool.query(`SELECT password_hash FROM users WHERE id = $1`, [userId]);
+        if (!currentPassword || !rows[0] || !(await bcrypt.compare(currentPassword, rows[0].password_hash))) {
+          return reply.code(401).send({ error: 'Your current password is not correct.' });
+        }
+      }
+      const failure = await updateUserDetails(pool, userId, { name, email, phone, itsNumber });
+      if (failure) return reply.code(failure.status).send({ error: failure.error });
+      return readUserDetails(userId);
     }
   );
 

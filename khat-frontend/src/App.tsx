@@ -96,6 +96,8 @@ function App() {
     setSessionUser(freshUser);
     if (!freshUser && !isPublicPage) {
       navigate('landing');
+    } else if (freshUser?.mustChangePassword && page !== 'forced-password') {
+      navigate('forced-password'); // still on the admin-given first password: nothing else opens until it is changed
     }
   }, [page, isPublicPage]);
 
@@ -116,7 +118,8 @@ function App() {
       .catch(() => broadcastNotificationReceived({ id: `theme-${Date.now()}`, type: 'theme_changed', payload: { theme: nextTheme }, read: false, created_at: new Date().toISOString() }));
   };
 
-  if (!sessionUser && !isPublicPage) return null; // avoid a flash of protected content before the redirect above runs
+  if (!sessionUser && !isPublicPage) return null;
+  if (sessionUser?.mustChangePassword && page !== 'forced-password') return null; // avoid a flash of protected content before the redirect above runs
 
   const content = (() => {
     // Landing / role selection

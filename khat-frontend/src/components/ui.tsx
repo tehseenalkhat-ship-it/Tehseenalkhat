@@ -4,7 +4,7 @@ import {
   ArrowRight, Award, BarChart3, BookOpen, CalendarDays, Check, ChevronRight, ClipboardList,
   FileImage, FileSpreadsheet, Flame, FolderOpen, GraduationCap, Heart, Home, Images, LayoutDashboard, Library, Lock,
   LogOut, MapPin, MoreHorizontal, Menu, Palette, PenTool, Play, Search, Settings, ShieldCheck, Trophy,
-  Upload, UserRound, Users, Video, X, Bell, MessageCircle,
+  Upload, UserRound, Users, Video, X, Bell, MessageCircle, Eye, EyeOff,
 } from 'lucide-react';
 import type { Script, Role } from '@/data/types';
 import { khatTypes, scriptList, branches, type GalleryWork } from '@/data/mock';
@@ -30,6 +30,19 @@ export function useHash(): string {
 
 export function Button({ children, onClick, outline = false, className = '', disabled, type, style }: { children: ReactNode; onClick?: () => void; outline?: boolean; className?: string; disabled?: boolean; type?: 'button' | 'submit' | 'reset'; style?: CSSProperties }) {
   return <button onClick={onClick} type={type} disabled={disabled} style={style} className={`btn ${outline ? 'btn-outline' : 'btn-primary'} ${className}`}>{children}</button>;
+}
+
+/** Password box with an eye button to show / hide what was typed. */
+export function PasswordInput({ value, onChange, placeholder, autoComplete }: { value: string; onChange: (value: string) => void; placeholder?: string; autoComplete?: string }) {
+  const [visible, setVisible] = useState(false);
+  return (
+    <span className="password-input">
+      <input className="field" type={visible ? 'text' : 'password'} value={value} onChange={e => onChange(e.target.value)} placeholder={placeholder} autoComplete={autoComplete} />
+      <button type="button" className="password-eye" onClick={() => setVisible(v => !v)} aria-label={visible ? 'Hide password' : 'Show password'} aria-pressed={visible}>
+        {visible ? <EyeOff size={17} /> : <Eye size={17} />}
+      </button>
+    </span>
+  );
 }
 
 export function StatusChip({ children, tone = 'gold' }: { children: ReactNode; tone?: 'gold' | 'green' | 'red' | 'amber' | 'blue' }) {

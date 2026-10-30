@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
 import { ArrowRight, Camera, Check, ChevronDown, ChevronRight, Lock, Palette, Settings, UserRound } from 'lucide-react';
-import { navigate, Button, Logo } from '@/components/ui';
+import { navigate, Button, Logo, PasswordInput } from '@/components/ui';
 import { ProfilePhotoCropper } from '@/components/ProfilePhotoCropper';
+import { EditableRow, PhoneField, countryForBranch, type UserDetails } from '@/components/EditDetails';
 import { THEME_OPTIONS, type ThemeName } from '@/theme';
 import type { Role } from '@/data/types';
 import jameaPhoto from '../public/jamea-photo.jpg';
@@ -177,8 +178,8 @@ export function Auth({ signup = false, initialRole = 'student' }: { signup?: boo
             </>
           )}
           <label className="field-label">{signup ? 'Email' : 'Email'}<input className="field" type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder={signup ? '@jameasaifiyah.edu' : '@jameasaifiyah.edu'} />{signup && <small className="auth-email-note">Enter your Jamea Saifiyah .edu email.</small>}</label>
-          <label className="field-label">Password<input className="field" type="password" value={password} onChange={e => setPassword(e.target.value)} placeholder="At least 8 characters" /></label>
-          {signup && <label className="field-label">Confirm password<input className="field" type="password" value={confirmPassword} onChange={e => setConfirmPassword(e.target.value)} placeholder="Re-enter password" /></label>}
+          <label className="field-label">Password<PasswordInput value={password} onChange={setPassword} placeholder={signup ? 'At least 8 characters' : 'Your password'} autoComplete={signup ? 'new-password' : 'current-password'} /></label>
+          {signup && <label className="field-label">Confirm password<PasswordInput value={confirmPassword} onChange={setConfirmPassword} placeholder="Re-enter password" autoComplete="new-password" /></label>}
           {error && <small className="error-text">{error}</small>}
           <Button onClick={signup ? handleSignup : handleLogin}>
             {busy ? 'Please wait…' : signup ? 'Create account' : 'Sign in'} <ArrowRight size={16} />
@@ -260,7 +261,7 @@ export function ResetPassword() {
             <p className="auth-switch">Password updated. <button onClick={() => navigate('login-student')}>Sign in →</button></p>
           ) : (
             <>
-              <label className="field-label">New password<input className="field" type="password" value={newPassword} onChange={e => setNewPassword(e.target.value)} placeholder="At least 8 characters" /></label>
+              <label className="field-label">New password<PasswordInput value={newPassword} onChange={setNewPassword} placeholder="At least 8 characters" autoComplete="new-password" /></label>
               {error && <small className="error-text">{error}</small>}
               <Button onClick={submit}>Set new password</Button>
             </>
@@ -272,6 +273,8 @@ export function ResetPassword() {
 }
 
 export function ForcedPasswordChange() {
+  // Same page for the required first-login change and for "Change password" in Settings.
+  const forced = Boolean(getSessionUser()?.mustChangePassword);
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -281,11 +284,14 @@ export function ForcedPasswordChange() {
 
   const submit = async () => {
     setError(null);
+    if (!currentPassword) { setError(forced ? 'Enter the first password the admin gave you.' : 'Enter your current password.'); return; }
+    if (newPassword.length < 8) { setError('The new password must be at least 8 characters.'); return; }
     if (newPassword !== confirmPassword) { setError('New passwords do not match.'); return; }
     setBusy(true);
     try {
-      await apiFetch('/auth/change-password', { method: 'POST', body: { currentPassword, newPassword } });
+      const result = await apiFetch<{ token?: string }>('/auth/change-password', { method: 'POST', body: { currentPassword, newPassword } });
       const user = getSessionUser();
+      if (user && result.token) saveSession(result.token, { ...user, mustChangePassword: false });
       setDone(true);
       if (user) setTimeout(() => navigate(roleHomePage(user.role)), 800);
     } catch (err) {
@@ -300,24 +306,26 @@ export function ForcedPasswordChange() {
       <div className="auth-art">
         <Logo />
         <div>
-          <p className="eyebrow">First login</p>
+          <p className="eyebrow">{forced ? 'First login' : 'Account security'}</p>
           <h1>Set a new password.</h1>
-          <p>For security, your temporary password must be changed before you can continue.</p>
+          <p>{forced ? 'For security, the first password from your admin must be changed before you can continue.' : 'Choose a new password for signing in.'}</p>
         </div>
         <div className="auth-quote">"The first stroke is always the hardest — and the most important."</div>
       </div>
       <div className="auth-form">
-        <div className="auth-form-inner">
+        <form className="auth-form-inner" onSubmit={e => { e.preventDefault(); void submit(); }}>
           <p className="eyebrow"><Lock size={13} /> Security requirement</p>
           <h1>Change your password</h1>
-          <p>This is your first login. Please set a permanent password to continue.</p>
-          <label className="field-label">Temporary password<input className="field" type="password" value={currentPassword} onChange={e => setCurrentPassword(e.target.value)} placeholder="Provided by admin" /></label>
-          <label className="field-label">New password<input className="field" type="password" value={newPassword} onChange={e => setNewPassword(e.target.value)} placeholder="At least 8 characters" /></label>
-          <label className="field-label">Confirm new password<input className="field" type="password" value={confirmPassword} onChange={e => setConfirmPassword(e.target.value)} placeholder="Re-enter new password" /></label>
+          <p>{forced ? 'This is your first login. Please set your own password to continue.' : 'Enter your current password, then your new one twice.'}</p>
+          <label className="field-label">{forced ? 'First password (from your admin)' : 'Current password'}<PasswordInput value={currentPassword} onChange={setCurrentPassword} placeholder={forced ? 'Provided by admin' : 'Your current password'} autoComplete="current-password" /></label>
+          <label className="field-label">New password<PasswordInput value={newPassword} onChange={setNewPassword} placeholder="At least 8 characters" autoComplete="new-password" /></label>
+          <label className="field-label">Confirm new password<PasswordInput value={confirmPassword} onChange={setConfirmPassword} placeholder="Re-enter new password" autoComplete="new-password" /></label>
           {error && <small className="error-text">{error}</small>}
-          <Button onClick={submit}>{busy ? 'Please wait…' : done ? 'Password changed' : 'Set new password'} {done && <Check size={16} />}</Button>
+          <Button type="submit" disabled={busy}>{busy ? 'Please wait…' : done ? 'Password changed' : 'Set new password'} {done && <Check size={16} />}</Button>
           {done && <p className="auth-switch">Password updated. Redirecting…</p>}
-        </div>
+          {forced && !done && <button type="button" className="text-link" onClick={() => { clearSession(); navigate('landing'); }}>Log out</button>}
+          {!forced && !done && <button type="button" className="text-link" onClick={() => history.back()}>Cancel</button>}
+        </form>
       </div>
     </main>
   );
@@ -327,46 +335,69 @@ export function SettingsPage({ role, theme, onThemeChange }: { role: Role; theme
   const label = role === 'teacher' ? 'Faculty' : role[0].toUpperCase() + role.slice(1);
   const user = getSessionUser();
   const userId = user?.id;
-  const userEmail = user?.email ?? '';
   const userBranchId = user?.branchId ?? '';
   const supportsProfilePhoto = role === 'student' || role === 'teacher' || role === 'coordinator' || role === 'admin';
   const [photoFile, setPhotoFile] = useState<File | null>(null);
   const [uploading, setUploading] = useState(false);
   const [photoUrl, setPhotoUrl] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [info, setInfo] = useState<{ email: string; trNumber?: string | null; branchName?: string } | null>(null);
+  const [details, setDetails] = useState<UserDetails | null>(null);
+  const [branchName, setBranchName] = useState<string>();
+  const [editing, setEditing] = useState<'name' | 'email' | 'phone' | 'its' | null>(null);
+  const [draft, setDraft] = useState('');
+  const [emailPassword, setEmailPassword] = useState('');
+  const [saving, setSaving] = useState(false);
+  const [detailError, setDetailError] = useState<string | null>(null);
+  const [detailNotice, setDetailNotice] = useState<string | null>(null);
 
   useEffect(() => {
     if (!userId) return;
+    apiFetch<UserDetails>('/auth/me').then(async me => {
+      setDetails(me);
+      const branches = await apiFetch<{ id: string; name: string }[]>('/branches');
+      setBranchName(branches.find(branch => branch.id === (me.branchId ?? userBranchId))?.name);
+      if (me.photoStorageKey) setPhotoUrl(await getViewUrl(me.photoStorageKey));
+    }).catch(() => setDetails(null));
+  }, [userId, userBranchId]);
 
-    const profilePath = role === 'student'
-      ? `/students/${userId}/profile`
-      : role === 'teacher' || role === 'coordinator'
-        ? `/teachers/${userId}/profile`
-        : role === 'admin' ? '/admin/users/me/profile' : null;
+  const startEdit = (field: NonNullable<typeof editing>) => {
+    if (!details) return;
+    setEditing(field);
+    setDetailError(null);
+    setDetailNotice(null);
+    setEmailPassword('');
+    setDraft(field === 'name' ? details.name : field === 'email' ? details.email : field === 'phone' ? details.phone ?? '' : details.itsNumber ?? '');
+  };
 
-    if (profilePath) {
-      apiFetch<{
-        email?: string;
-        trNumber?: string | null;
-        branchId?: string;
-        photoStorageKey?: string | null;
-        photo_storage_key?: string | null;
-      }>(profilePath).then(async profile => {
-        const branches = await apiFetch<{ id: string; name: string }[]>('/branches');
-        const branchId = profile.branchId ?? userBranchId;
-        setInfo({
-          email: profile.email ?? userEmail,
-          trNumber: role === 'student' ? profile.trNumber : undefined,
-          branchName: branches.find(branch => branch.id === branchId)?.name,
-        });
-        const photoKey = profile.photoStorageKey ?? profile.photo_storage_key;
-        if (photoKey) setPhotoUrl(await getViewUrl(photoKey));
-      }).catch(() => {
-        if (role !== 'student') setInfo({ email: userEmail });
-      });
+  const saveDetail = async () => {
+    if (!editing) return;
+    setSaving(true);
+    setDetailError(null);
+    try {
+      const body = editing === 'name' ? { name: draft }
+        : editing === 'email' ? { email: draft, currentPassword: emailPassword }
+        : editing === 'phone' ? { phone: draft } : { itsNumber: draft };
+      const updated = await apiFetch<UserDetails>('/auth/me', { method: 'PATCH', body });
+      const session = getSessionUser();
+      const token = localStorage.getItem('khat_token');
+      if (session && token) saveSession(token, { ...session, name: updated.name, email: updated.email });
+      if (editing === 'email' && updated.email !== details?.email) setDetailNotice(`From now on, sign in with ${updated.email}.`);
+      setDetails(updated);
+      setEditing(null);
+    } catch (err) {
+      setDetailError(err instanceof ApiError ? err.message : 'Could not save. Please try again.');
+    } finally {
+      setSaving(false);
     }
-  }, [userId, userEmail, userBranchId, role]);
+  };
+
+  const rowProps = (field: NonNullable<typeof editing>) => ({
+    editing: editing === field,
+    saving,
+    onEdit: details ? () => startEdit(field) : undefined,
+    onCancel: () => { setEditing(null); setDetailError(null); },
+    onSave: () => void saveDetail(),
+  });
 
   const uploadPhoto = async (croppedFile: File) => {
     if (!user) return;
@@ -465,11 +496,26 @@ export function SettingsPage({ role, theme, onThemeChange }: { role: Role; theme
         {error && <p className="error-text">{error}</p>}
 
         <div className="settings-row"><div><strong>Account role</strong><small>{label} workspace</small></div><span className="chip chip-blue">Active</span></div>
-        {info && (
+        {details && (
           <>
-            <div className="settings-row"><div><strong>Email</strong><small>{info.email}</small></div></div>
-            {info.trNumber && <div className="settings-row"><div><strong>TR number</strong><small>{info.trNumber}</small></div></div>}
-            {info.branchName && <div className="settings-row"><div><strong>Branch</strong><small>{info.branchName}</small></div></div>}
+            <EditableRow label="Name" value={details.name} {...rowProps('name')}>
+              <input className="field" value={draft} onChange={e => setDraft(e.target.value)} maxLength={120} autoFocus required />
+            </EditableRow>
+            <EditableRow label="Email" value={details.email} note="This is also your sign-in name." {...rowProps('email')}>
+              <input className="field" type="email" value={draft} onChange={e => setDraft(e.target.value)} placeholder="name@jameasaifiyah.edu" autoFocus required />
+              <PasswordInput value={emailPassword} onChange={setEmailPassword} placeholder="Your current password (to confirm)" autoComplete="current-password" />
+              <small>Must end in @jameasaifiyah.edu. You will sign in with the new email from now on.</small>
+            </EditableRow>
+            <EditableRow label="Phone" value={details.phone} {...rowProps('phone')}>
+              <PhoneField value={details.phone} defaultCountry={countryForBranch(branchName)} onChange={setDraft} />
+            </EditableRow>
+            <EditableRow label="ITS number" value={details.itsNumber} {...rowProps('its')}>
+              <input className="field" inputMode="numeric" maxLength={8} value={draft} onChange={e => setDraft(e.target.value.replace(/\D/g, ''))} placeholder="8 digits" autoFocus />
+            </EditableRow>
+            {role === 'student' && <div className="settings-row"><div><strong>TR number</strong><small>{details.trNumber ?? '—'}</small><small className="editable-row-note">To change your TR, contact your admin.</small></div></div>}
+            {branchName && <div className="settings-row"><div><strong>Branch</strong><small>{branchName}</small></div></div>}
+            {detailError && <p className="error-text" role="alert">{detailError}</p>}
+            {detailNotice && <p className="info-banner" role="status"><Check size={16} /> {detailNotice}</p>}
           </>
         )}
         <div className="settings-row"><div><strong>Password</strong><small>Update your sign-in password</small></div><button className="text-link" onClick={() => navigate('forced-password')}>Change password <ArrowRight size={14} /></button></div>

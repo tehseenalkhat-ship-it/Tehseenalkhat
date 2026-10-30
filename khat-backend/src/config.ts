@@ -35,6 +35,9 @@ export const config = {
         sslCa: process.env.DB_SSL_CA?.trim() || undefined,
       },
   jwtSecret: required('JWT_SECRET'),
+  // First password for staff accounts an admin creates (they must change it on first sign-in).
+  // Set STAFF_DEFAULT_PASSWORD on the hosting panel; without it a random one is generated per account.
+  staffDefaultPassword: process.env.STAFF_DEFAULT_PASSWORD?.trim() || undefined,
   // Uploads are stored on the server's disk (see storage.ts). These S3 settings are only used by
   // LiveKit Egress to save event recordings, and are optional.
   r2: {

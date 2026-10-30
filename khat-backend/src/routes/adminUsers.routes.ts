@@ -3,6 +3,8 @@ import bcrypt from 'bcryptjs';
 import { randomBytes } from 'node:crypto';
 import { pool } from '../db.js';
 import { notify } from '../services/notify.js';
+import { config } from '../config.js';
+import { readUserDetails, updateUserDetails, type DetailChanges } from '../services/userDetails.js';
 
 type CreateStaffBody = {
   role: 'teacher' | 'admin';
@@ -63,7 +65,7 @@ export async function adminUserRoutes(app: FastifyInstance) {
         return reply.code(400).send({ error: "role must be 'teacher' or 'admin'" });
       }
 
-      const tempPassword = generateTempPassword();
+      const tempPassword = config.staffDefaultPassword ?? generateTempPassword();
       const passwordHash = await bcrypt.hash(tempPassword, 10);
 
       const client = await pool.connect();
@@ -73,7 +75,7 @@ export async function adminUserRoutes(app: FastifyInstance) {
           `INSERT INTO users (role, name, email, password_hash, branch_id, is_coordinator, must_change_password)
            VALUES ($1, $2, $3, $4, $5, $6, true)
            RETURNING id, role, name, email, branch_id, is_coordinator`,
-          [role, name, email, passwordHash, branchId, Boolean(isCoordinator)]
+          [role, name.trim(), email.trim().toLowerCase(), passwordHash, branchId, Boolean(isCoordinator)]
         );
         const staff = rows[0];
 
@@ -133,6 +135,39 @@ export async function adminUserRoutes(app: FastifyInstance) {
         params
       );
       return rows;
+    }
+  );
+
+  // ---- Any user's details (name, email, phone, ITS, and TR for students) — admin only ----
+  app.get<{ Params: { id: string } }>(
+    '/:id/details',
+    { preHandler: [app.authenticate, app.requireRole('admin')] },
+    async (request, reply) => (await readUserDetails(request.params.id)) ?? reply.code(404).send({ error: 'Account not found' })
+  );
+
+  app.patch<{ Params: { id: string }; Body: DetailChanges }>(
+    '/:id/details',
+    { preHandler: [app.authenticate, app.requireRole('admin')] },
+    async (request, reply) => {
+      const { name, email, phone, itsNumber, trNumber } = request.body ?? {};
+      const client = await pool.connect();
+      try {
+        await client.query('BEGIN');
+        const failure = await updateUserDetails(client, request.params.id, { name, email, phone, itsNumber, trNumber });
+        if (failure) {
+          await client.query('ROLLBACK');
+          return reply.code(failure.status).send({ error: failure.error });
+        }
+        await client.query('COMMIT');
+      } catch (err) {
+        await client.query('ROLLBACK');
+        throw err;
+      } finally {
+        client.release();
+      }
+      const changedFields = Object.keys(request.body ?? {}).filter(key => ['name', 'email', 'phone', 'itsNumber', 'trNumber'].includes(key));
+      if (changedFields.length) await notify(request.params.id, 'profile_updated', { changedFields });
+      return readUserDetails(request.params.id);
     }
   );
 

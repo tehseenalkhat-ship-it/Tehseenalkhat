@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
-  Activity, ArrowRight, Award, BarChart3, BookOpen, CalendarDays, Check, ChevronDown, ChevronRight,
+  Activity, ArrowRight, Pencil, Award, BarChart3, BookOpen, CalendarDays, Check, ChevronDown, ChevronRight,
   ClipboardList, FileText, FileImage, FileVideo, FileSpreadsheet, Images, LayoutDashboard, Lock, LogOut, Menu,
   MapPin, Play, Plus, RefreshCw, Search, Settings, ShieldCheck, Sparkles, Trash2, Trophy, Upload, Users, Download, Copy,
 } from 'lucide-react';
@@ -12,6 +12,7 @@ import {
 } from '@/components/ui';
 import { apiFetch, uploadFile, ApiError, clearSession, getSessionUser, getViewUrl } from '@/api';
 import { FixedReportsCard } from '@/components/ReportProblem';
+import { AdminDetailsModal } from '@/components/EditDetails';
 
 type ApiMediaItem = { kind: 'video' | 'image' | 'pdf'; storageKey: string; originalFilename?: string };
 type SheetSize = '1mm' | '2mm' | '3mm';
@@ -1204,7 +1205,7 @@ function TeacherLoadManagement() {
           <Button onClick={createAccount}>Create account</Button>
         </div>
         {createdAccount && (
-          <div className="info-banner"><Check size={16} /><span>Temporary password for {createdAccount.email}: <strong>{createdAccount.tempPassword}</strong></span></div>
+          <div className="info-banner"><Check size={16} /><span>First password for {createdAccount.email}: <strong>{createdAccount.tempPassword}</strong>. They will be asked to set their own password when they first sign in.</span></div>
         )}
       </div>
       <div className="stats-grid">
@@ -2035,6 +2036,7 @@ function GovernanceManager({ section }: { section: 'certificates' | 'governance'
   const [governanceRows, setGovernanceRows] = useState<ApiGovernanceRow[]>([]);
   const [deleteTarget, setDeleteTarget] = useState<{ id: string; role: 'student' | 'teacher'; name: string } | null>(null);
   const [viewTarget, setViewTarget] = useState<GovernanceProfileView | null>(null);
+  const [editTarget, setEditTarget] = useState<ApiGovernanceRow | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const load = async () => {
@@ -2400,6 +2402,7 @@ function GovernanceManager({ section }: { section: 'certificates' | 'governance'
               <span className="governance-no-tr" aria-hidden="true" />
             )}
             <span className="governance-actions-cell" data-label="Actions">
+              <button className="edit-pencil" onClick={() => setEditTarget(row)} aria-label={`Edit ${row.name}'s details`} title="Edit details"><Pencil size={15} /></button>
               <Button outline onClick={() => viewRow(row)}>View</Button>
               <Button outline onClick={() => exportRow(row)}>Export</Button>
               <button className="text-link danger" onClick={() => setDeleteTarget({ id: row.id, role: row.role, name: row.name })}><Trash2 size={14} /> Delete</button>
@@ -2452,6 +2455,10 @@ function GovernanceManager({ section }: { section: 'certificates' | 'governance'
             ))}
           </div>
         </Modal>
+      )}
+
+      {showGovernance && editTarget && (
+        <AdminDetailsModal userId={editTarget.id} branchName={branchMap[editTarget.branch_id]} onClose={() => setEditTarget(null)} onSaved={() => void load()} />
       )}
 
       {showGovernance && deleteTarget && (

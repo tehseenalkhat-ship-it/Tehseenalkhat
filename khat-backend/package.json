@@ -16,7 +16,8 @@
     "create-admin": "tsx scripts/create-admin.ts",
     "seed-demo": "tsx scripts/seed-demo-data.ts",
     "bundle": "esbuild src/server.ts --bundle --platform=node --target=node18 --format=cjs --outfile=dist/server.cjs --log-level=warning",
-    "test:reports": "tsx scripts/test-reports.ts"
+    "test:reports": "tsx scripts/test-reports.ts",
+    "test:account": "tsx scripts/test-account-details.ts"
   },
   "dependencies": {
     "@fastify/cors": "^9.0.1",

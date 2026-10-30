@@ -34,6 +34,7 @@ import { chatRoutes } from './routes/chat.routes.js';
 import { reportRoutes } from './routes/reports.routes.js';
 import { logsRoutes } from './routes/logs.routes.js';
 import { ensureProblemTables, logError } from './services/problemReports.js';
+import { ensureUserDetailColumns } from './services/userDetails.js';
 
 // trustProxy: the hosting panel runs the app behind a proxy; this makes request.ip the visitor's real IP.
 const app = Fastify({ logger: true, trustProxy: true });
@@ -79,6 +80,7 @@ process.on('uncaughtException', (err) => {
 
 async function main() {
   await ensureProblemTables().catch((err) => app.log.error(err, 'Could not create problem_reports / error_log tables'));
+  await ensureUserDetailColumns().catch((err) => app.log.error(err, 'Could not add users.phone / users.its_number'));
   await app.register(cors, { origin: true }); // tighten this to your real frontend URL before going live
   await app.register(authPlugin);
 

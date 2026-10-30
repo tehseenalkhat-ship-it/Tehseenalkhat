@@ -2878,3 +2878,17 @@ html[data-theme] .auth-page .auth-art p:not(.eyebrow),html[data-theme] .auth-pag
 @media(max-width:520px){.reference-landing .landing-panel-brand .logo-symbol,.auth-art .logo-symbol{width:min(100px,40vw)}.reference-landing .landing-panel-brand .logo strong{font-size:17px}.reference-landing .landing-panel-brand .logo small{font-size:9px;letter-spacing:.13em}.global-topbar .logo-symbol{width:30px;height:28px}}
 html[data-theme] .reference-landing .landing-panel .reference-role-card{background:transparent!important;border-color:rgba(255,255,255,.25)!important}
 html[data-theme] .reference-landing .landing-panel .reference-role-card:hover{background:rgba(255,255,255,.1)!important;border-color:rgba(255,255,255,.48)!important}
+/* Password eye button + pencil-to-edit rows (Settings, admin Data governance) */
+.password-input{position:relative;display:block}.field-label .password-input{margin-top:8px}.field-label .password-input .field{margin-top:0}
+.password-input .field{padding-right:44px}
+.password-eye{position:absolute;right:6px;top:50%;transform:translateY(-50%);width:34px;height:34px;display:grid;place-items:center;border-radius:6px;color:var(--muted);background:transparent}
+.password-eye:hover,.password-eye:focus-visible{color:var(--gold)}
+.edit-pencil{width:34px;height:34px;flex:none;display:grid;place-items:center;border:1px solid var(--line);border-radius:50%;color:var(--muted);background:transparent}
+.edit-pencil:hover,.edit-pencil:focus-visible{color:var(--gold);border-color:var(--gold)}
+.editable-row>div{flex:1;min-width:0}
+.editable-row-form{display:grid;gap:10px;margin-top:6px}
+.editable-row-actions{display:flex;gap:10px;flex-wrap:wrap}
+.editable-row-note{font-size:11px}
+.phone-field{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.3fr);gap:8px}.field-label .phone-field{margin-top:8px}.field-label .phone-field .field{margin-top:0}
+.admin-details-form{display:grid;gap:14px;text-align:left;margin-top:10px}
+@media (max-width:560px){.phone-field{grid-template-columns:1fr}}

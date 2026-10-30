@@ -10,6 +10,7 @@ export type AuthUser = {
   role: Role;
   branchId: string;
   isCoordinator: boolean;
+  mustChangePassword?: boolean;
 };
 
 // Module augmentation so `request.user` and `app.jwt.sign(...)` are correctly typed everywhere.
@@ -34,7 +35,11 @@ export const authPlugin = fp(async (app: FastifyInstance) => {
     try {
       await request.jwtVerify();
     } catch {
-      reply.code(401).send({ error: 'Unauthorized' });
+      return reply.code(401).send({ error: 'Unauthorized' });
+    }
+    // Accounts still on the admin-given first password can only change it — nothing else.
+    if ((request.user as AuthUser).mustChangePassword && request.routeOptions.url !== '/auth/change-password') {
+      return reply.code(403).send({ error: 'Please set a new password before continuing.', code: 'MUST_CHANGE_PASSWORD' });
     }
   });
 
