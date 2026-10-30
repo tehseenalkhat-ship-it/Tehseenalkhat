@@ -376,11 +376,14 @@ export async function eventRoutes(app: FastifyInstance) {
         );
         if (!eventRows[0]) return reply.code(404).send({ error: 'Event not found' });
         if (eventRows[0].status !== 'live') return reply.code(409).send({ error: 'This event is not live yet.' });
-      const { rows } = await pool.query(
+      await pool.query(
         `INSERT INTO event_attendance (event_id, student_id, joined_at)
          VALUES ($1, $2, now())
-         ON CONFLICT (event_id, student_id) DO UPDATE SET joined_at = now()
-         RETURNING *`,
+         ON CONFLICT (event_id, student_id) DO UPDATE SET joined_at = now()`,
+        [request.params.id, studentId]
+      );
+      const { rows } = await pool.query(
+        `SELECT * FROM event_attendance WHERE event_id = $1 AND student_id = $2`,
         [request.params.id, studentId]
       );
       const roomName = liveKitRoomName(request.params.id);
@@ -399,11 +402,14 @@ export async function eventRoutes(app: FastifyInstance) {
     { preHandler: [app.authenticate, app.requireRole('student')] },
     async (request, reply) => {
       const studentId = (request.user as AuthUser).id;
-      const { rows } = await pool.query(
+      await pool.query(
         `INSERT INTO event_attendance (event_id, student_id, watched_recording)
          VALUES ($1, $2, true)
-         ON CONFLICT (event_id, student_id) DO UPDATE SET watched_recording = true
-         RETURNING *`,
+         ON CONFLICT (event_id, student_id) DO UPDATE SET watched_recording = true`,
+        [request.params.id, studentId]
+      );
+      const { rows } = await pool.query(
+        `SELECT * FROM event_attendance WHERE event_id = $1 AND student_id = $2`,
         [request.params.id, studentId]
       );
       return reply.code(201).send(rows[0]);

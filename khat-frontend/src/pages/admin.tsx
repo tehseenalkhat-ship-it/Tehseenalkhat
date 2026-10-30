@@ -19,7 +19,7 @@ type ApiLevel = {
   id: string; course_id: string; order_index: number; level_type: 'mufradat' | 'writing' | 'test';
   title: string; media: ApiMediaItem[]; sheet_files: ApiSheetFiles; badge_tier: string | null;
 };
-type ApiCourse = { id: string; khat_type_id: string; category: string; title: string; description?: string; is_deletable: boolean };
+type ApiCourse = { id: string; khat_type_id: string; category: string; title: string; description?: string; guidance_question?: string | null; is_deletable: boolean };
 type ApiKhatType = { id: string; code: string; display_name: string };
 type ApiCertTemplate = {
   id: string; khat_type_id: string; level_id: string | null; course_id: string | null; title: string; file_storage_key: string;
@@ -536,12 +536,18 @@ function CourseBuilder() {
   const [showNewCourse, setShowNewCourse] = useState(false);
   const [newCourseTitle, setNewCourseTitle] = useState('');
   const [newCourseDesc, setNewCourseDesc] = useState('');
+  const [newCourseQuestion, setNewCourseQuestion] = useState('');
+  const [courseTitleDraft, setCourseTitleDraft] = useState('');
+  const [courseDescDraft, setCourseDescDraft] = useState('');
+  const [courseQuestionDraft, setCourseQuestionDraft] = useState('');
+  const [courseCategoryDraft, setCourseCategoryDraft] = useState<'certification' | 'secondary'>('certification');
 
   // Draft state for whichever level is selected — edits happen here, then "Save changes" persists it.
   const [titleDraft, setTitleDraft] = useState('');
   const [mediaDraft, setMediaDraft] = useState<ApiMediaItem[]>([]);
   const [sheetDraft, setSheetDraft] = useState<ApiSheetFiles>({});
   const [badgeTierDraft, setBadgeTierDraft] = useState('');
+  const [levelTypeDraft, setLevelTypeDraft] = useState<ApiLevel['level_type']>('mufradat');
 
   const level = levels.find(l => l.id === selectedLevelId) ?? null;
   const isCheckpoint = level?.level_type === 'test';
@@ -570,6 +576,7 @@ function CourseBuilder() {
               category: 'certification',
               title: `${khatTypes[script].name} certification course`,
               description: `The ${khatTypes[script].name} certification path.`,
+              guidanceQuestion: `Would you like to develop your ${khatTypes[script].name} handwriting and earn a certificate?`,
             },
           });
         } catch (createErr) {
@@ -605,11 +612,21 @@ function CourseBuilder() {
   useEffect(() => { setSelectedCourseId(null); loadEverything(null); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [script, courseType]);
 
   useEffect(() => {
+    if (course) {
+      setCourseTitleDraft(course.title);
+      setCourseDescDraft(course.description ?? '');
+      setCourseQuestionDraft(course.guidance_question ?? '');
+      setCourseCategoryDraft(course.category === 'secondary' ? 'secondary' : 'certification');
+    }
+  }, [course?.id]);
+
+  useEffect(() => {
     if (level) {
       setTitleDraft(level.title);
       setMediaDraft(level.media);
       setSheetDraft(level.sheet_files);
       setBadgeTierDraft(level.badge_tier ?? '');
+      setLevelTypeDraft(level.level_type);
     }
   }, [level?.id]);
 
@@ -630,11 +647,35 @@ function CourseBuilder() {
     try {
       await apiFetch(`/levels/${level.id}`, {
         method: 'PUT',
-        body: { title: titleDraft, media: mediaDraft, sheetFiles: sheetDraft, badgeTier: badgeTierDraft || undefined },
+        body: { levelType: levelTypeDraft, title: titleDraft, media: mediaDraft, sheetFiles: sheetDraft, badgeTier: badgeTierDraft || null },
       });
       await loadEverything();
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Failed to save this level.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const saveCourse = async () => {
+    if (!course || !courseTitleDraft.trim()) return;
+    setSaving(true);
+    setError(null);
+    try {
+      const updated = await apiFetch<ApiCourse>(`/courses/${course.id}`, {
+        method: 'PUT',
+        body: {
+          title: courseTitleDraft.trim(),
+          description: courseDescDraft.trim(),
+          category: courseCategoryDraft,
+          guidanceQuestion: courseQuestionDraft.trim(),
+        },
+      });
+      setCourse(updated);
+      setCourseChoices(items => items.map(item => item.id === updated.id ? updated : item));
+      if (updated.category !== courseType) setCourseType(updated.category as 'certification' | 'secondary');
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'Failed to save course settings.');
     } finally {
       setSaving(false);
     }
@@ -719,11 +760,12 @@ function CourseBuilder() {
     try {
       const created = await apiFetch<ApiCourse>('/courses', {
         method: 'POST',
-        body: { khatTypeId: khatType.id, category: courseType, title: newCourseTitle.trim(), description: newCourseDesc.trim() },
+        body: { khatTypeId: khatType.id, category: courseType, title: newCourseTitle.trim(), description: newCourseDesc.trim(), guidanceQuestion: newCourseQuestion.trim() },
       });
       setShowNewCourse(false);
       setNewCourseTitle('');
       setNewCourseDesc('');
+      setNewCourseQuestion('');
       setSelectedCourseId(created.id);
       await loadEverything(created.id);
     } catch (err) {
@@ -757,10 +799,6 @@ function CourseBuilder() {
       </div>
       {error && <p className="error-text">{error}</p>}
       {loading && <PenLoader label="Loading course builder…" compact />}
-      {courseType === 'certification' && course && (
-        <div className="info-banner"><Lock size={16} /><span>Certification courses cannot be deleted. You can add, reorder, and remove unused levels; each checkpoint locks later levels until passed.</span></div>
-      )}
-
       {courseType === 'secondary' && (
         <div className="secondary-course-controls">
           {courseChoices.length > 0 && (
@@ -774,11 +812,25 @@ function CourseBuilder() {
         </div>
       )}
 
-      {showNewCourse && courseType === 'secondary' && (
+      {courseType === 'certification' && (
+        <div className="secondary-course-controls">
+          {courseChoices.length > 0 && (
+            <label className="field-label">Certification course
+              <select className="field" value={selectedCourseId ?? ''} onChange={event => void selectCourse(event.target.value)}>
+                {courseChoices.map(item => <option key={item.id} value={item.id}>{item.title}</option>)}
+              </select>
+            </label>
+          )}
+          <Button outline onClick={() => setShowNewCourse(value => !value)}><Plus size={15} /> {showNewCourse ? 'Cancel' : 'Add certification course'}</Button>
+        </div>
+      )}
+
+      {showNewCourse && (
         <div className="builder-editor new-course-form">
           <div className="editor-heading"><div><p className="eyebrow">New {courseType} course</p><h2>Create a course</h2></div></div>
           <label className="field-label">Course title<input className="field" value={newCourseTitle} onChange={event => setNewCourseTitle(event.target.value)} placeholder="Course title" /></label>
           <label className="field-label">Description<input className="field" value={newCourseDesc} onChange={event => setNewCourseDesc(event.target.value)} placeholder="Short course description" /></label>
+          <label className="field-label">Student course-choice question<textarea className="field textarea" value={newCourseQuestion} onChange={event => setNewCourseQuestion(event.target.value)} placeholder={courseType === 'certification' ? 'Would you like to learn this script and earn a certificate?' : 'Would you like to explore this subject at your own pace?'} /></label>
           <Button onClick={createCourse} disabled={!newCourseTitle.trim()}><Plus size={15} /> Create course</Button>
         </div>
       )}
@@ -791,6 +843,21 @@ function CourseBuilder() {
       )}
 
       {!loading && course && (
+        <>
+        <section className="builder-editor builder-course-settings">
+          <div className="editor-heading"><div><p className="eyebrow">Course details</p><h2>Edit course card and introduction</h2></div></div>
+          <label className="field-label">Course title<input className="field" value={courseTitleDraft} onChange={event => setCourseTitleDraft(event.target.value)} /></label>
+          <label className="field-label">Catalog section
+            <select className="field" value={courseCategoryDraft} onChange={event => setCourseCategoryDraft(event.target.value as 'certification' | 'secondary')}>
+              <option value="certification">Certification course</option>
+              <option value="secondary">Secondary · self-paced course</option>
+            </select>
+          </label>
+          <label className="field-label">Course description<textarea className="field textarea" value={courseDescDraft} onChange={event => setCourseDescDraft(event.target.value)} placeholder="Briefly describe what students will learn." /></label>
+          <label className="field-label">Student course-choice question<textarea className="field textarea" value={courseQuestionDraft} onChange={event => setCourseQuestionDraft(event.target.value)} placeholder="Would you like to ...?" /></label>
+          <p className="editor-hint">This question appears near the top of the student’s course card to help them choose a path.</p>
+          <Button onClick={saveCourse} disabled={saving || !courseTitleDraft.trim()}>{saving ? <PenLoader label="Saving course" compact tiny /> : 'Save course details'} {!saving && <Check size={15} />}</Button>
+        </section>
         <div className="builder-grid">
           <div className="builder-levels">
             {levels.map((l, i) => (
@@ -812,7 +879,7 @@ function CourseBuilder() {
               </button>
             ))}
             <button className="add-level-btn" onClick={openAddLevel}><Plus size={16} /> Add level</button>
-            {courseType === 'secondary' && <button className="delete-course-btn" onClick={deleteCourse}><Trash2 size={15} /> Delete course</button>}
+            <button className="delete-course-btn" onClick={deleteCourse}><Trash2 size={15} /> Delete course</button>
           </div>
           <div className="builder-editor">
             {showAddLevel ? (
@@ -849,7 +916,14 @@ function CourseBuilder() {
                     <button className="text-link danger" onClick={deleteLevel}><Trash2 size={14} /> Delete level</button>
                   </div>
                 </div>
-                <label className="field-label">Level title<input className="field" value={titleDraft} onChange={e => setTitleDraft(e.target.value)} /></label>
+                <label className="field-label">Level heading<input className="field" value={titleDraft} onChange={e => setTitleDraft(e.target.value)} /></label>
+                <label className="field-label">Level type
+                  <select className="field" value={levelTypeDraft} onChange={event => setLevelTypeDraft(event.target.value as ApiLevel['level_type'])}>
+                    <option value="mufradat">Practice · Mufradat</option>
+                    <option value="writing">Practice · Writing</option>
+                    <option value="test">Checkpoint test · teacher reviewed</option>
+                  </select>
+                </label>
 
                 <div className="editor-section">
                   <p className="eyebrow">{isCheckpoint ? 'Reference images — exact letters/text to copy' : 'Reference media — uploaded files'}</p>
@@ -886,7 +960,10 @@ function CourseBuilder() {
                   <p className="eyebrow">Practice sheets — one file per grid size</p>
                   <div className="sheet-upload-row">
                     {(['1mm', '2mm', '3mm'] as SheetSize[]).map(size => (
-                      <UploadBox key={size} label={sheetDraft[size]?.originalFilename ?? `${size} grid sheet`} sublabel={`${size} sheet · image or PDF · drag and drop or browse`} accept="image/*,.pdf,application/pdf" onChange={file => uploadSheetAt(size, file)} />
+                      <div className="admin-sheet-edit" key={size}>
+                        <UploadBox label={sheetDraft[size]?.originalFilename ?? `${size} grid sheet`} sublabel={`${size} sheet · image or PDF · drag and drop or browse`} accept="image/*,.pdf,application/pdf" onChange={file => uploadSheetAt(size, file)} />
+                        {sheetDraft[size] && <button type="button" className="text-link danger" onClick={() => setSheetDraft(current => ({ ...current, [size]: undefined }))}><Trash2 size={13} /> Remove sheet</button>}
+                      </div>
                     ))}
                   </div>
                 </div>
@@ -910,6 +987,7 @@ function CourseBuilder() {
             )}
           </div>
         </div>
+        </>
       )}
     </>
   );

@@ -1,9 +1,10 @@
+import { useLanguage } from '@/language';
 import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react';
 import {
-  Activity, ArrowRight, Award, BarChart3, BookOpen, CalendarDays, Check, ChevronRight, ClipboardList,
+  ArrowRight, Award, BarChart3, BookOpen, CalendarDays, Check, ChevronRight, ClipboardList,
   FileImage, FileSpreadsheet, Flame, FolderOpen, GraduationCap, Heart, Home, Images, LayoutDashboard, Library, Lock,
   LogOut, MapPin, MoreHorizontal, Menu, Palette, PenTool, Play, Search, Settings, ShieldCheck, Trophy,
-  Upload, UserRound, Users, Video, X, Bell,
+  Upload, UserRound, Users, Video, X, Bell, MessageCircle,
 } from 'lucide-react';
 import type { Script, Role } from '@/data/types';
 import { khatTypes, scriptList, branches, type GalleryWork } from '@/data/mock';
@@ -64,7 +65,7 @@ export function PenLoader({ label = 'Loading…', compact = false, tiny = false,
 export function Logo({ admin = false }: { admin?: boolean }) {
   return (
     <button onClick={() => navigate(admin ? 'admin' : 'landing')} className="logo">
-      <span className="logo-mark">╱</span>
+      <img className="logo-symbol" src="/funun-logo-white.png" alt="Funun al-Quran" />
       <span>
         <strong>Al-Jamea-tus-Saifiyah</strong>
         <small>{admin ? 'CONTROL PANEL' : 'TEHSEEN AL-KHAT STUDIO'}</small>
@@ -75,12 +76,12 @@ export function Logo({ admin = false }: { admin?: boolean }) {
 
 const roleNavigation: Record<Role, [string, string, typeof LayoutDashboard][]> = {
   student: [
-    ['dashboard', 'Dashboard', Home], ['catalog', 'Courses', GraduationCap], ['achievements', 'Achievements', Award], ['gallery', 'Gallery', Images],
+    ['dashboard', 'Dashboard', Home], ['catalog', 'Courses', GraduationCap], ['chats', 'Chats', MessageCircle], ['achievements', 'Achievements', Award], ['gallery', 'Gallery', Images],
     ['competitions', 'Competitions', Trophy], ['events', 'Events', CalendarDays], ['resources', 'Resources', Library],
     ['showcase', 'My showcase', PenTool], ['notifications', 'Notifications', Bell],
   ],
   teacher: [
-    ['teacher-dashboard', 'Dashboard', Home], ['queue', 'Review queue', ClipboardList], ['reviews', 'My reviews', Check],
+    ['teacher-dashboard', 'Dashboard', Home], ['queue', 'Review queue', ClipboardList], ['reviews', 'My reviews', Check], ['teacher-chats', 'Student messages', MessageCircle],
     ['showcase', 'Showcase', PenTool], ['assets', 'Asset library', FolderOpen], ['judging', 'Judging', Trophy],
     ['events-host', 'Host events', Video], ['notifications', 'Notifications', Bell],
   ],
@@ -112,6 +113,9 @@ export function notificationPresentation(notification: UserNotification): Notifi
   const competition = typeof payload.title === 'string' ? ` “${payload.title}”` : '';
   const map: Record<string, NotificationPresentation> = {
     test_result: { title: 'Checkpoint result', body: payload.decision === 'pass' ? 'Your checkpoint test passed and your next level is unlocked.' : 'Your checkpoint needs another attempt. Check the review for feedback.' },
+    entry_marked: payload.entryKind === 'mashq_marking'
+      ? { title: payload.passed === true ? 'Mashq worksheet marked' : 'Mashq worksheet needs another attempt', body: typeof payload.markOutOfTen === 'number' ? `Your Mashq worksheet was marked ${payload.markOutOfTen}/10. Open the matching worksheet category to view teacher feedback.` : 'Your Mashq worksheet was marked. Open its worksheet category to see the result and feedback.' }
+      : { title: payload.passed === true ? 'Practice passed' : 'Practice needs another attempt', body: typeof payload.markOutOfTen === 'number' ? `The course review team marked your work ${payload.markOutOfTen}/10. Open your course journey for feedback.` : 'Your course practice was marked. Open your course journey for the result and feedback.' },
     new_entry_to_check: { title: 'New entry to review', body: 'A student submission has been added to your review queue.' },
     entry_queued_unassigned: { title: 'Entry needs assignment', body: 'A submission is waiting for an administrator to assign a reviewer.' },
     entry_auto_diverted: { title: 'Entry reassigned', body: 'A submission was automatically moved to another reviewer.' },
@@ -258,7 +262,7 @@ export function Drawer({ open, onClose, children, ariaLabel }: { open: boolean; 
 
 export function Header({
   role,
-  theme = 'gold',
+  theme = 'sky',
   onThemeChange,
 }: {
   role: Role;
@@ -274,6 +278,7 @@ export function Header({
   const [navExpanded, setNavExpanded] = useState(() => window.matchMedia('(min-width: 741px)').matches && localStorage.getItem('khat-sidebar-expanded') === 'true');
   const [hoveredRailLabel, setHoveredRailLabel] = useState<{ label: string; top: number } | null>(null);
   const [unreadNotifications, setUnreadNotifications] = useState(0);
+  const [unreadChats, setUnreadChats] = useState(0);
   const [notificationToasts, setNotificationToasts] = useState<UserNotification[]>([]);
   const knownNotificationIds = useRef<Set<string>>(new Set());
   const notificationsLoaded = useRef(false);
@@ -281,6 +286,7 @@ export function Header({
   const activeNotificationToastIds = useRef<Set<string>>(new Set());
   const notificationToastTimers = useRef<Map<string, number>>(new Map());
   const page = useHash();
+  const { language, setLanguage, t } = useLanguage();
   const user = getSessionUser();
   const hamburgerRef = useRef<HTMLButtonElement>(null);
   const profileRef = useRef<HTMLDivElement>(null);
@@ -360,11 +366,12 @@ export function Header({
   const profilePage = role === 'admin' ? 'settings' : 'profile';
   const currentSection = nav.find(([href]) => href === page) ?? nav[0];
   const CurrentSectionIcon = currentSection[2];
-  const currentSectionLabel = currentSection[0] === 'admin' ? 'Dashboard' : currentSection[1];
-  const filteredDrawerNav = nav.filter(([, label]) => label.toLowerCase().includes(drawerSearch.trim().toLowerCase()));
+  const currentSectionLabel = t(currentSection[0] === 'admin' ? 'Dashboard' : currentSection[1]);
+  const localizedNav = nav.map(([href, label, Icon]) => [href, t(label), Icon] as const);
+  const filteredDrawerNav = localizedNav.filter(([, label]) => label.toLowerCase().includes(drawerSearch.trim().toLowerCase()));
   const normalizedSearch = search.trim().toLowerCase();
   const searchResults = normalizedSearch
-    ? nav.filter(([, label]) => label.toLowerCase().includes(normalizedSearch)).slice(0, 5)
+    ? localizedNav.filter(([, label]) => label.toLowerCase().includes(normalizedSearch)).slice(0, 5)
     : [];
 
   const setRailHoverLabel = (label: string, element: HTMLButtonElement) => {
@@ -474,6 +481,20 @@ export function Header({
     };
   }, [user?.id]);
 
+  useEffect(() => {
+    if (role !== 'student' || !user?.id) { setUnreadChats(0); return; }
+    let stopped = false;
+    const poll = async () => {
+      try {
+        const result = await apiFetch<{ courses: { unread_count: number }[]; teachers: { unread_count: number }[] }>('/chat/threads', { silent: true });
+        if (!stopped) setUnreadChats([...(result.courses ?? []), ...(result.teachers ?? [])].reduce((sum, row) => sum + Number(row.unread_count || 0), 0));
+      } catch { /* Keep the last known unread count while offline. */ }
+    };
+    void poll();
+    const timer = window.setInterval(() => { void poll(); }, 15000);
+    return () => { stopped = true; window.clearInterval(timer); };
+  }, [role, user?.id, page]);
+
   const dismissNotificationToast = (id: string) => {
     const timer = notificationToastTimers.current.get(id);
     if (timer !== undefined) window.clearTimeout(timer);
@@ -510,17 +531,18 @@ export function Header({
         <Logo admin={role === 'admin'} />
         <div className="global-search" ref={searchRef}>
           <Search size={16} aria-hidden="true" />
-          <input value={search} onChange={event => setSearch(event.target.value)} placeholder="Search menus, pages…" aria-label="Search pages" />
+          <input value={search} onChange={event => setSearch(event.target.value)} placeholder={t('Search menus, pages…')} aria-label={t('Search pages')} />
           <kbd>/</kbd>
           {searchResults.length > 0 && <div className="global-search-results">{searchResults.map(([href, label, Icon]) => <button key={href} onClick={() => handleNav(href)}><Icon size={15} />{label}<ArrowRight size={13} /></button>)}</div>}
         </div>
         <div className="global-topbar-actions">
+          <button type="button" className="global-language-toggle" onClick={() => setLanguage(language === 'en' ? 'ar' : 'en')} aria-label={language === 'en' ? 'Switch to Arabic' : 'Switch to English'}>{language === 'en' ? 'العربية' : 'English'}</button>
           <div className="global-popover-anchor" ref={themeRef}>
             <button className={`global-header-action${themeOpen ? ' active' : ''}`} onClick={() => { setThemeOpen(value => !value); setProfileOpen(false); }} aria-label="Choose theme" aria-expanded={themeOpen} title="Choose theme">
               <Palette size={18} />
               <span className="icon-tooltip">Choose theme</span>
             </button>
-            {themeOpen && <div className="global-popover theme-popover"><p className="global-popover-kicker">Appearance</p><div className="theme-swatch-grid" role="group" aria-label="Choose a site theme">{THEME_OPTIONS.map(option => <button key={option.id} className={`theme-swatch${theme === option.id ? ' selected' : ''}`} onClick={() => onThemeChange?.(option.id)} aria-label={`${option.label} theme${theme === option.id ? ', selected' : ''}`} aria-pressed={theme === option.id} title={option.label}><span style={{ background: `linear-gradient(145deg, ${option.colors[0]}, ${option.colors[1]} 52%, ${option.colors[2]})` }} /><small>{option.label}</small>{theme === option.id && <Check size={13} />}</button>)}</div></div>}
+            {themeOpen && <div className="global-popover theme-popover"><p className="global-popover-kicker">Color themes</p>{Array.from(new Set(THEME_OPTIONS.map(option => option.family))).map(family => <section className="theme-family-group" key={family}><strong>{family}</strong><div className="theme-swatch-grid" role="group" aria-label={`${family} themes`}>{THEME_OPTIONS.filter(option => option.family === family).map(option => <button key={option.id} className={`theme-swatch${theme === option.id ? ' selected' : ''}`} onClick={() => onThemeChange?.(option.id)} aria-label={`${option.label} theme${theme === option.id ? ', selected' : ''}`} aria-pressed={theme === option.id} title={option.label}><span style={{ background: `linear-gradient(90deg, ${option.colors[0]} 0 33.33%, ${option.colors[1]} 33.33% 66.66%, ${option.colors[2]} 66.66% 100%)` }} /><small>{option.label}</small>{theme === option.id && <Check size={13} />}</button>)}</div></section>)}</div>}
           </div>
           <div className="global-popover-anchor" ref={profileRef}>
             <button className="global-profile-trigger" onClick={() => { setProfileOpen(value => !value); setThemeOpen(false); }} aria-label="Open profile menu" aria-expanded={profileOpen}>
@@ -542,7 +564,7 @@ export function Header({
             <span><small>Current section</small><strong>{currentSectionLabel}</strong></span>
           </div>
         )}
-        <nav id="global-primary-navigation">{nav.map(([href, label, Icon]) => <button key={href} className={`global-rail-link${page === href ? ' active' : ''}`} onMouseEnter={event => setRailHoverLabel(label, event.currentTarget)} onMouseLeave={() => setHoveredRailLabel(null)} onFocus={event => setRailHoverLabel(label, event.currentTarget)} onBlur={() => setHoveredRailLabel(null)} onClick={() => handleNav(href)} aria-label={href === 'notifications' && unreadNotifications ? `${label}, ${unreadNotifications} unread` : label}><Icon size={18} strokeWidth={1.8} /><span>{label}</span>{href === 'notifications' && unreadNotifications > 0 && <i className="global-rail-badge">{unreadNotifications > 99 ? '99+' : unreadNotifications}</i>}<ChevronRight className="global-rail-chevron" size={15} /></button>)}</nav>
+          <nav id="global-primary-navigation">{localizedNav.map(([href, label, Icon]) => <button key={href} className={`global-rail-link${page === href ? ' active' : ''}`} onMouseEnter={event => setRailHoverLabel(label, event.currentTarget)} onMouseLeave={() => setHoveredRailLabel(null)} onFocus={event => setRailHoverLabel(label, event.currentTarget)} onBlur={() => setHoveredRailLabel(null)} onClick={() => handleNav(href)} aria-label={href === 'notifications' && unreadNotifications ? `${label}, ${unreadNotifications} unread` : href === 'chats' && unreadChats ? `${label}, ${unreadChats} unread` : label}><Icon size={18} strokeWidth={1.8} /><span>{label}</span>{href === 'notifications' && unreadNotifications > 0 && <i className="global-rail-badge">{unreadNotifications > 99 ? '99+' : unreadNotifications}</i>}{href === 'chats' && unreadChats > 0 && <i className="global-rail-badge">{unreadChats > 99 ? '99+' : unreadChats}</i>}<ChevronRight className="global-rail-chevron" size={15} /></button>)}</nav>
         <button className="global-rail-link global-settings-link" onMouseEnter={event => setRailHoverLabel('Settings', event.currentTarget)} onMouseLeave={() => setHoveredRailLabel(null)} onFocus={event => setRailHoverLabel('Settings', event.currentTarget)} onBlur={() => setHoveredRailLabel(null)} onClick={() => handleNav('settings')} aria-label="Settings"><Settings size={18} strokeWidth={1.8} /><span>Settings</span><ChevronRight className="global-rail-chevron" size={15} /></button>
       </aside>
       {hoveredRailLabel && !navExpanded && <div className="global-rail-hover-label" style={{ top: hoveredRailLabel.top }} role="tooltip">{hoveredRailLabel.label}</div>}
@@ -567,7 +589,7 @@ export function Header({
         </div>
         <label className="mobile-drawer-search">
           <Search size={16} aria-hidden="true" />
-          <input value={drawerSearch} onChange={event => setDrawerSearch(event.target.value)} placeholder="Search available menus" aria-label="Search menu items" />
+          <input value={drawerSearch} onChange={event => setDrawerSearch(event.target.value)} placeholder={t('Search available menus')} aria-label={t('Search menu items')} />
         </label>
         <nav className="mobile-drawer-nav">
           <button className={`mobile-drawer-item${page === profilePage ? ' active' : ''}`} onClick={() => { handleNav(profilePage); closeMobileMenu(); }} aria-label="My Profile">
@@ -580,6 +602,7 @@ export function Header({
               <Icon size={18} strokeWidth={1.6} />
               <span className="mobile-drawer-label">{label}</span>
               {href === 'notifications' && unreadNotifications > 0 && <span className="mobile-drawer-badge">{unreadNotifications > 99 ? '99+' : unreadNotifications}</span>}
+              {href === 'chats' && unreadChats > 0 && <span className="mobile-drawer-badge">{unreadChats > 99 ? '99+' : unreadChats}</span>}
               <ChevronRight className="mobile-drawer-chevron" size={15} />
             </button>
           ))}

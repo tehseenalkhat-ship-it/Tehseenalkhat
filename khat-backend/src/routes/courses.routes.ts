@@ -1,6 +1,6 @@
 import type { FastifyInstance } from 'fastify';
 import { pool } from '../db.js';
-import { mapPgError } from '../utils/pgErrors.js';
+import { mapDatabaseError } from '../utils/dbErrors.js';
 import type { AuthUser } from '../plugins/auth.js';
 import { notifyAllStudents } from '../services/notify.js';
 
@@ -12,8 +12,9 @@ type CreateCourseBody = {
   category: 'certification' | 'secondary';
   title: string;
   description?: string;
+  guidanceQuestion?: string;
 };
-type UpdateCourseBody = { title?: string; description?: string };
+type UpdateCourseBody = { title?: string; description?: string; category?: 'certification' | 'secondary'; guidanceQuestion?: string };
 
 type CreateLevelBody = {
   levelType: 'mufradat' | 'writing' | 'test';
@@ -21,7 +22,7 @@ type CreateLevelBody = {
   media?: MediaItem[];
   sheetFiles?: SheetFiles;
 };
-type UpdateLevelBody = { title?: string; media?: MediaItem[]; sheetFiles?: SheetFiles; badgeTier?: string };
+type UpdateLevelBody = { levelType?: 'mufradat' | 'writing' | 'test'; title?: string; media?: MediaItem[]; sheetFiles?: SheetFiles; badgeTier?: string | null };
 type ReorderBody = { orderedLevelIds: string[] };
 
 const VALID_CATEGORIES = ['certification', 'secondary'] as const;
@@ -37,6 +38,9 @@ export async function courseRoutes(app: FastifyInstance) {
       const { khatTypeId, category } = request.query;
       const conditions: string[] = [];
       const params: unknown[] = [];
+      if ((request.user as AuthUser).role === 'student') {
+        conditions.push(`khat_type_id NOT IN (SELECT id FROM khat_types WHERE code = 'tehseen_al_khat_normal_pen')`);
+      }
       if (khatTypeId) {
         params.push(khatTypeId);
         conditions.push(`khat_type_id = $${params.length}`);
@@ -47,7 +51,7 @@ export async function courseRoutes(app: FastifyInstance) {
       }
       const where = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
       const { rows } = await pool.query(
-        `SELECT id, khat_type_id, category, title, description, is_deletable, created_at
+        `SELECT id, khat_type_id, category, title, description, guidance_question, is_deletable, created_at
          FROM courses ${where}
          ORDER BY category, created_at`,
         params
@@ -57,6 +61,15 @@ export async function courseRoutes(app: FastifyInstance) {
   );
 
   app.get<{ Params: { id: string } }>('/:id', { preHandler: [app.authenticate] }, async (request, reply) => {
+    const user = request.user as AuthUser;
+    if (user.role === 'student') {
+      const { rows: hiddenRows } = await pool.query(
+        `SELECT 1 FROM courses c JOIN khat_types kt ON kt.id = c.khat_type_id
+         WHERE c.id = $1 AND kt.code = 'tehseen_al_khat_normal_pen'`,
+        [request.params.id]
+      );
+      if (hiddenRows[0]) return reply.code(404).send({ error: 'Course not found' });
+    }
     const { rows } = await pool.query('SELECT * FROM courses WHERE id = $1', [request.params.id]);
     if (!rows[0]) return reply.code(404).send({ error: 'Course not found' });
     return rows[0];
@@ -65,7 +78,16 @@ export async function courseRoutes(app: FastifyInstance) {
   app.get<{ Params: { id: string } }>(
     '/:id/levels',
     { preHandler: [app.authenticate] },
-    async (request) => {
+    async (request, reply) => {
+      const user = request.user as AuthUser;
+      if (user.role === 'student') {
+        const { rows: hiddenRows } = await pool.query(
+          `SELECT 1 FROM courses c JOIN khat_types kt ON kt.id = c.khat_type_id
+           WHERE c.id = $1 AND kt.code = 'tehseen_al_khat_normal_pen'`,
+          [request.params.id]
+        );
+        if (hiddenRows[0]) return reply.code(404).send({ error: 'Course not found' });
+      }
       const { rows } = await pool.query('SELECT * FROM levels WHERE course_id = $1 ORDER BY order_index', [
         request.params.id,
       ]);
@@ -77,7 +99,7 @@ export async function courseRoutes(app: FastifyInstance) {
     '/',
     { preHandler: [app.authenticate, app.requireRole('admin')] },
     async (request, reply) => {
-      const { khatTypeId, category, title, description } = request.body;
+      const { khatTypeId, category, title, description, guidanceQuestion } = request.body;
       if (!khatTypeId || !category || !title) {
         return reply.code(400).send({ error: 'khatTypeId, category, and title are required' });
       }
@@ -88,17 +110,17 @@ export async function courseRoutes(app: FastifyInstance) {
       const createdBy = (request.user as AuthUser).id;
       try {
         const { rows } = await pool.query(
-          `INSERT INTO courses (khat_type_id, category, title, description, is_deletable, created_by)
-           VALUES ($1, $2, $3, $4, $5, $6) RETURNING *`,
-          [khatTypeId, category, title, description ?? null, category === 'secondary', createdBy]
+          `INSERT INTO courses (khat_type_id, category, title, description, guidance_question, is_deletable, created_by)
+           VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *`,
+          [khatTypeId, category, title, description ?? null, guidanceQuestion?.trim() || null, category === 'secondary', createdBy]
         );
         await notifyAllStudents('course_created', { courseId: rows[0].id, title });
         return reply.code(201).send(rows[0]);
       } catch (err) {
-        const mapped = mapPgError(err);
+        const mapped = mapDatabaseError(err);
         if (mapped) {
-          // The partial unique index on (khat_type_id) WHERE category='certification'
-          // fires here — give a specific message rather than the generic one.
+          // The generated-column unique index enforces one certification course
+          // per khat type — provide a specific response for that collision.
           if (category === 'certification' && mapped.status === 409) {
             return reply.code(409).send({ error: 'This khat type already has a certification course.' });
           }
@@ -114,30 +136,40 @@ export async function courseRoutes(app: FastifyInstance) {
     '/:id',
     { preHandler: [app.authenticate, app.requireRole('admin')] },
     async (request, reply) => {
-      const { title, description } = request.body;
-      const { rows } = await pool.query(
-        `UPDATE courses SET title = COALESCE($1, title), description = COALESCE($2, description)
-         WHERE id = $3 RETURNING *`,
-        [title ?? null, description ?? null, request.params.id]
-      );
-      if (!rows[0]) return reply.code(404).send({ error: 'Course not found' });
-      await notifyAllStudents('course_updated', { courseId: rows[0].id, title: rows[0].title });
-      return rows[0];
+      const { title, description, category, guidanceQuestion } = request.body;
+      if (category !== undefined && !VALID_CATEGORIES.includes(category)) {
+        return reply.code(400).send({ error: `category must be one of: ${VALID_CATEGORIES.join(', ')}` });
+      }
+      try {
+        const { rows } = await pool.query(
+          `UPDATE courses SET
+             title = COALESCE($1, title),
+             description = COALESCE($2, description),
+             category = COALESCE($3, category),
+             guidance_question = CASE WHEN $4::boolean THEN NULLIF(TRIM($5), '') ELSE guidance_question END
+           WHERE id = $6 RETURNING *`,
+          [title ?? null, description ?? null, category ?? null, guidanceQuestion !== undefined, guidanceQuestion ?? null, request.params.id]
+        );
+        if (!rows[0]) return reply.code(404).send({ error: 'Course not found' });
+        await notifyAllStudents('course_updated', { courseId: rows[0].id, title: rows[0].title });
+        return rows[0];
+      } catch (err) {
+        const mapped = mapDatabaseError(err);
+        if (mapped) return reply.code(mapped.status).send(mapped.body);
+        request.log.error(err);
+        return reply.code(500).send({ error: 'Failed to update course' });
+      }
     }
   );
 
-  // Certification courses are never deletable (is_deletable = false, set at creation
-  // and never changed) — this enforces "admin can edit references/add levels but
-  // cannot delete the course or alter core logic."
+  // Admins can remove any course from the catalog when it is no longer needed,
+  // including certification courses, while preserving the remaining course data model.
   app.delete<{ Params: { id: string } }>(
     '/:id',
     { preHandler: [app.authenticate, app.requireRole('admin')] },
     async (request, reply) => {
-      const { rows } = await pool.query('SELECT id, title, is_deletable FROM courses WHERE id = $1', [request.params.id]);
+      const { rows } = await pool.query('SELECT id, title FROM courses WHERE id = $1', [request.params.id]);
       if (!rows[0]) return reply.code(404).send({ error: 'Course not found' });
-      if (!rows[0].is_deletable) {
-        return reply.code(403).send({ error: 'The certification course cannot be deleted.' });
-      }
       await pool.query('DELETE FROM courses WHERE id = $1', [request.params.id]);
       await notifyAllStudents('course_removed', { courseId: rows[0].id, title: rows[0].title });
       return reply.code(204).send();
@@ -178,7 +210,7 @@ export async function courseRoutes(app: FastifyInstance) {
         await notifyAllStudents('course_updated', { courseId: request.params.id, title });
         return reply.code(201).send(rows[0]);
       } catch (err) {
-        const mapped = mapPgError(err);
+        const mapped = mapDatabaseError(err);
         if (mapped) return reply.code(mapped.status).send(mapped.body);
         request.log.error(err);
         return reply.code(500).send({ error: 'Failed to create level' });
@@ -246,21 +278,27 @@ export async function levelRoutes(app: FastifyInstance) {
     '/:levelId',
     { preHandler: [app.authenticate, app.requireRole('admin')] },
     async (request, reply) => {
-      const { title, media, sheetFiles, badgeTier } = request.body;
+      const { levelType, title, media, sheetFiles, badgeTier } = request.body;
+      if (levelType && !VALID_LEVEL_TYPES.includes(levelType)) {
+        return reply.code(400).send({ error: `levelType must be one of: ${VALID_LEVEL_TYPES.join(', ')}` });
+      }
       if (badgeTier && !(VALID_BADGE_TIERS as readonly string[]).includes(badgeTier)) {
         return reply.code(400).send({ error: `badgeTier must be one of: ${VALID_BADGE_TIERS.join(', ')}` });
       }
       const { rows } = await pool.query(
         `UPDATE levels SET
-           title = COALESCE($1, title),
-           media = COALESCE($2, media),
-           sheet_files = COALESCE($3, sheet_files),
-           badge_tier = COALESCE($4, badge_tier)
-         WHERE id = $5 RETURNING *`,
+           level_type = COALESCE($1, level_type),
+           title = COALESCE($2, title),
+           media = COALESCE($3, media),
+           sheet_files = COALESCE($4, sheet_files),
+           badge_tier = CASE WHEN $5::boolean THEN $6 ELSE badge_tier END
+         WHERE id = $7 RETURNING *`,
         [
+          levelType ?? null,
           title ?? null,
           media ? JSON.stringify(media) : null,
           sheetFiles ? JSON.stringify(sheetFiles) : null,
+          badgeTier !== undefined,
           badgeTier ?? null,
           request.params.levelId,
         ]

@@ -8,12 +8,17 @@ export const khatTypes: Record<Script, KhatType> = {
   'Naskh (Normal Pen)': { name: 'Naskh · Normal pen', arabic: 'نسخ', color: '#607a69', soft: '#dce8df', desc: 'Naskh forms and proportions practised with an ordinary pen.', tagline: 'Naskh, practised with the everyday pen.' },
   Sulus: { name: 'Sulus (Thuluth)', arabic: 'ثلث', color: '#8d3327', soft: '#f0dbd2', desc: 'Monumental and dramatic — the script of titles, domes, and inscriptions.', tagline: 'the script built to be seen.' },
   Nastaaleeq: { name: 'Nastaaleeq', arabic: 'نستعلیق', color: '#496052', soft: '#dce4da', desc: 'Flowing and suspended — the script of Persian and Urdu poetry.', tagline: 'the hand that carries poetry.' },
+  Istinsaakh: { name: 'Istinsaakh', arabic: 'استنساخ', color: '#7a4d23', soft: '#f5eadd', desc: 'A disciplined, measured script form designed for careful proportion and clean rhythm.', tagline: 'precision through repetition.' },
+  'Tehseen Al Khat': { name: 'Tehseen Al Khat', arabic: 'تحسين الخط', color: '#2f5f67', soft: '#dfeef0', desc: 'A final polishing script focused on balance, stroke control, and refined form.', tagline: 'the measured polish of the hand.' },
 };
 
-export const scriptList: Script[] = ['Naskh', 'Naskh (Normal Pen)', 'Sulus', 'Nastaaleeq'];
+export const scriptList: Script[] = ['Naskh', 'Sulus', 'Nastaaleeq', 'Istinsaakh', 'Tehseen Al Khat', 'Naskh (Normal Pen)'];
 
 export function scriptToCode(script: Script): string {
-  return script === 'Naskh (Normal Pen)' ? 'naskh_normal_pen' : script.toLowerCase();
+  if (script === 'Naskh (Normal Pen)') return 'naskh_normal_pen';
+  if (script === 'Istinsaakh') return 'istinsaakh';
+  if (script === 'Tehseen Al Khat') return 'tehseen_al_khat';
+  return script.toLowerCase();
 }
 
 export function scriptFromCode(code: string): Script | null {
@@ -21,11 +26,15 @@ export function scriptFromCode(code: string): Script | null {
   if (code === 'naskh_normal_pen') return 'Naskh (Normal Pen)';
   if (code === 'sulus') return 'Sulus';
   if (code === 'nastaaleeq') return 'Nastaaleeq';
+  if (code === 'istinsaakh') return 'Istinsaakh';
+  if (code === 'tehseen_al_khat') return 'Tehseen Al Khat';
   return null;
 }
 
 export const scriptFromHash = (hash: string): Script => {
   if (hash.includes('naskh-normal-pen') || hash.includes('naskh_normal_pen') || hash.includes('normal-pen')) return 'Naskh (Normal Pen)';
+  if (hash.includes('istinsaakh')) return 'Istinsaakh';
+  if (hash.includes('tehseen') || hash.includes('al-khat') || hash.includes('tehseen_al_khat')) return 'Tehseen Al Khat';
   if (hash.includes('sulus') || hash.includes('thuluth')) return 'Sulus';
   if (hash.includes('nastaliq') || hash.includes('nastaaleeq')) return 'Nastaaleeq';
   return 'Naskh';
@@ -37,7 +46,7 @@ export type MockStudent = {
   name: string; branch: Branch; script: Script; level: string; hours: string;
   tr: string; tier: string; progress: number; lastPractice: string; streak: number;
   practiceUploads: PracticeUpload[];
-  scriptProgress: Record<Script, { enrolled: boolean; level: string; progress: number; tier: string; timeSpent: string; certificate?: string }>;
+  scriptProgress: Partial<Record<Script, { enrolled: boolean; level: string; progress: number; tier: string; timeSpent: string; certificate?: string }>>;
 };
 export type PracticeUpload = {
   id: string; levelName: string; script: Script; minutes: number; date: string; thumb: string;
@@ -46,12 +55,12 @@ export const students: MockStudent[] = [
   {
     name: 'Amina Suleiman', branch: 'Nairobi', script: 'Naskh', level: 'Murakkabāt · Ex. 4', hours: '61 hrs left', tr: 'TR-20481', tier: 'Composition', progress: 62, lastPractice: '1 day', streak: 14,
     practiceUploads: [
-      { id: 'PU-301', levelName: 'The round letters', script: 'Naskh', minutes: 22, date: '12 Sep', thumb: 'ا' },
-      { id: 'PU-302', levelName: 'Tall and angular letters', script: 'Naskh', minutes: 18, date: '10 Sep', thumb: 'ب' },
-      { id: 'PU-303', levelName: 'Mufradāt set one', script: 'Naskh', minutes: 35, date: '08 Sep', thumb: 'ت' },
-      { id: 'PU-304', levelName: 'Mufradāt set two', script: 'Naskh', minutes: 28, date: '05 Sep', thumb: 'ث' },
-      { id: 'PU-305', levelName: 'Joining at the baseline', script: 'Naskh', minutes: 40, date: '03 Sep', thumb: 'بت' },
-      { id: 'PU-306', levelName: 'The round letters', script: 'Sulus', minutes: 15, date: '02 Sep', thumb: 'ج' },
+      { id: 'PU-301', levelName: 'The round letters', script: 'Naskh', minutes: 22, date: '12 Sep', thumb: '' },
+      { id: 'PU-302', levelName: 'Tall and angular letters', script: 'Naskh', minutes: 18, date: '10 Sep', thumb: '' },
+      { id: 'PU-303', levelName: 'Mufradāt set one', script: 'Naskh', minutes: 35, date: '08 Sep', thumb: '' },
+      { id: 'PU-304', levelName: 'Mufradāt set two', script: 'Naskh', minutes: 28, date: '05 Sep', thumb: '' },
+      { id: 'PU-305', levelName: 'Joining at the baseline', script: 'Naskh', minutes: 40, date: '03 Sep', thumb: '' },
+      { id: 'PU-306', levelName: 'The round letters', script: 'Sulus', minutes: 15, date: '02 Sep', thumb: '' },
     ],
     scriptProgress: {
       Naskh: { enrolled: true, level: 'Composition (Murakkabāt)', progress: 62, tier: 'Composition', timeSpent: '28h 15m', certificate: 'Foundation certificate · issued 24 Aug 2026' },
@@ -63,8 +72,8 @@ export const students: MockStudent[] = [
   {
     name: 'Husain Khatri', branch: 'Surat', script: 'Sulus', level: 'Mufradāt · Ex. 2', hours: '31 hrs left', tr: 'TR-20482', tier: 'Foundation', progress: 20, lastPractice: '3 days', streak: 3,
     practiceUploads: [
-      { id: 'PU-401', levelName: 'The round letters', script: 'Sulus', minutes: 20, date: '10 Sep', thumb: 'س' },
-      { id: 'PU-402', levelName: 'Tall and angular letters', script: 'Sulus', minutes: 15, date: '07 Sep', thumb: 'ل' },
+      { id: 'PU-401', levelName: 'The round letters', script: 'Sulus', minutes: 20, date: '10 Sep', thumb: '' },
+      { id: 'PU-402', levelName: 'Tall and angular letters', script: 'Sulus', minutes: 15, date: '07 Sep', thumb: '' },
     ],
     scriptProgress: {
       Naskh: { enrolled: false, level: 'Not enrolled', progress: 0, tier: '—', timeSpent: '—' },
@@ -76,8 +85,8 @@ export const students: MockStudent[] = [
   {
     name: 'Maryam Raza', branch: 'Karachi', script: 'Nastaaleeq', level: 'Foundation · Ex. 6', hours: '9 hrs left', tr: 'TR-20483', tier: 'Foundation', progress: 45, lastPractice: '1 day', streak: 7,
     practiceUploads: [
-      { id: 'PU-501', levelName: 'The round letters', script: 'Nastaaleeq', minutes: 30, date: '11 Sep', thumb: 'ن' },
-      { id: 'PU-502', levelName: 'Mufradāt set one', script: 'Nastaaleeq', minutes: 25, date: '09 Sep', thumb: 'ست' },
+      { id: 'PU-501', levelName: 'The round letters', script: 'Nastaaleeq', minutes: 30, date: '11 Sep', thumb: '' },
+      { id: 'PU-502', levelName: 'Mufradāt set one', script: 'Nastaaleeq', minutes: 25, date: '09 Sep', thumb: '' },
     ],
     scriptProgress: {
       Naskh: { enrolled: false, level: 'Not enrolled', progress: 0, tier: '—', timeSpent: '—' },
@@ -89,8 +98,8 @@ export const students: MockStudent[] = [
   {
     name: 'Zahra Noor', branch: 'Sidhpur', script: 'Naskh', level: 'Mufradāt · Ex. 8', hours: '40 hrs left', tr: 'TR-20484', tier: 'Foundation', progress: 30, lastPractice: '5 days', streak: 2,
     practiceUploads: [
-      { id: 'PU-601', levelName: 'The round letters', script: 'Naskh', minutes: 12, date: '08 Sep', thumb: 'ا' },
-      { id: 'PU-602', levelName: 'Mufradāt set one', script: 'Naskh', minutes: 20, date: '04 Sep', thumb: 'ب' },
+      { id: 'PU-601', levelName: 'The round letters', script: 'Naskh', minutes: 12, date: '08 Sep', thumb: '' },
+      { id: 'PU-602', levelName: 'Mufradāt set one', script: 'Naskh', minutes: 20, date: '04 Sep', thumb: '' },
     ],
     scriptProgress: {
       Naskh: { enrolled: true, level: 'Foundation (Mufradāt)', progress: 30, tier: 'Foundation', timeSpent: '10h 15m' },
@@ -102,8 +111,8 @@ export const students: MockStudent[] = [
   {
     name: 'Yusuf Ali', branch: 'Marol / Mumbai', script: 'Sulus', level: 'Mastery · Ex. 3', hours: '52 hrs left', tr: 'TR-20485', tier: 'Mastery', progress: 85, lastPractice: '2 days', streak: 21,
     practiceUploads: [
-      { id: 'PU-701', levelName: 'Joining at the baseline', script: 'Sulus', minutes: 45, date: '11 Sep', thumb: 'سل' },
-      { id: 'PU-702', levelName: 'A complete short line', script: 'Sulus', minutes: 50, date: '09 Sep', thumb: 'سلا' },
+      { id: 'PU-701', levelName: 'Joining at the baseline', script: 'Sulus', minutes: 45, date: '11 Sep', thumb: '' },
+      { id: 'PU-702', levelName: 'A complete short line', script: 'Sulus', minutes: 50, date: '09 Sep', thumb: '' },
     ],
     scriptProgress: {
       Naskh: { enrolled: false, level: 'Not enrolled', progress: 0, tier: '—', timeSpent: '—' },
@@ -116,13 +125,13 @@ export const students: MockStudent[] = [
 
 export type GalleryWork = { word: string; name: string; branch: Branch; script: Script; tier: string; likes: number; role: 'student' | 'teacher'; status?: 'pending' | 'approved' | 'rejected' };
 export const galleryWorks: GalleryWork[] = [
-  { word: 'بسم الله', name: 'Amina Suleiman', branch: 'Nairobi', script: 'Naskh', tier: 'Mastery', likes: 24, role: 'student', status: 'approved' },
-  { word: 'نور', name: 'Husain Khatri', branch: 'Surat', script: 'Nastaaleeq', tier: 'Composition', likes: 17, role: 'student', status: 'approved' },
-  { word: 'سلام', name: 'Maryam Raza', branch: 'Karachi', script: 'Sulus', tier: 'Foundation', likes: 31, role: 'student', status: 'approved' },
-  { word: 'علم', name: 'Zahra Noor', branch: 'Sidhpur', script: 'Naskh', tier: 'Foundation', likes: 12, role: 'student', status: 'approved' },
-  { word: 'حمد', name: 'Ustadh Yusuf Ali', branch: 'Marol / Mumbai', script: 'Sulus', tier: 'Mastery', likes: 28, role: 'teacher', status: 'approved' },
-  { word: 'عشق', name: 'Fatima Abbas', branch: 'Nairobi', script: 'Nastaaleeq', tier: 'Foundation', likes: 19, role: 'student', status: 'approved' },
-  { word: 'صبر', name: 'Ustadha Zahra Abbas', branch: 'Karachi', script: 'Naskh', tier: 'Mastery', likes: 42, role: 'teacher', status: 'approved' },
+  { word: 'Bismillah', name: 'Amina Suleiman', branch: 'Nairobi', script: 'Naskh', tier: 'Mastery', likes: 24, role: 'student', status: 'approved' },
+  { word: 'Light', name: 'Husain Khatri', branch: 'Surat', script: 'Nastaaleeq', tier: 'Composition', likes: 17, role: 'student', status: 'approved' },
+  { word: 'Peace', name: 'Maryam Raza', branch: 'Karachi', script: 'Sulus', tier: 'Foundation', likes: 31, role: 'student', status: 'approved' },
+  { word: 'Knowledge', name: 'Zahra Noor', branch: 'Sidhpur', script: 'Naskh', tier: 'Foundation', likes: 12, role: 'student', status: 'approved' },
+  { word: 'Praise', name: 'Ustadh Yusuf Ali', branch: 'Marol / Mumbai', script: 'Sulus', tier: 'Mastery', likes: 28, role: 'teacher', status: 'approved' },
+  { word: 'Love', name: 'Fatima Abbas', branch: 'Nairobi', script: 'Nastaaleeq', tier: 'Foundation', likes: 19, role: 'student', status: 'approved' },
+  { word: 'Patience', name: 'Ustadha Zahra Abbas', branch: 'Karachi', script: 'Naskh', tier: 'Mastery', likes: 42, role: 'teacher', status: 'approved' },
 ];
 
 export type Entry = { id: string; student: string; branch: Branch; script: Script; level: string; hours: string; source: 'Checkpoint' | 'Event' | 'Competition'; status: 'pending' | 'assigned' | 'in_review' | 'reviewed' | 'redo'; lockedByYou?: boolean; idleFlagged?: boolean };
@@ -156,8 +165,8 @@ export const teachers: Teacher[] = [
 
 export type Competition = { title: string; desc: string; deadline: string; script: Script; status: 'open' | 'judging' | 'closed'; judge?: string; judgingDeadline?: string };
 export const competitions: Competition[] = [
-  { title: 'The patient line', desc: 'Write صبر in any script, any level. Judges will look for proportion, intention, and a calm finish.', deadline: '30 Sep', script: 'Naskh', status: 'open' },
-  { title: 'One word, three moods', desc: 'Interpret سلام in three different scripts.', deadline: '14 Oct', script: 'Nastaaleeq', status: 'open' },
+  { title: 'The patient line', desc: 'Write “patience” in any script, any level. Judges will look for proportion, intention, and a calm finish.', deadline: '30 Sep', script: 'Naskh', status: 'open' },
+  { title: 'One word, three moods', desc: 'Interpret “peace” in three different scripts.', deadline: '14 Oct', script: 'Nastaaleeq', status: 'open' },
 ];
 export const pastCompetitionWinners = [
   { name: 'Amina Suleiman', title: 'The patient line', script: 'Naskh', branch: 'Nairobi' as Branch, won: true },
@@ -189,7 +198,7 @@ export type Notification = { title: string; body: string; type: string; time: st
 export const studentNotifications: Notification[] = [
   { title: 'Your Naskh checkpoint result is ready', body: 'Foundation checkpoint passed. Your next level is unlocked.', type: 'Test result', time: 'Today' },
   { title: 'A new course is open', body: 'Qalam care & cutting has been added to the library.', type: 'New course', time: 'Yesterday' },
-  { title: 'Guild challenge closes soon', body: 'Three days left to submit صبر.', type: 'Competition', time: '2 days ago' },
+  { title: 'Guild challenge closes soon', body: 'Three days left to submit your work.', type: 'Competition', time: '2 days ago' },
   { title: 'Monthly practice reminder', body: 'Your hand has been quiet for 4 days. Five minutes is enough.', type: 'Reminder', time: '4 days ago' },
   { title: 'Live event starting soon', body: 'Naskh clinic begins in 1 hour.', type: 'Live event', time: '5 days ago' },
 ];

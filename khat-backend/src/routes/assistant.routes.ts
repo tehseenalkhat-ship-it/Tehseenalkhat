@@ -99,7 +99,7 @@ function localFallbackReply(messages: ChatMessage[], courses: CourseSummary[], l
   }
 
   if (contains(normalized, ['what is arabic calligraphy', 'what is khat', 'meaning of khat', 'what is calligraphy'])) {
-    return 'Arabic calligraphy is the art and disciplined practice of shaping Arabic writing through letter form, proportion, connection, rhythm, spacing, and composition. “Khaṭṭ” (خط) is commonly used for writing or calligraphic script. It is both a way to make writing legible and a visual art with many scripts, teachers, and regional traditions.';
+    return 'Arabic calligraphy is the art and disciplined practice of shaping Arabic writing through letter form, proportion, connection, rhythm, spacing, and composition. “Khaṭṭ” is commonly used for writing or calligraphic script. It is both a way to make writing legible and a visual art with many scripts, teachers, and regional traditions.';
   }
 
   if (contains(normalized, ['right to left', 'which direction', 'writing direction', 'arabic direction'])) {
@@ -107,7 +107,7 @@ function localFallbackReply(messages: ChatMessage[], courses: CourseSummary[], l
   }
 
   if (contains(normalized, ['non joining', 'non-joining', 'do not join', 'dont join', 'letters dont connect', 'letters do not connect'])) {
-    return 'Some Arabic letters do not connect to the following letter in the normal written sequence. A common group is ا د ذ ر ز و (alif, dal, dhal, ra, zay, waw). They can still connect from a preceding letter where applicable. Check the particular letter pair and its context in your course reference, since the visible word shape depends on position.';
+    return 'Some Arabic letters do not connect to the following letter in the normal written sequence. A common group is alif, dal, dhal, ra, zay, and waw. They can still connect from a preceding letter where applicable. Check the particular letter pair and its context in your course reference, since the visible word shape depends on position.';
   }
 
   if (contains(normalized, ['harakat', 'diacritic', 'vowel mark', 'vowels in arabic', 'tashkil', 'tashkeel'])) {

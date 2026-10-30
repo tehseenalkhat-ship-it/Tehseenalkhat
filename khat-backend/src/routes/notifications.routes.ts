@@ -24,7 +24,7 @@ export async function notificationRoutes(app: FastifyInstance) {
         return reply.code(400).send({ error: 'payload must be an object' });
       }
       const theme = payload.theme;
-      if (theme !== 'blue' && theme !== 'green' && theme !== 'gold' && theme !== 'maroon') {
+      if (theme !== 'sky' && theme !== 'lavender' && theme !== 'sage' && theme !== 'rose') {
         return reply.code(400).send({ error: 'A valid theme is required' });
       }
       const userId = (request.user as AuthUser).id;

@@ -1,18 +1,18 @@
 import { lazy, Suspense, useEffect, useRef, useState } from 'react';
 import {
   ArrowRight, Award, Bell, BookOpen, CalendarDays, Check, ChevronDown, ChevronLeft, ChevronRight,
-  ClipboardList, ExternalLink, FileImage, FileText, FileVideo, Flame, Lock, Pause, Play, Search, Sparkles, Trophy, Upload, X,
+  ClipboardList, ExternalLink, FileImage, FileText, FileVideo, Flame, Lock, MessageCircle, Pause, Play, Search, Sparkles, Trophy, Upload, X,
   Clock, Download,
 } from 'lucide-react';
 import type { Script } from '@/data/types';
 import {
   khatTypes, scriptList,
   scriptToCode, scriptFromCode,
-  encouragementQuotes, galleryWorks,
+  galleryWorks,
 } from '@/data/mock';
 import {
   navigate, Button, SectionHeading, StatusChip, BadgeIcon, ActivityHeatmap,
-  StatCard, ScriptTabs, UploadBox, Modal, BackLink, ShowcaseSections, ShowcaseFeedSections, DashboardShowcaseCarousels, ShowcaseHeading, Footer, PenLoader,
+  StatCard, UploadBox, Modal, BackLink, ShowcaseSections, ShowcaseFeedSections, DashboardShowcaseCarousels, ShowcaseHeading, Footer, PenLoader,
 } from '@/components/ui';
 import {
   apiFetch,
@@ -23,9 +23,14 @@ import {
   getSessionUser,
   ApiError,
 } from '@/api';
+import './StudentCourseStyles.css';
+import { useLanguage } from '@/language';
 import { openCourseLevel, useCourseSession } from '@/courseSession';
 import { ShowcaseImageEditor } from '@/components/ShowcaseImageEditor';
+import { CourseJourney } from '@/components/CourseJourney';
 import type { LiveKitRoomAccess } from '@/components/LiveKitEventRoom';
+import '@/components/StudentCourseOverview.css';
+import '@/components/CourseEnvironmentLesson.css';
 const ResourcePdfViewer = lazy(() => import('@/components/ResourcePdfViewer'));
 const ResourceBookCover = lazy(() => import('@/components/ResourcePdfViewer').then(module => ({ default: module.ResourceBookCover })));
 const LiveKitEventRoom = lazy(() => import('@/components/LiveKitEventRoom').then(module => ({ default: module.LiveKitEventRoom })));
@@ -38,10 +43,25 @@ type ApiLevel = {
   id: string; course_id: string; order_index: number; level_type: 'mufradat' | 'writing' | 'test';
   title: string; media: ApiMediaItem[]; sheet_files: ApiSheetFiles; badge_tier: string | null; locked?: boolean;
 };
-type ApiCourse = { id: string; khat_type_id: string; category: string; title: string; description?: string };
-type ApiEnrollment = { id: string; current_level_index: number; percent_complete: string | number; status: string };
+type ApiCourse = { id: string; khat_type_id: string; category: string; title: string; description?: string; guidance_question?: string | null };
+type ApiEnrollment = { id: string; current_level_index: number; percent_complete: string | number; status: string; enrolled_at?: string };
 type ApiSecondaryCourse = { course: ApiCourse; enrollment: ApiEnrollment | null; levels: ApiLevel[] };
 type ApiKhatType = { id: string; code: string; display_name: string };
+type ApiDashboardEntry = {
+  id: string;
+  source_type: string;
+  level_id?: string | null;
+  created_at: string;
+  time_spent_minutes?: number | null;
+  mark_out_of_ten?: number | null;
+  status?: string;
+  entry_kind?: string | null;
+};
+const mashqSetSamples = [
+  { key: 'qs', category: 'Al-Qasāʾid al-Sharīfa', title: 'Hubbi Lakum', year: '1445H', sheetCount: 8, firstLevel: 0, levelCount: 2 },
+  { key: 'ms', category: 'Munājāt Sharīfa', title: 'ʿAbduka Rabbi', year: '1447H', sheetCount: 6, firstLevel: 2, levelCount: 2 },
+  { key: 'rh', category: 'Rawḍat al-Hidāyāt', title: 'Rawḍat al-Hidāyāt', year: '', sheetCount: 10, firstLevel: 4, levelCount: 1 },
+];
 type ApiEvent = {
   id: string;
   host_teacher_id: string;
@@ -56,6 +76,33 @@ type ApiEvent = {
   host_name: string;
   branch_name: string;
 };
+
+type CourseStage = { levels: ApiLevel[]; assessment: ApiLevel | null; start: number; end: number };
+
+function groupLevelsIntoStages(levels: ApiLevel[]): CourseStage[] {
+  const stages: CourseStage[] = [];
+  let current: CourseStage = { levels: [], assessment: null, start: 1, end: 0 };
+  let practiceNumber = 0;
+  const finishStage = () => {
+    if (current.levels.length || current.assessment) stages.push(current);
+    current = { levels: [], assessment: null, start: practiceNumber + 1, end: practiceNumber };
+  };
+
+  levels.forEach(level => {
+    if (level.level_type === 'test') {
+      current.assessment = level;
+      finishStage();
+      return;
+    }
+    if (current.levels.length === 6) finishStage();
+    practiceNumber += 1;
+    if (!current.levels.length) current.start = practiceNumber;
+    current.end = practiceNumber;
+    current.levels.push(level);
+  });
+  finishStage();
+  return stages;
+}
 
 type ApiCheckpoint = {
   id: string;
@@ -137,7 +184,6 @@ type ApiBadge = {
   khat_type_name: string;
 };
 type ApiBadgeArtwork = { key: string; filename: string; mediaType: 'image' | 'pdf'; url: string | null };
-
 type ApiActivity = {
   activity_date: string;
   login_count: number;
@@ -153,12 +199,47 @@ function scriptCode(script: Script): string {
   return scriptToCode(script);
 }
 
-const CATALOG_SCRIPT_KEY = 'khat_catalog_script';
-const dashboardScriptOrder: Script[] = ['Naskh', 'Sulus', 'Nastaaleeq', 'Naskh (Normal Pen)'];
+function scriptForCourseCode(code: string): Script {
+  return scriptFromCode(code.replace(/_normal_pen$/, '')) ?? 'Naskh';
+}
 
-function navigateToCatalogForScript(script: Script) {
+function dashboardCourseOrder(code: string): number {
+  const script = scriptFromCode(code) ?? scriptForCourseCode(code);
+  return dashboardScriptOrder.indexOf(script);
+}
+
+function courseGuidanceQuestion(course: ApiCourse, script?: Script): string {
+  if (course.guidance_question?.trim()) return course.guidance_question;
+  const subject = script ? khatTypes[script].name : course.title;
+  return course.category === 'certification'
+    ? `Would you like to develop your ${subject} handwriting and earn a certificate?`
+    : `Would you like to explore ${subject} at your own pace?`;
+}
+
+const CATALOG_SCRIPT_KEY = 'khat_catalog_script';
+const CATALOG_COURSE_KEY = 'khat_catalog_course';
+const CHAT_COURSE_REQUEST_KEY = 'khat_chat_course_request';
+const MASHQ_FILTER_KEY = 'khat_mashq_filter';
+const dashboardScriptOrder: Script[] = ['Naskh', 'Sulus', 'Nastaaleeq', 'Istinsaakh', 'Tehseen Al Khat', 'Naskh (Normal Pen)'];
+
+function navigateToCatalogForCourse(courseId: string, script: Script = 'Naskh') {
+  window.sessionStorage.setItem(CATALOG_COURSE_KEY, courseId);
   window.sessionStorage.setItem(CATALOG_SCRIPT_KEY, script);
   navigate('catalog');
+}
+
+function openDashboardCourse(course: ApiCourse, khatType: ApiKhatType) {
+  navigateToCatalogForCourse(course.id, scriptForCourseCode(khatType.code));
+}
+
+function navigateToCourseChat(courseId: string) {
+  window.sessionStorage.setItem(CHAT_COURSE_REQUEST_KEY, courseId);
+  navigate('chats');
+}
+
+function navigateToMashqWorksheets(filter = 'all') {
+  window.sessionStorage.setItem(MASHQ_FILTER_KEY, filter);
+  navigate('mashq');
 }
 
 function preferredCatalogScript(): Script {
@@ -179,7 +260,6 @@ export function StudentLandingPage() {
             <button className="text-link" onClick={() => navigate('catalog')}>Browse the curriculum <ArrowRight size={15} /></button>
           </div>
         </div>
-        <div className="hero-script">نسخ<br /><span>خط</span></div>
       </section>
       <main>
         <ShowcaseSections works={galleryWorks} />
@@ -199,26 +279,22 @@ export function StudentLandingPage() {
 }
 
 export function StudentDashboard() {
+  const { t } = useLanguage();
   type DashboardCourse = {
     course: ApiCourse;
+    khatType: ApiKhatType;
     enrollment: ApiEnrollment | null;
     progress: number;
     levels: ApiLevel[];
   };
 
-  const [courses, setCourses] = useState<
-    Record<Script, DashboardCourse | null>
-  >({
-    Naskh: null,
-    'Naskh (Normal Pen)': null,
-    Sulus: null,
-    Nastaaleeq: null,
-  });
+  const [courses, setCourses] = useState<DashboardCourse[]>([]);
   const [secondaryCourses, setSecondaryCourses] = useState<ApiSecondaryCourse[]>([]);
-  const [secondaryFilter, setSecondaryFilter] = useState<Script | 'all'>('all');
+  const [penTrack, setPenTrack] = useState<'cut' | 'normal'>('cut');
+  const [selectedCutStyles, setSelectedCutStyles] = useState<Record<'naskh' | 'istinsaakh', 1 | 2>>({ naskh: 1, istinsaakh: 1 });
+  const [secondaryFilter, setSecondaryFilter] = useState<string | 'all'>('all');
   const [secondaryLoading, setSecondaryLoading] = useState(true);
   const [secondaryError, setSecondaryError] = useState<string | null>(null);
-  const [enrollingSecondaryId, setEnrollingSecondaryId] = useState<string | null>(null);
 
   const [showcasePosts, setShowcasePosts] = useState<{
     id: string;
@@ -270,7 +346,7 @@ export function StudentDashboard() {
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [enrolling, setEnrolling] = useState<Script | null>(null);
+  const [practiceEntries, setPracticeEntries] = useState<ApiDashboardEntry[]>([]);
 
   // Dashboard events
   const [events, setEvents] = useState<ApiEvent[]>([]);
@@ -304,19 +380,24 @@ export function StudentDashboard() {
           apiFetch<ApiCourse[]>('/courses?category=secondary'),
         ]);
         const coursesWithProgress = await Promise.all(availableCourses.map(async course => {
+          const authoredLevels = await apiFetch<ApiLevel[]>(`/courses/${course.id}/levels`);
           try {
             const progress = await apiFetch<{ enrollment: ApiEnrollment; levels: ApiLevel[] }>(`/levels/courses/${course.id}/progress`);
             return { course, enrollment: progress.enrollment, levels: progress.levels };
           } catch (err) {
             if (err instanceof ApiError && err.status === 404) {
-              return { course, enrollment: null, levels: [] };
+              return { course, enrollment: null, levels: authoredLevels };
             }
             throw err;
           }
         }));
         if (!cancelled) {
           setKhatTypesList(types);
-          setSecondaryCourses(coursesWithProgress);
+          setSecondaryCourses(coursesWithProgress.sort((a, b) => {
+            const aCode = types.find(type => type.id === a.course.khat_type_id)?.code ?? '';
+            const bCode = types.find(type => type.id === b.course.khat_type_id)?.code ?? '';
+            return dashboardCourseOrder(aCode) - dashboardCourseOrder(bCode);
+          }));
         }
       } catch (err) {
         if (!cancelled) setSecondaryError(err instanceof ApiError ? err.message : 'Could not load secondary courses.');
@@ -342,26 +423,6 @@ export function StudentDashboard() {
     }
   };
 
-  const enrollInSecondaryCourse = async (item: ApiSecondaryCourse) => {
-    setEnrollingSecondaryId(item.course.id);
-    setSecondaryError(null);
-    try {
-      await apiFetch('/levels/enroll', { method: 'POST', body: { courseId: item.course.id } });
-      const progress = await apiFetch<{ enrollment: ApiEnrollment; levels: ApiLevel[] }>(`/levels/courses/${item.course.id}/progress`);
-      const enrolled = { ...item, enrollment: progress.enrollment, levels: progress.levels };
-      setSecondaryCourses(current => current.map(course => course.course.id === item.course.id ? enrolled : course));
-      const firstAvailable = progress.levels.find(level => !level.locked);
-      if (firstAvailable) {
-        openCourseLevel(item.course.id, firstAvailable.id);
-        navigate('course');
-      }
-    } catch (err) {
-      setSecondaryError(err instanceof ApiError ? err.message : 'Could not enroll in this course.');
-    } finally {
-      setEnrollingSecondaryId(null);
-    }
-  };
-
   useEffect(() => {
     let cancelled = false;
 
@@ -377,79 +438,22 @@ export function StudentDashboard() {
           setKhatTypesList(fetchedKhatTypes);
         }
 
-        const results = await Promise.all(
-          scriptList.map(async (script) => {
-            const khatType = fetchedKhatTypes.find(
-              k => k.code === scriptCode(script)
-            );
+        const certificationCourses = await apiFetch<ApiCourse[]>(('/courses?category=certification'));
+        const results = await Promise.all(certificationCourses.map(async course => {
+          const khatType = fetchedKhatTypes.find(item => item.id === course.khat_type_id);
+          if (!khatType) return null;
+          const authoredLevels = await apiFetch<ApiLevel[]>(`/courses/${course.id}/levels`);
+          try {
+            const progress = await apiFetch<{ enrollment: ApiEnrollment; levels: ApiLevel[] }>(`/levels/courses/${course.id}/progress`);
+            return { course, khatType, enrollment: progress.enrollment, progress: Number(progress.enrollment.percent_complete ?? 0), levels: progress.levels };
+          } catch (err) {
+            if (!(err instanceof ApiError) || err.status !== 404) throw err;
+            return { course, khatType, enrollment: null, progress: 0, levels: authoredLevels };
+          }
+        }));
 
-            if (!khatType) {
-              return [script, null] as const;
-            }
-
-            const certCourses =
-              await apiFetch<ApiCourse[]>(
-                `/courses?khatTypeId=${khatType.id}&category=certification`
-              );
-
-            const course = certCourses[0];
-
-            if (!course) {
-              return [script, null] as const;
-            }
-
-            const authoredLevels = await apiFetch<ApiLevel[]>(`/courses/${course.id}/levels`);
-
-            /*
-             * IMPORTANT:
-             * We only READ progress here.
-             * We do NOT automatically enroll the student.
-             *
-             * If the student is not enrolled, the progress endpoint
-             * will fail and we treat it as "not enrolled".
-             */
-            try {
-              const progress =
-                await apiFetch<{
-                  enrollment: ApiEnrollment;
-                  levels: ApiLevel[];
-                }>(
-                  `/levels/courses/${course.id}/progress`
-                );
-
-              return [
-                script,
-                {
-                  course,
-                  enrollment: progress.enrollment,
-                  progress: Number(
-                    progress.enrollment?.percent_complete ?? 0
-                  ),
-                  levels: progress.levels,
-                },
-              ] as const;
-            } catch {
-              return [
-                script,
-                {
-                  course,
-                  enrollment: null,
-                  progress: 0,
-                  levels: [],
-                },
-              ] as const;
-            }
-          })
-        );
-
-        if (!cancelled) {
-          setCourses(
-            Object.fromEntries(results) as Record<
-              Script,
-              DashboardCourse | null
-            >
-          );
-        }
+        if (!cancelled) setCourses(results.filter((item): item is DashboardCourse => item !== null)
+          .sort((a, b) => dashboardCourseOrder(a.khatType.code) - dashboardCourseOrder(b.khatType.code)));
       } catch (err) {
         if (!cancelled) {
           setError(
@@ -515,12 +519,21 @@ export function StudentDashboard() {
           return;
         }
     
-        const profile = await apiFetch<{
-          activity: ApiActivity[];
-        }>(`/students/${user.id}/profile`);
+        const [profile, entries] = await Promise.all([
+          apiFetch<{ activity: ApiActivity[]; levelSubmissions?: { id: string; submitted_at: string; time_spent_minutes: number; course_category?: string }[] }>(`/students/${user.id}/profile`),
+          apiFetch<ApiDashboardEntry[]>('/entries/mine'),
+        ]);
     
         if (!cancelled) {
           setActivity(profile.activity ?? []);
+          const legacyPractice = (profile.levelSubmissions ?? []).map(submission => ({
+            id: submission.id,
+            source_type: 'legacy_practice',
+            created_at: submission.submitted_at,
+            time_spent_minutes: submission.time_spent_minutes,
+            entry_kind: submission.course_category === 'secondary' ? 'secondary_marking' : 'practice_marking',
+          }));
+          setPracticeEntries([...entries, ...legacyPractice]);
         }
       } catch (err) {
         console.error('Failed to load dashboard activity:', err);
@@ -621,52 +634,6 @@ export function StudentDashboard() {
     };
   }, []);
 
-  const enroll = async (script: Script) => {
-    const dashboardCourse = courses[script];
-
-    if (!dashboardCourse?.course) return;
-
-    setEnrolling(script);
-    setError(null);
-
-    try {
-      await apiFetch('/levels/enroll', {
-        method: 'POST',
-        body: {
-          courseId: dashboardCourse.course.id,
-        },
-      });
-
-      const progress =
-        await apiFetch<{
-          enrollment: ApiEnrollment;
-          levels: ApiLevel[];
-        }>(
-          `/levels/courses/${dashboardCourse.course.id}/progress`
-        );
-
-      setCourses(prev => ({
-        ...prev,
-        [script]: {
-          ...dashboardCourse,
-          enrollment: progress.enrollment,
-          progress: Number(
-            progress.enrollment?.percent_complete ?? 0
-          ),
-          levels: progress.levels,
-        },
-      }));
-    } catch (err) {
-      setError(
-        err instanceof ApiError
-          ? err.message
-          : `Could not enroll in ${script}.`
-      );
-    } finally {
-      setEnrolling(null);
-    }
-  };
-
   /*
    * Map the backend checkpoint's khat_type_id to the
    * frontend Script value.
@@ -731,485 +698,271 @@ export function StudentDashboard() {
     );
   }
 
+  const today = new Date();
+  const weekStart = new Date(today);
+  weekStart.setHours(0, 0, 0, 0);
+  weekStart.setDate(weekStart.getDate() - ((weekStart.getDay() + 6) % 7));
+  const lastWeekStart = new Date(weekStart);
+  lastWeekStart.setDate(lastWeekStart.getDate() - 7);
+  const nextWeekStart = new Date(today);
+  nextWeekStart.setDate(nextWeekStart.getDate() + 1);
+  nextWeekStart.setHours(0, 0, 0, 0);
+  const entriesThisWeek = practiceEntries.filter(entry => (entry.entry_kind === 'practice_marking' || entry.entry_kind === 'secondary_marking') && new Date(entry.created_at) >= weekStart && new Date(entry.created_at) < nextWeekStart);
+  const entriesLastWeek = practiceEntries.filter(entry => (entry.entry_kind === 'practice_marking' || entry.entry_kind === 'secondary_marking') && new Date(entry.created_at) >= lastWeekStart && new Date(entry.created_at) < weekStart);
+  const minutesThisWeek = entriesThisWeek.reduce((sum, entry) => sum + Number(entry.time_spent_minutes ?? 0), 0);
+  const minutesLastWeek = entriesLastWeek.reduce((sum, entry) => sum + Number(entry.time_spent_minutes ?? 0), 0);
+  const markOnlyEntries = practiceEntries.filter(entry => entry.entry_kind === 'practice_marking' || entry.entry_kind === 'secondary_marking');
+  const markedEntries = markOnlyEntries.filter(entry => entry.mark_out_of_ten != null).sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+  const averageLastThree = markedEntries.slice(0, 3).reduce((sum, entry) => sum + Number(entry.mark_out_of_ten), 0) / Math.max(1, Math.min(3, markedEntries.length));
+  const previousThree = markedEntries.slice(3, 6);
+  const previousAverage = previousThree.length ? previousThree.reduce((sum, entry) => sum + Number(entry.mark_out_of_ten), 0) / previousThree.length : null;
+  const activityDays = [...new Set(activity.map(item => item.activity_date.slice(0, 10)))].sort();
+  let longestStreak = 0;
+  let runningStreak = 0;
+  let previousActivityDay: number | null = null;
+  const weekdayCounts = [0, 0, 0, 0, 0, 0, 0];
+  for (const day of activityDays) {
+    const date = new Date(`${day}T00:00:00Z`);
+    const dayNumber = Math.floor(date.getTime() / 86_400_000);
+    runningStreak = previousActivityDay !== null && dayNumber === previousActivityDay + 1 ? runningStreak + 1 : 1;
+    longestStreak = Math.max(longestStreak, runningStreak);
+    previousActivityDay = dayNumber;
+  }
+  for (const entry of practiceEntries) {
+    weekdayCounts[new Date(entry.created_at).getDay()] += 1;
+  }
+  const bestPracticeDay = practiceEntries.length
+    ? ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'][weekdayCounts.indexOf(Math.max(...weekdayCounts))]
+    : '—';
+  const allDashboardCourses = courses.filter(item => item.khatType.code !== 'tehseen_al_khat');
+  const dashboardCourses = allDashboardCourses.filter(item => {
+    if (!['naskh', 'istinsaakh'].includes(item.khatType.code)) return true;
+    const stylePattern = /\bstyle\s*(one|two|1|2)\b/i;
+    const hasStyleVariants = allDashboardCourses.some(candidate => candidate.khatType.code === item.khatType.code && stylePattern.test(candidate.course.title));
+    if (hasStyleVariants && !stylePattern.test(item.course.title)) return false;
+    const styleMatch = item.course.title.match(stylePattern);
+    const styleNumber = styleMatch ? (/two|2/i.test(styleMatch[1]) ? 2 : 1) : null;
+    return styleNumber === null || styleNumber === selectedCutStyles[item.khatType.code as 'naskh' | 'istinsaakh'];
+  });
+  const enrolledCourses = [
+    ...dashboardCourses.filter(item => item.enrollment && item.levels.length),
+    ...secondaryCourses.filter(item => item.enrollment && item.levels.length && !/mashq|worksheet/i.test(item.course.title)).map(item => ({ ...item, khatType: khatTypesList.find(type => type.id === item.course.khat_type_id) })),
+  ];
+  const masterLevelCount = enrolledCourses.reduce((sum, item) => sum + item.levels.length, 0);
+  const masterCompletedCount = enrolledCourses.reduce((sum, item) => sum + Math.min(item.levels.length, item.enrollment?.current_level_index ?? Math.round(item.levels.length * Number(item.enrollment?.percent_complete ?? 0) / 100)), 0);
+  const masterProgress = masterLevelCount ? Math.round(masterCompletedCount / masterLevelCount * 100) : 0;
+  const upcomingAssessment = dashboardCourses.flatMap(item => {
+    if (!item.enrollment) return [];
+    const checkpoint = item.levels.find(level => level.level_type === 'test' && level.order_index >= item.enrollment!.current_level_index);
+    return checkpoint ? [{ course: item, level: checkpoint, levelsAway: Math.max(0, checkpoint.order_index - item.enrollment.current_level_index) }] : [];
+  }).sort((a, b) => a.levelsAway - b.levelsAway)[0];
+  const focusCourse = dashboardCourses.find(item => item.enrollment && item.levels.length);
+  const focusLevel = focusCourse?.levels[focusCourse.enrollment?.current_level_index ?? 0] ?? null;
+  const courseStartedAt = (enrolledAt?: string) => enrolledAt ? new Date(enrolledAt).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' }) : null;
+  const rawCutPenCourses = allDashboardCourses.filter(item => !item.khatType.code.endsWith('_normal_pen'));
+  const styledCutPenCourses = (['naskh', 'istinsaakh'] as const).flatMap(code => {
+    const matching = rawCutPenCourses.filter(item => item.khatType.code === code);
+    if (!matching.length) return [];
+    const styleCourses = matching.filter(item => /\bstyle\s*(one|two|1|2)\b/i.test(item.course.title));
+    if (styleCourses.length) {
+      const selectedStyle = selectedCutStyles[code];
+      const selectedCourse = styleCourses.find(item => new RegExp(`\\bstyle\\s*${selectedStyle === 1 ? '(?:one|1)' : '(?:two|2)'}\\b`, 'i').test(item.course.title));
+      return [selectedCourse ?? matching.find(item => !styleCourses.includes(item)) ?? styleCourses[0]];
+    }
+    const sourceCourse = matching[0];
+    const styleName = selectedCutStyles[code] === 1 ? 'One' : 'Two';
+    const title = code === 'naskh' ? `Naskh Style ${styleName}` : `Instinsakh Style ${styleName}`;
+    return [{ ...sourceCourse, course: { ...sourceCourse.course, title } }];
+  });
+  const cutPenCourses = [
+    ...rawCutPenCourses.filter(item => !['naskh', 'istinsaakh'].includes(item.khatType.code)),
+    ...styledCutPenCourses,
+  ].sort((a, b) => dashboardCourseOrder(a.khatType.code) - dashboardCourseOrder(b.khatType.code));
+  const normalPenCourses = dashboardCourses.filter(item => item.khatType.code.endsWith('_normal_pen'));
+  const mashqCourses = secondaryCourses.filter(item => /mashq|worksheet/i.test(item.course.title));
+  const crashCourses = secondaryCourses.filter(item => !/mashq|worksheet/i.test(item.course.title));
+  const cutCrashCourses = crashCourses.filter(item => !(khatTypesList.find(type => type.id === item.course.khat_type_id)?.code ?? '').endsWith('_normal_pen'));
+  const normalCrashCourses = crashCourses.filter(item => (khatTypesList.find(type => type.id === item.course.khat_type_id)?.code ?? '').endsWith('_normal_pen'));
+  const visibleCourses = penTrack === 'cut' ? cutPenCourses : normalPenCourses;
+  const visibleCrashCourses = crashCourses.filter(item => {
+    const code = khatTypesList.find(type => type.id === item.course.khat_type_id)?.code ?? '';
+    return penTrack === 'normal' ? code.endsWith('_normal_pen') : !code.endsWith('_normal_pen');
+  });
+  const visibleMashqCourses = mashqCourses.filter(item => {
+    const code = khatTypesList.find(type => type.id === item.course.khat_type_id)?.code ?? '';
+    const matchesPen = penTrack === 'normal' ? code.endsWith('_normal_pen') : !code.endsWith('_normal_pen');
+    return matchesPen && (secondaryFilter === 'all' || code === secondaryFilter);
+  });
+
   return (
-    <main className="page portal-page">
-      <div className="portal-welcome">
+    <main className="page portal-page student-home-redesign">
+      <header className="student-home-heading">
         <div>
-          <p className="eyebrow">
-            Your learning path
-          </p>
-
-          <h1>Your Path</h1>
-
-          <p>
-            Continue your calligraphy journey at your own pace.
-          </p>
+          <p className="eyebrow">{t('Your learning path')}</p>
+          <h1>{t('Your Path')}</h1>
+          <p>{t('First choose your pen. Then pick the course that matches what you want to learn.')}</p>
         </div>
+        <div className="student-home-streak"><Flame size={15} /><strong>{activityLoading ? '—' : dayStreak}</strong><span>day streak</span></div>
+      </header>
 
-        <div className="streak">
-          <Flame size={22} />
-        
-          <strong>
-            {activityLoading ? '—' : dayStreak}
-          </strong>
-        
-          <span>day streak</span>
+      {error && <p className="error-text" role="alert">{error}</p>}
+
+      <section className="student-home-section" aria-label="Choose your pen">
+        <span className="student-home-step">{t('Step 1 · Choose your pen')}</span>
+        <div className="student-pen-options">
+          <button type="button" className={`student-pen-option${penTrack === 'cut' ? ' active' : ''}`} aria-pressed={penTrack === 'cut'} onClick={() => setPenTrack('cut')}>
+            <span><strong>{t('Cut pen courses')}</strong><small><b>Qalam al-Qasab</b> (wooden) or <b>Qalam al-Hadeed</b> (metal)</small><em>{t('Courses')} {cutPenCourses.length + cutCrashCourses.length} · {t('Worksheets')} {mashqCourses.length || 1}</em></span>
+          </button>
+          <button type="button" className={`student-pen-option${penTrack === 'normal' ? ' active' : ''}`} aria-pressed={penTrack === 'normal'} onClick={() => setPenTrack('normal')}>
+            <span><strong>{t('Normal pen courses')}</strong><small>{t('An everyday pen, for better daily handwriting')}</small><em>{t('Courses')} {normalPenCourses.length + normalCrashCourses.length} · {t('Worksheets soon')}</em></span>
+          </button>
         </div>
-      </div>
-
-      {error && (
-        <p className="error-text">
-          {error}
-        </p>
-      )}
-
-      <div className="certification-section-heading">
-        <span className="certification-course-badge"><Award size={13} /> Certification courses</span>
-      </div>
-      <div className="script-progress-grid">
-        {dashboardScriptOrder.map(script => {
-          const dashboardCourse =
-            courses[script];
-
-          const active = Boolean(dashboardCourse?.enrollment && dashboardCourse.levels.length > 0);
-
-          const progress =
-            dashboardCourse?.progress ?? 0;
-
-          const levels =
-            dashboardCourse?.levels ?? [];
-
-          const currentLevelIndex =
-            dashboardCourse?.enrollment
-              ?.current_level_index ?? 0;
-
-          const currentLevel =
-            levels[currentLevelIndex] ?? null;
-
-          const nextLevel =
-            levels[currentLevelIndex + 1] ?? null;
-
-          return (
-            <div
-              className={`progress-card ${!active ? 'not-enrolled' : ''} ${script === 'Naskh (Normal Pen)' ? 'normal-pen-progress-card' : ''}`}
-              key={script}
-              style={
-                {
-                  '--script':
-                    khatTypes[script].color,
-                } as React.CSSProperties
-              }
-            >
-              <div className="card-top">
-                <strong
-                  style={{
-                    color:
-                      khatTypes[script].color,
-                  }}
-                >
-                  {khatTypes[script].arabic}
-                </strong>
-
-                <span>
-                  {khatTypes[script].name}
-                </span>
-
-                {script === 'Naskh (Normal Pen)' && <small className="normal-pen-card-label">Ordinary pen · no cut qalam</small>}
-
-                {active && (
-                  <small>
-                    <Flame size={13} />
-                    Active
-                  </small>
-                )}
-              </div>
-
-              <div className={script === 'Naskh (Normal Pen)' ? 'normal-pen-card-body' : undefined}>
-              {active ? (
-                <>
-                  <p>
-                    Level:{' '}
-                    <b>
-                      {currentLevel?.title ??
-                        'Getting started'}
-                    </b>{' '}
-                    · {Math.round(progress)}%
-                  </p>
-
-                  <div className="progress">
-                    <i
-                      style={{
-                        width: `${Math.min(
-                          100,
-                          Math.max(0, progress)
-                        )}%`,
-                      }}
-                    />
-                  </div>
-
-                  <small className="next">
-                    {nextLevel
-                      ? `Next: ${nextLevel.title}`
-                      : 'You have reached the current final level.'}
-                  </small>
-
-                  <div className="card-actions">
-                    <Button
-                      onClick={() =>
-                        navigateToCatalogForScript(script)
-                      }
-                    >
-                      Continue
-                      <ArrowRight size={14} />
-                    </Button>
-
-                    <Button
-                      outline
-                      onClick={() =>
-                        navigateToCatalogForScript(script)
-                      }
-                    >
-                      Submit practice
-                    </Button>
-                  </div>
-                </>
-              ) : (
-                <>
-                  <p>
-                    {script === 'Naskh (Normal Pen)'
-                      ? 'A dedicated Naskh certification path for everyday pen practice, separate from the three cut-qalam courses.'
-                      : "Not yet enrolled. Start whenever you're ready — no prerequisite from your other tracks."}
-                  </p>
-
-                  {dashboardCourse?.course ? (
-                    dashboardCourse.levels.length > 0 ? (
-                      <Button
-                        outline
-                        onClick={() => enroll(script)}
-                      >
-                        {enrolling === script ? 'Enrolling…' : 'Enroll free'}
-                        <ArrowRight size={14} />
-                      </Button>
-                    ) : (
-                      <small className="muted">Course design in progress · enrollment opens when lessons are ready.</small>
-                    )
-                  ) : (
-                    <small className="muted">
-                      This course is not available yet.
-                    </small>
-                  )}
-                </>
-              )}
-              </div>
-            </div>
-          );
-        })}
-      </div>
-
-      <section className="dashboard-secondary-section" aria-labelledby="dashboard-secondary-title">
-        <div className="dashboard-secondary-heading">
-          <div>
-            <p className="eyebrow">Explore at your own pace</p>
-            <h2 id="dashboard-secondary-title">Secondary courses</h2>
-            <p>Optional lessons in technique, history, and composition — no certification prerequisites.</p>
-          </div>
-          <span className="dashboard-secondary-count">{secondaryCourses.length} {secondaryCourses.length === 1 ? 'course' : 'courses'}</span>
-        </div>
-        <div className="dashboard-secondary-filters" role="group" aria-label="Filter secondary courses by script">
-          {(['all', ...scriptList] as (Script | 'all')[]).map(filter => (
-            <button
-              type="button"
-              key={filter}
-              className={`secondary-filter-chip${secondaryFilter === filter ? ' active' : ''}`}
-              aria-pressed={secondaryFilter === filter}
-              onClick={() => setSecondaryFilter(filter)}
-            >
-              {filter === 'all' ? 'All scripts' : filter === 'Sulus' ? 'Thuluth' : khatTypes[filter].name}
-            </button>
-          ))}
-        </div>
-        {secondaryError && <p className="error-text" role="alert">{secondaryError}</p>}
-        {secondaryLoading ? (
-          <div className="dashboard-secondary-loading"><PenLoader label="Loading secondary courses…" compact /> <span>Finding courses for your scripts…</span></div>
-        ) : (
-          <div className="dashboard-secondary-grid">
-            {secondaryCourses.filter(item => {
-              if (secondaryFilter === 'all') return true;
-              const script = scriptFromCode(khatTypesList.find(type => type.id === item.course.khat_type_id)?.code ?? '');
-              return script === secondaryFilter;
-            }).map(item => {
-              const script = scriptFromCode(khatTypesList.find(type => type.id === item.course.khat_type_id)?.code ?? '');
-              const type = script ? khatTypes[script] : null;
-              const enrolled = Boolean(item.enrollment);
-              const currentIndex = item.enrollment?.current_level_index ?? 0;
-              const currentLevel = item.levels[currentIndex] ?? item.levels.find(level => !level.locked) ?? null;
-              const progress = Number(item.enrollment?.percent_complete ?? 0);
-              const complete = Boolean(item.enrollment && item.levels.length > 0 && currentIndex >= item.levels.length);
-
-              return (
-                <article className="dashboard-secondary-card" key={item.course.id}>
-                  <div className="dashboard-secondary-card-top">
-                    <span className="secondary-course-tag"><BookOpen size={13} /> Self-learning</span>
-                    {enrolled && <StatusChip tone="green">{complete ? 'Complete' : 'In progress'}</StatusChip>}
-                  </div>
-                  <div className="dashboard-secondary-title-row">
-                    {type && script !== 'Naskh' && <span className="secondary-script-mark" aria-hidden="true">{type.arabic}</span>}
-                    <div><h3>{item.course.title}</h3>{type && <span className="secondary-script-name">{type.name}</span>}</div>
-                  </div>
-                  <p className="dashboard-secondary-description">{item.course.description || 'Explore this self-paced course and work through its lessons in your own time.'}</p>
-                  {enrolled ? (
-                    <>
-                      <div className="dashboard-secondary-progress-copy"><span>{complete ? 'Course progress' : currentLevel?.title ?? 'Ready to begin'}</span><strong>{Math.round(progress)}%</strong></div>
-                      <div className="progress dashboard-secondary-progress"><i style={{ width: `${Math.min(100, Math.max(0, progress))}%` }} /></div>
-                      <Button disabled={!currentLevel} onClick={() => currentLevel && (openCourseLevel(item.course.id, currentLevel.id), navigate('course'))}>{complete ? 'Review course' : 'Continue learning'} <ArrowRight size={14} /></Button>
-                    </>
-                  ) : (
-                    <>
-                      <div className="dashboard-secondary-progress-copy"><span>Not started</span><strong>0%</strong></div>
-                      <div className="progress dashboard-secondary-progress"><i style={{ width: '0%' }} /></div>
-                      <Button outline disabled={enrollingSecondaryId === item.course.id} onClick={() => void enrollInSecondaryCourse(item)}>{enrollingSecondaryId === item.course.id ? 'Enrolling…' : 'Start learning'} <ArrowRight size={14} /></Button>
-                    </>
-                  )}
-                </article>
-              );
-            })}
-            {secondaryCourses.length === 0 && <div className="dashboard-secondary-empty"><Sparkles size={19} /><div><strong>More ways to explore are on their way</strong><p>New secondary courses will appear here when they’re available.</p></div></div>}
-            {secondaryCourses.length > 0 && secondaryFilter !== 'all' && !secondaryCourses.some(item => khatTypesList.find(type => type.id === item.course.khat_type_id)?.code === scriptCode(secondaryFilter)) && <div className="dashboard-secondary-empty"><BookOpen size={19} /><div><strong>No {secondaryFilter === 'Sulus' ? 'Thuluth' : secondaryFilter} courses yet</strong><p>Try another script filter to explore available courses.</p></div></div>}
-          </div>
-        )}
       </section>
 
-      <div className="dashboard-lower">
-        {/* ==============================
-            LAST CHECKPOINT TEST
-            ============================== */}
+      <div className="student-home-key" aria-label={t('Course card guide')}><strong>{t('Every card reads the same way:')}</strong><span className="home-key-q">{t('1 · Is this for you?')}</span><span className="home-key-levels">{t('2 · Levels')}</span><span className="home-key-progress">{t('3 · Your progress')}</span><span className="home-key-assessment">{t('4 · Assessment')}</span></div>
+      <span className="student-home-step">{t('Step 2 · Pick a course')}</span>
 
-        <div className="submission-card">
-          <p className="eyebrow">
-            Your last checkpoint test
-          </p>
-
-          {checkpointLoading ? (
-            <PenLoader label="Loading checkpoint activity…" compact />
-          ) : latestCheckpoint ? (
-            <div className="checkpoint-result-content">
-              <div className="submission-title">
-                <div>
-                  <h3>{checkpointScript ? `${checkpointScript} checkpoint` : 'Checkpoint test'}</h3>
-                  <p>{checkpointLevel ? `Level: ${checkpointLevel}` : 'Checkpoint submission'} · Submitted {checkpointDate}</p>
-                </div>
-                <StatusChip tone={latestCheckpoint.status === 'reviewed' ? 'green' : latestCheckpoint.status === 'redo_needed' ? 'red' : 'amber'}>{checkpointStatus}</StatusChip>
-              </div>
-              {latestCheckpointReview && (
-                <div className="checkpoint-teacher-result">
-                  <div className="checkpoint-result-heading">
-                    <div><strong>Teacher’s review</strong><small>{latestCheckpointReview.reviewed_by_name ? `Reviewed by ${latestCheckpointReview.reviewed_by_name}` : 'Reviewed by your teacher'}{latestCheckpointReview.reviewed_at ? ` · ${new Date(latestCheckpointReview.reviewed_at).toLocaleDateString()}` : ''}</small></div>
-                    <StatusChip tone={latestCheckpointReview.status === 'reviewed' ? 'green' : 'red'}>{latestCheckpointReview.status === 'reviewed' ? 'Passed' : 'Needs redo'}</StatusChip>
-                  </div>
-                  {latestCheckpointReview.feedback && <p className="checkpoint-result-feedback">{latestCheckpointReview.feedback}</p>}
-                  <div className="checkpoint-result-files">
-                    {latestCheckpointReview.submissionImageUrl && <a href={latestCheckpointReview.submissionImageUrl} target="_blank" rel="noreferrer"><img src={latestCheckpointReview.submissionImageUrl} alt="Your reviewed checkpoint submission" /><span>Your submitted sheet</span></a>}
-                    {latestCheckpointReview.correctionImageUrl && <a href={latestCheckpointReview.correctionImageUrl} target="_blank" rel="noreferrer"><img src={latestCheckpointReview.correctionImageUrl} alt="Teacher's annotated correction" /><span>Teacher’s annotated feedback</span></a>}
-                  </div>
-                  {latestCheckpointReview.correctionVoiceUrl && <StudentVoicePlayer src={latestCheckpointReview.correctionVoiceUrl} />}
-                  {!latestCheckpointReview.feedback && !latestCheckpointReview.correctionImageUrl && !latestCheckpointReview.correctionVoiceUrl && <p className="muted">Your teacher did not add written, annotated, or voice feedback for this attempt.</p>}
-                </div>
-              )}
-            </div>
-          ) : (
-            <div className="submission-title">
-              <div>
-                <h3>
-                  No checkpoint submitted yet
-                </h3>
-
-                <p>
-                  Your checkpoint activity will appear
-                  here once you submit a test.
-                </p>
-              </div>
-
-              <StatusChip tone="gold">
-                No submission
-              </StatusChip>
-            </div>
-          )}
+      <section className="student-home-course-section" aria-labelledby="certification-courses-heading">
+        <div className="student-home-section-title"><div><h2 id="certification-courses-heading">{t('Certification courses')}</h2><p>{t('Complete every level to earn a certificate.')}</p></div></div>
+        <div className="student-home-course-grid">
+          {visibleCourses.map((item, index) => {
+            const enrolled = Boolean(item.enrollment && item.levels.length);
+            const currentIndex = item.enrollment?.current_level_index ?? 0;
+            const progress = enrolled ? Number(item.enrollment?.percent_complete ?? 0) : 0;
+            const nextAssessment = item.levels.find(level => level.level_type === 'test' && level.order_index >= currentIndex);
+            const arabic = scriptFromCode(item.khatType.code) ? khatTypes[scriptFromCode(item.khatType.code)!].arabic : '';
+            return <article className="student-course-card" key={item.course.id} role="link" tabIndex={0} aria-label={`Open ${item.course.title} course page`} onClick={() => openDashboardCourse(item.course, item.khatType)} onKeyDown={event => { if (event.target === event.currentTarget && (event.key === 'Enter' || event.key === ' ')) { event.preventDefault(); openDashboardCourse(item.course, item.khatType); } }}>
+              <div className="student-course-card-heading"><span className="student-course-number">{index + 1}</span><span className="student-course-tag">{t('Certification')}</span>{item.khatType.code.endsWith('_normal_pen') && <span className="student-course-tag pen-tag">{t('Normal pen')}</span>}{['naskh', 'istinsaakh'].includes(item.khatType.code) && <div className="student-course-style-toggle" role="group" aria-label={`${khatTypes[scriptFromCode(item.khatType.code)!].name} ${t('Course style')}`} onClick={event => event.stopPropagation()}>{([1, 2] as const).map(style => <button key={style} type="button" className={selectedCutStyles[item.khatType.code as 'naskh' | 'istinsaakh'] === style ? 'active' : ''} aria-pressed={selectedCutStyles[item.khatType.code as 'naskh' | 'istinsaakh'] === style} onClick={() => setSelectedCutStyles(current => ({ ...current, [item.khatType.code]: style }))}>{t(style === 1 ? 'Style One' : 'Style Two')}</button>)}</div>}<span className="student-course-arabic" lang="ar" dir="rtl">{arabic}</span></div>
+              <div className="student-course-name"><h3>{['naskh', 'istinsaakh'].includes(item.khatType.code) ? item.course.title : scriptFromCode(item.khatType.code) ? khatTypes[scriptFromCode(item.khatType.code)!].name.replace(' · Normal pen', '') : item.khatType.display_name}</h3><p>{item.course.description || t('Build confident, measured handwriting with this guided certification path.')}</p></div>
+              <div className="student-course-info"><small>1 · Is this for you?</small><p>“{courseGuidanceQuestion(item.course, scriptFromCode(item.khatType.code) ?? undefined)}”</p></div>
+              <div className="student-course-levels"><div><small>2 · Levels</small><strong>{item.levels.length} levels</strong></div><div className="student-level-pips">{item.levels.map((level, levelIndex) => <i key={level.id} className={`${level.level_type === 'test' ? 'assessment' : ''}${enrolled && levelIndex < currentIndex ? ' complete' : ''}`} title={`${level.title}${level.level_type === 'test' ? ' · assessment' : ''}`} />)}</div><span><i className="student-assessment-diamond" /> marks an online assessment</span></div>
+              <div className="student-course-progress"><div className="student-course-progress-copy"><small>3 · Your progress</small><span>{enrolled ? `Started ${courseStartedAt(item.enrollment?.enrolled_at) ?? 'earlier'} · Level ${Math.min(currentIndex, item.levels.length)} of ${item.levels.length}` : `Not started yet · 0 of ${item.levels.length} levels`}</span><strong>{enrolled ? `${Math.round(progress)}%` : '0%'}</strong></div><div className="student-progress-track"><i style={{ width: `${progress}%` }} /></div></div>
+              <div className="student-course-assessment"><small>4 · Assessment</small><p>{nextAssessment ? `Online assessment and marking at ${nextAssessment.title}.` : 'Online assessment and marking after every 6–7 levels.'}</p><strong>{nextAssessment ? `Next assessment after Level ${nextAssessment.order_index}` : 'Practice levels receive marks; optional voice feedback may be included.'}</strong></div>
+              <div className="student-course-actions" onClick={event => event.stopPropagation()}><Button outline onClick={() => openDashboardCourse(item.course, item.khatType)}>{enrolled ? 'Open course' : 'View course'} <ArrowRight size={14} /></Button></div>
+            </article>;
+          })}
+          {!visibleCourses.length && <div className="student-home-empty">{penTrack === 'normal' ? 'Normal-pen certification courses will appear here when available.' : 'No certification courses are available yet.'}</div>}
         </div>
+      </section>
 
-        {/* ==============================
-            BADGES
-            ============================== */}
-        
-        <div className="badge-panel dashboard-badge-panel">
-          <div className="dashboard-badge-heading"><div><p className="eyebrow">Milestones earned</p><h2>Your badges</h2><p>Recognition for your dedication to each script.</p></div><span className="dashboard-badge-total">{badges.length} {badges.length === 1 ? 'badge' : 'badges'}</span></div>
-        
-          <div className="badge-row dashboard-badge-grid">
-            {badgesLoading ? (
-              <PenLoader label="Loading your badges…" compact />
-            ) : badges.length === 0 ? (
-              <div className="dashboard-badge-empty"><span className="dashboard-badge-placeholder"><img src="/mock-badge.svg" alt="" /></span><div><strong>Your first badge is waiting</strong><p>Pass a checkpoint to earn a badge for your script.</p></div></div>
-            ) : (
-              badges.map(badge => {
-                const badgeScript = scriptFromCode(badge.khat_type_code);
-        
-                if (!badgeScript) {
-                  return null;
-                }
-        
-                const asset = badgeArtwork.find(item => item.key === `${badge.khat_type_id}:${badge.tier}`);
-                const tierLabel = badge.tier.charAt(0).toUpperCase() + badge.tier.slice(1);
-                return <article className="dashboard-badge-card" key={badge.id} style={{ '--badge-accent': khatTypes[badgeScript].color, '--badge-accent-soft': khatTypes[badgeScript].soft } as React.CSSProperties}>
-                  <div className="dashboard-badge-art">
-                    {asset?.mediaType === 'image' && asset.url
-                      ? <img src={asset.url} alt={`${tierLabel} ${badge.khat_type_name} badge`} />
-                      : <img className="dashboard-badge-mock" src="/mock-badge.svg" alt={`${tierLabel} badge artwork`} />}
-                    {asset?.mediaType === 'pdf' && asset.url && <a href={asset.url} target="_blank" rel="noreferrer" className="dashboard-badge-pdf-link"><FileText size={13} /> View PDF</a>}
-                  </div>
-                  <div className="dashboard-badge-card-copy"><span className="dashboard-badge-script">{badge.khat_type_name}</span><strong>{tierLabel}</strong><small>Earned {new Date(badge.awarded_at).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' })}</small></div>
-                  <span className="dashboard-badge-check"><Check size={14} /></span>
-                </article>;
-              })
-            )}
-          </div>
+      <section className="student-home-course-section" aria-labelledby="crash-courses-heading">
+        <div className="student-home-section-title"><div><h2 id="crash-courses-heading">{t('Crash courses')}</h2><p>{t('Short, focused courses to learn a new script.')}</p></div></div>
+        {secondaryError && <p className="error-text" role="alert">{secondaryError}</p>}
+        {secondaryLoading ? <div className="student-home-empty"><PenLoader label={t('Loading courses…')} compact /></div> : <div className="student-home-course-grid">
+          {visibleCrashCourses.map((item, index) => {
+            const khatType = khatTypesList.find(type => type.id === item.course.khat_type_id);
+            const script = khatType ? scriptFromCode(khatType.code) : null;
+            const enrolled = Boolean(item.enrollment && item.levels.length);
+            const currentIndex = item.enrollment?.current_level_index ?? 0;
+            const progress = enrolled ? Number(item.enrollment?.percent_complete ?? 0) : 0;
+            const nextAssessment = item.levels.find(level => level.level_type === 'test' && level.order_index >= currentIndex);
+            return <article className="student-course-card" key={item.course.id} role="link" tabIndex={0} aria-label={`Open ${item.course.title} course page`} onClick={() => khatType && openDashboardCourse(item.course, khatType)} onKeyDown={event => { if (khatType && event.target === event.currentTarget && (event.key === 'Enter' || event.key === ' ')) { event.preventDefault(); openDashboardCourse(item.course, khatType); } }}>
+              <div className="student-course-card-heading"><span className="student-course-number">{cutPenCourses.length + index + 1}</span><span className="student-course-tag crash-tag">Crash course</span><span className="student-course-arabic" lang="ar" dir="rtl">{script ? khatTypes[script].arabic : ''}</span></div>
+              <div className="student-course-name"><h3>{script ? khatTypes[script].name : khatType?.display_name ?? item.course.title}</h3><p>{item.course.description || 'Learn the script through a short, focused sequence of guided levels.'}</p></div>
+              <div className="student-course-info"><small>1 · Is this for you?</small><p>“{courseGuidanceQuestion(item.course, script ?? undefined)}”</p></div>
+              <div className="student-course-levels"><div><small>2 · Levels</small><strong>{item.levels.length} levels</strong></div><div className="student-level-pips">{item.levels.map((level, levelIndex) => <i key={level.id} className={`${level.level_type === 'test' ? 'assessment' : ''}${enrolled && levelIndex < currentIndex ? ' complete' : ''}`} title={`${level.title}${level.level_type === 'test' ? ' · assessment' : ''}`} />)}</div>{item.levels.some(level => level.level_type === 'test') && <span><i className="student-assessment-diamond" /> marks an online assessment</span>}</div>
+              <div className="student-course-progress"><div className="student-course-progress-copy"><small>3 · Your progress</small><span>{enrolled ? `Started ${courseStartedAt(item.enrollment?.enrolled_at) ?? 'earlier'} · Level ${Math.min(currentIndex, item.levels.length)} of ${item.levels.length}` : `Not started yet · 0 of ${item.levels.length} levels`}</span><strong>{enrolled ? `${Math.round(progress)}%` : '0%'}</strong></div><div className="student-progress-track"><i style={{ width: `${progress}%` }} /></div></div>
+              <div className="student-course-assessment"><small>4 · Assessment</small><p>{nextAssessment ? `Checkpoint assessments receive a thorough review at ${nextAssessment.title}; normal practice levels receive marks.` : 'Practice levels receive marks; optional voice feedback may be included.'}</p><strong>{nextAssessment ? `Next assessment after Level ${nextAssessment.order_index}` : `Short course · ${item.levels.length} guided levels`}</strong></div>
+              <div className="student-course-actions" onClick={event => event.stopPropagation()}><Button outline onClick={() => khatType && openDashboardCourse(item.course, khatType)}>{enrolled ? 'Open course' : 'View course'} <ArrowRight size={14} /></Button></div>
+            </article>;
+          })}
+          {!visibleCrashCourses.length && <div className="student-home-empty">{penTrack === 'normal' ? 'Normal-pen crash courses are coming soon.' : 'More focused script courses will appear here when available.'}</div>}
+        </div>}
+      </section>
+
+      <section className="student-home-course-section student-mashq-section" aria-labelledby="mashq-worksheets-heading">
+        <div className="student-home-section-title"><div><h2 id="mashq-worksheets-heading">{t('Mashq worksheets')}</h2><p>{t('Downloadable practice sheets. Current sets are available in Naskh.')}</p></div></div>
+        <div className="student-mashq-filters" role="group" aria-label="Filter Mashq worksheets by khat type">
+          <button type="button" className={secondaryFilter === 'all' ? 'active' : ''} aria-pressed={secondaryFilter === 'all'} onClick={() => setSecondaryFilter('all')}>All khat types</button>
+          {khatTypesList.filter(type => !type.code.endsWith('_normal_pen')).map(type => <button type="button" key={type.id} className={secondaryFilter === type.code ? 'active' : ''} aria-pressed={secondaryFilter === type.code} onClick={() => setSecondaryFilter(type.code)}>{type.display_name}</button>)}
         </div>
-      </div>
+        {secondaryLoading ? <div className="student-home-empty"><PenLoader label="Loading worksheets…" compact /></div> : visibleMashqCourses.length ? <div className="student-mashq-list">
+          {visibleMashqCourses.map(item => {
+            const khatType = khatTypesList.find(type => type.id === item.course.khat_type_id);
+            const isNaskhSet = khatType?.code === 'naskh';
+            const worksheetRows = isNaskhSet
+              ? mashqSetSamples.map(sample => ({ sample, sourceLevel: item.levels[sample.firstLevel] })).filter(row => row.sourceLevel)
+              : item.levels.map((sourceLevel, index) => ({ sourceLevel, sample: { key: `other-${index}`, category: sourceLevel.title, title: sourceLevel.title, year: '', sheetCount: Object.keys(sourceLevel.sheet_files ?? {}).length || 1, firstLevel: index, levelCount: 1 } }));
+            return worksheetRows.map(({ sample, sourceLevel }, index) => <article className="student-mashq-row" key={`${item.course.id}-${sourceLevel.id}`}>
+              <span className="student-mashq-number">{isNaskhSet ? `5.${index + 1}` : index + 1}</span><div className="student-mashq-copy"><strong>{sample.category} worksheets</strong><span>{sample.title}{sample.year ? ` · ${sample.year}` : ''}</span><div><small>Script: {khatType?.display_name ?? 'Naskh'}</small><small>{sample.sheetCount} sheets</small></div></div><button type="button" className="student-mashq-view" onClick={() => navigateToMashqWorksheets(isNaskhSet ? sample.key : 'all')}>View sheets <ArrowRight size={13} /></button>
+            </article>);
+          })}
+          <p className="student-mashq-footnote">More genres will be added soon.</p>
+        </div> : <div className="student-home-empty">{penTrack === 'normal' ? 'Normal-pen worksheet sets are being prepared.' : 'No Mashq worksheet sets are available for this khat type yet.'}</div>}
+      </section>
 
-      {/* ==============================
-          UPCOMING EVENTS
-          ============================== */}
+      <section className="student-home-panel student-master-progress" aria-label="Master progress">
+        <div className="student-home-panel-heading"><div><p className="eyebrow">{t('Master progress')}</p><h2>{t('All your courses')}</h2></div><strong>{masterProgress}% <small>· {masterCompletedCount} {t('of')} {masterLevelCount} {t('levels')}</small></strong></div>
+        <div className="student-master-bar"><i style={{ width: `${masterProgress}%` }} /></div>
+        {enrolledCourses.length ? enrolledCourses.map(item => {
+          const khatType = item.khatType;
+          const script = khatType ? scriptFromCode(khatType.code) : null;
+          const progress = Number(item.enrollment?.percent_complete ?? 0);
+          const level = item.levels[item.enrollment?.current_level_index ?? 0] ?? item.levels[0];
+          return <button type="button" className="student-master-row" key={item.course.id} onClick={() => khatType && openDashboardCourse(item.course, khatType)}>
+            <span className="student-master-number">{script ? scriptList.indexOf(script) + 1 || 1 : '·'}</span><span className="student-master-course"><strong>{script ? khatTypes[script].name : khatType?.display_name ?? item.course.title} · {item.course.category === 'certification' ? 'Certification' : 'Crash course'}</strong><i><b style={{ width: `${progress}%` }} /></i></span><span className="student-master-level">Level {Math.min(item.enrollment?.current_level_index ?? 0, item.levels.length)} of {item.levels.length}</span><strong>{Math.round(progress)}%</strong>
+          </button>;
+        }) : <p className="student-home-empty">Enroll in a course to start building your overall progress.</p>}
+      </section>
 
-      <div className="upcoming-events-strip">
-        <SectionHeading
-          title="Upcoming events"
-          action={
-            <button
-              className="text-link"
-              onClick={() =>
-                navigate('events')
-              }
-            >
-              All events
-              <ArrowRight size={14} />
-            </button>
-          }
-        />
+      <section className="student-home-events" aria-label={t('Upcoming events')}>
+        <div className="student-home-inline-heading"><h2>{t('Upcoming events')}</h2><button type="button" onClick={() => navigate('events')}>{t('All events')} <ArrowRight size={13} /></button></div>
+        {eventsLoading ? <div className="student-home-event-empty"><PenLoader label="Loading events…" compact /></div> : events.length === 0 ? <div className="student-home-event-empty">No upcoming events.</div> : events.map(event => <article className="student-home-event" key={event.id}><span className="student-home-event-date">{new Date(event.scheduled_at).toLocaleDateString(undefined, { day: 'numeric', month: 'short' })}</span><div><strong>{event.title}</strong><small>{event.host_name} · {event.branch_name}</small></div><StatusChip tone={event.status === 'live' ? 'green' : 'gold'}>{event.status === 'live' ? 'Live now' : 'Upcoming'}</StatusChip></article>)}
+      </section>
 
-        <div className="event-mini-row">
-          {eventsLoading ? (
-            <div className="event-mini">
-              <PenLoader label="Loading upcoming events…" compact />
-            </div>
-          ) : events.length === 0 ? (
-            <div className="event-mini">
-              <span className="muted">
-                No upcoming events.
-              </span>
-            </div>
-          ) : (
-            events.map(event => (
-              <div
-                className="event-mini"
-                key={event.id}
-              >
-                <StatusChip
-                  tone={
-                    event.status === 'live'
-                      ? 'green'
-                      : 'gold'
-                  }
-                >
-                  {event.status === 'live'
-                    ? 'Live now'
-                    : 'Upcoming'}
-                </StatusChip>
-
-                <strong>
-                  {event.title}
-                </strong>
-
-                <small>
-                  {event.host_name}
-                  {' · '}
-                  {event.branch_name}
-                </small>
-              </div>
-            ))
-          )}
+      <section className="student-home-panel student-practice-rhythm" aria-label={t('Your practice rhythm')}>
+        <div><h2>{t('Your practice rhythm')}</h2><p>{t('Your practice over the last 12 weeks, and what to do next.')}</p></div>
+        <div className="student-rhythm-stats">
+          <article className="rhythm-streak"><small>Current streak</small><strong>{activityLoading ? '—' : `${dayStreak} ${dayStreak === 1 ? 'day' : 'days'}`}</strong><span>Best: {longestStreak} days</span></article>
+          <article className="rhythm-week"><small>Practice this week</small><strong>{activityLoading ? '—' : `${minutesThisWeek} min`}</strong><span>{minutesThisWeek - minutesLastWeek >= 0 ? '+' : ''}{minutesThisWeek - minutesLastWeek} min on last week</span></article>
+          <article className="rhythm-mark"><small>Average mark (last 3)</small><strong>{markedEntries.length ? `${averageLastThree.toFixed(1)} / 10` : '—'}</strong><span>{previousAverage === null ? 'Marks appear after teacher review' : `${averageLastThree >= previousAverage ? 'Up' : 'Down'} from ${previousAverage.toFixed(1)}`}</span></article>
+          <article className="rhythm-assessment"><small>Next assessment</small><strong>{upcomingAssessment ? `${upcomingAssessment.levelsAway} ${upcomingAssessment.levelsAway === 1 ? 'level' : 'levels'}` : '—'}</strong><span>{upcomingAssessment ? `After Level ${upcomingAssessment.level.order_index}` : 'No upcoming checkpoint'}</span></article>
         </div>
-      </div>
-
-      {/* ==============================
-          PRACTICE RHYTHM
-          
-          Still intentionally untouched.
-          We will connect this to login
-          activity after tracing the backend.
-          ============================== */}
-
-      <div className="activity-card">
-        <SectionHeading
-          title="Your practice rhythm"
-          text="Your login activity over the last 12 weeks."
-          action={
-            <span className="muted">
-              Login activity
-            </span>
-          }
-        />
-
+        <div className="student-practice-tip"><strong>Today:</strong><span>{focusLevel ? `Continue with ${focusLevel.title} in ${focusCourse?.khatType.display_name ?? 'your course'}${focusLevel.level_type === 'test' ? ' — this is a checkpoint assessment.' : ' to keep your learning moving.'}` : 'Choose a course and start a short practice session to build your rhythm.'}</span></div>
+        <div className="student-home-heatmap-heading"><span>Last 12 weeks</span><span>Your best day: <strong>{bestPracticeDay}</strong></span></div>
         <ActivityHeatmap activity={activity} />
-      </div>
+      </section>
+
       <ShowcaseHeading title="From the guild" text="Recent shares from students and faculty." action={<button className="text-link" onClick={() => navigate('gallery')}>Visit gallery <ArrowRight size={14} /></button>} />
-      {showcaseLoading ? (
-        <PenLoader label="Loading gallery…" compact />
-      ) : (
-        <DashboardShowcaseCarousels posts={showcasePosts.map(post => ({
-          id: post.id,
-          role: post.user_role ?? 'student',
-          imageUrl: post.imageUrl,
-          caption: post.caption,
-          authorName: post.author_name,
-          branch: post.branch_name ?? post.branch,
-          likes: Number(post.like_count),
-          liked: post.liked_by_me,
-        }))} onLike={toggleShowcaseLike} />
-      )}
-      {winners.length > 0 && (
-        <section className="dashboard-winners-section" aria-label="Latest competition winners">
-          <SectionHeading
-            eyebrow="Guild honors"
-            title="Latest competition winners"
-            text="Celebrating the students and their work across the guild."
-            action={<button className="text-link" onClick={() => navigate('competitions')}>See all results <ArrowRight size={15} /></button>}
-          />
-          <div className="dashboard-winner-grid">
-            {winners.map((winner, index) => (
-              <article className="dashboard-winner-card" key={`${winner.competitionTitle}-${winner.student_name}-${index}`}>
-                <span className="dashboard-winner-trophy"><Trophy size={17} /></span>
-                <div><strong>{winner.student_name}</strong><span>{winner.competitionTitle}</span></div>
-                <span className="dashboard-winner-rank">Winner</span>
-              </article>
-            ))}
-          </div>
-        </section>
-      )}
+      {showcaseLoading ? <PenLoader label="Loading gallery…" compact /> : <DashboardShowcaseCarousels posts={showcasePosts.map(post => ({ id: post.id, role: post.user_role ?? 'student', imageUrl: post.imageUrl, caption: post.caption, authorName: post.author_name, branch: post.branch_name ?? post.branch, likes: Number(post.like_count), liked: post.liked_by_me }))} onLike={toggleShowcaseLike} />}
+      {winners.length > 0 && <section className="dashboard-winners-section" aria-label="Latest competition winners"><SectionHeading eyebrow="Guild honors" title="Latest competition winners" text="Celebrating the students and their work across the guild." action={<button className="text-link" onClick={() => navigate('competitions')}>See all results <ArrowRight size={15} /></button>} /><div className="dashboard-winner-grid">{winners.map((winner, index) => <article className="dashboard-winner-card" key={`${winner.competitionTitle}-${winner.student_name}-${index}`}><span className="dashboard-winner-trophy"><Trophy size={17} /></span><div><strong>{winner.student_name}</strong><span>{winner.competitionTitle}</span></div><span className="dashboard-winner-rank">Winner</span></article>)}</div></section>}
     </main>
   );
 }
 
 export function Catalog() {
-  const [script, setScript] = useState<Script>(preferredCatalogScript);
+  const script = preferredCatalogScript();
+  const [selectedCourseId] = useState(() => window.sessionStorage.getItem(CATALOG_COURSE_KEY));
   const [course, setCourse] = useState<ApiCourse | null>(null);
+  const [courseKhatType, setCourseKhatType] = useState<ApiKhatType | null>(null);
   const [levels, setLevels] = useState<ApiLevel[]>([]);
   const [enrollment, setEnrollment] = useState<ApiEnrollment | null>(null);
-  const [secondary, setSecondary] = useState<ApiSecondaryCourse[]>([]);
-  const [enrollingSecondaryId, setEnrollingSecondaryId] = useState<string | null>(null);
+  const [courseEntries, setCourseEntries] = useState<ApiDashboardEntry[]>([]);
+  const [enrollingCourse, setEnrollingCourse] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     window.sessionStorage.removeItem(CATALOG_SCRIPT_KEY);
+    window.sessionStorage.removeItem(CATALOG_COURSE_KEY);
   }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    if (!course?.id) {
+      setCourseEntries([]);
+      return;
+    }
+    void apiFetch<ApiDashboardEntry[]>('/entries/mine', { silent: true })
+      .then(entries => {
+        if (!cancelled) {
+          const levelIds = new Set(levels.map(level => level.id));
+          setCourseEntries((Array.isArray(entries) ? entries : []).filter(entry => entry.level_id && levelIds.has(entry.level_id)));
+        }
+      })
+      .catch(() => { if (!cancelled) setCourseEntries([]); });
+    return () => { cancelled = true; };
+  }, [course?.id, levels]);
 
   useEffect(() => {
     let cancelled = false;
@@ -1218,29 +971,40 @@ export function Catalog() {
       setError(null);
       try {
         const khatTypesList = await apiFetch<ApiKhatType[]>('/khat-types');
-        const khatType = khatTypesList.find(k => k.code === scriptCode(script));
-        if (!khatType) throw new Error('This script is not set up on the server yet.');
+        let targetCourse: ApiCourse | null = null;
+        let targetKhatType: ApiKhatType | undefined;
+        if (selectedCourseId) {
+          targetCourse = await apiFetch<ApiCourse>(`/courses/${selectedCourseId}`);
+          targetKhatType = khatTypesList.find(item => item.id === targetCourse?.khat_type_id);
+        } else {
+          targetKhatType = khatTypesList.find(item => item.code === scriptCode(script));
+          if (targetKhatType) {
+            const courses = await apiFetch<ApiCourse[]>(`/courses?khatTypeId=${targetKhatType.id}&category=certification`);
+            targetCourse = courses[0] ?? null;
+          }
+        }
+        if (!targetKhatType) throw new Error('This khat type is not set up on the server yet.');
+        if (!cancelled) setCourseKhatType(targetKhatType);
 
-        const [certCourses, secondaryCourses] = await Promise.all([
-          apiFetch<ApiCourse[]>(`/courses?khatTypeId=${khatType.id}&category=certification`),
-          apiFetch<ApiCourse[]>(`/courses?khatTypeId=${khatType.id}&category=secondary`),
-        ]);
-        const cert = certCourses[0] ?? null;
-
-        if (cert) {
-          const authoredLevels = await apiFetch<ApiLevel[]>(`/courses/${cert.id}/levels`);
+        if (targetCourse) {
+          const authoredLevels = await apiFetch<ApiLevel[]>(`/courses/${targetCourse.id}/levels`);
           if (!cancelled) {
-            setCourse(cert);
+            setCourse(targetCourse);
             setLevels(authoredLevels);
+            setEnrollment(null);
           }
           if (authoredLevels.length > 0) {
-            await apiFetch('/levels/enroll', { method: 'POST', body: { courseId: cert.id } });
+            try {
             const progress = await apiFetch<{ enrollment: ApiEnrollment; levels: ApiLevel[] }>(
-              `/levels/courses/${cert.id}/progress`
+              `/levels/courses/${targetCourse.id}/progress`
             );
             if (!cancelled) {
               setLevels(progress.levels);
               setEnrollment(progress.enrollment);
+            }
+            } catch (progressError) {
+              if (!(progressError instanceof ApiError) || progressError.status !== 404) throw progressError;
+              if (!cancelled) { setLevels(authoredLevels); setEnrollment(null); }
             }
           } else if (!cancelled) {
             setEnrollment(null);
@@ -1250,18 +1014,6 @@ export function Catalog() {
           setLevels([]);
           setEnrollment(null);
         }
-        const secondaryWithProgress = await Promise.all(secondaryCourses.map(async secondaryCourse => {
-          try {
-            const progress = await apiFetch<{ enrollment: ApiEnrollment; levels: ApiLevel[] }>(`/levels/courses/${secondaryCourse.id}/progress`);
-            return { course: secondaryCourse, enrollment: progress.enrollment, levels: progress.levels };
-          } catch (progressError) {
-            if (progressError instanceof ApiError && progressError.status === 404) {
-              return { course: secondaryCourse, enrollment: null, levels: [] };
-            }
-            throw progressError;
-          }
-        }));
-        if (!cancelled) setSecondary(secondaryWithProgress);
       } catch (err) {
         if (!cancelled) setError(err instanceof ApiError ? err.message : 'Failed to load this course.');
       } finally {
@@ -1270,135 +1022,155 @@ export function Catalog() {
     }
     load();
     return () => { cancelled = true; };
-  }, [script]);
+  }, [script, selectedCourseId]);
 
   const openLevel = (courseId: string, levelId: string) => {
+    if (course?.id === courseId && !enrollment) return;
     openCourseLevel(courseId, levelId);
     navigate('course');
   };
 
-  const enrollAndOpenSecondary = async (secondaryCourse: ApiSecondaryCourse) => {
-    setEnrollingSecondaryId(secondaryCourse.course.id);
+  const enrollInCertification = async () => {
+    if (!course || enrollingCourse) return;
+    setEnrollingCourse(true);
     setError(null);
     try {
-      await apiFetch('/levels/enroll', { method: 'POST', body: { courseId: secondaryCourse.course.id } });
-      const progress = await apiFetch<{ enrollment: ApiEnrollment; levels: ApiLevel[] }>(`/levels/courses/${secondaryCourse.course.id}/progress`);
-      setSecondary(current => current.map(item => item.course.id === secondaryCourse.course.id
-        ? { ...item, enrollment: progress.enrollment, levels: progress.levels }
-        : item));
-      if (progress.levels[0]) openLevel(secondaryCourse.course.id, progress.levels[0].id);
+      await apiFetch('/levels/enroll', { method: 'POST', body: { courseId: course.id } });
+      const progress = await apiFetch<{ enrollment: ApiEnrollment; levels: ApiLevel[] }>(`/levels/courses/${course.id}/progress`);
+      setEnrollment(progress.enrollment);
+      setLevels(progress.levels);
+      if (progress.levels[0]) {
+        openCourseLevel(course.id, progress.levels[0].id);
+        navigate('course');
+      }
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'Could not enroll in this course.');
+      setError(err instanceof ApiError ? err.message : 'Could not start this course.');
     } finally {
-      setEnrollingSecondaryId(null);
+      setEnrollingCourse(false);
     }
   };
 
+  const courseStages = groupLevelsIntoStages(levels);
+  const practiceLevels = levels.filter(level => level.level_type !== 'test');
+  const currentLevel = enrollment ? levels[enrollment.current_level_index] ?? null : null;
+  const currentPracticeNumber = currentLevel && currentLevel.level_type !== 'test'
+    ? practiceLevels.findIndex(level => level.id === currentLevel.id) + 1
+    : Math.min(practiceLevels.length, Math.max(0, enrollment?.current_level_index ?? 0));
+  const courseProgress = Math.min(100, Math.max(0, Number(enrollment?.percent_complete ?? 0)));
+  const courseMarks = courseEntries.filter(entry => typeof entry.mark_out_of_ten === 'number');
+  const averageCourseMark = courseMarks.length
+    ? courseMarks.reduce((total, entry) => total + Number(entry.mark_out_of_ten), 0) / courseMarks.length
+    : null;
+  const courseStartedDate = enrollment?.enrolled_at
+    ? new Date(enrollment.enrolled_at).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' })
+    : null;
+  const displayScript = scriptForCourseCode(courseKhatType?.code ?? scriptCode(script));
+  const courseNumber = Math.max(1, dashboardCourseOrder(courseKhatType?.code ?? scriptCode(script)) + 1);
+
   return (
     <main className="page portal-page">
-      <SectionHeading eyebrow="Course catalog" title={`${khatTypes[script].name} curriculum`} text="Build the hand one measured exercise at a time." action={<ScriptTabs script={script} setScript={setScript} />} />
       {loading && <PenLoader label="Loading course…" />}
       {error && <p className="error-text">{error}</p>}
 
       {!loading && course && (
-        <>
-          <div className="course-banner" style={{ '--script': khatTypes[script].color, '--script-soft': khatTypes[script].soft } as React.CSSProperties}>
-            <div>
-              <p className="eyebrow">Certification course</p>
-              <h2>{khatTypes[script].name} · The complete hand</h2>
-              <p>{levels.length > 0 ? `${levels.length} levels. Regular practice levels unlock immediately on upload — only checkpoint tests are teacher-reviewed.` : 'This certification path is being prepared. Enrollment opens once its lessons and teacher-reviewed checkpoints are ready.'}</p>
-            </div>
-            <StatusChip>{levels.length > 0 ? `${Math.round(Number(enrollment?.percent_complete ?? 0))}% complete` : 'In preparation'}</StatusChip>
+        <section className="student-course-overview" style={{ '--script': khatTypes[displayScript].color, '--script-soft': khatTypes[displayScript].soft } as React.CSSProperties}>
+          <div className="student-course-overview-backrow">
+            <button type="button" className="student-course-back" onClick={() => navigate('dashboard')}><ChevronLeft size={15} /> Your Path</button>
           </div>
-          {levels.length > 0 ? <div className="level-list">
-            {levels.map((level, i) => (
-              <button
-                className={`level-row ${level.locked ? 'locked' : ''} ${level.level_type === 'test' ? 'is-checkpoint' : ''}`}
-                onClick={() => !level.locked && openLevel(course.id, level.id)}
-                key={level.id}
-              >
-                <span className="level-number">{String(i + 1).padStart(2, '0')}</span>
-                <div>
-                  <strong>{level.title}</strong>
-                  <small>{level.level_type === 'test' ? 'Checkpoint test · teacher reviewed' : 'Practice level · instant unlock'}</small>
-                </div>
-                <span>{level.locked ? <Lock size={16} /> : level.level_type === 'test' ? <StatusChip tone="amber">Test</StatusChip> : <Check size={16} />}</span>
-                <ChevronRight size={16} />
-              </button>
-            ))}
-          </div> : <div className="course-preparation-note"><BookOpen size={19} /><span>Course design is in progress. Please check back soon.</span></div>}
-        </>
+          <header className="student-course-hero">
+            <div className="student-course-hero-top">
+              <div className="student-course-tags"><span className="student-course-number">{courseNumber}</span><span className="student-course-tag">{course.category === 'secondary' ? 'Crash course' : 'Certification'}</span>{courseKhatType?.code.endsWith('_normal_pen') && <span className="student-course-tag is-pen">Normal pen</span>}</div>
+              <span className="student-course-arabic" lang="ar" dir="rtl">{khatTypes[displayScript].arabic}</span>
+            </div>
+            <div className="student-course-title"><h1>{khatTypes[displayScript].name}</h1><p>{course.description || `${khatTypes[displayScript].name}-centric`}</p></div>
+            <div className="student-course-hero-panels">
+              <section className="student-course-panel is-question">
+                <small>1 · Is this for you?</small>
+                <p>“{courseGuidanceQuestion(course, script)}”</p>
+              </section>
+              <section className="student-course-panel is-progress">
+                <small>3 · Your progress</small>
+                <div className="student-course-progress-meta"><span>{courseStartedDate ? `Started ${courseStartedDate}` : enrollment ? 'Course started' : 'Not started yet'}</span><strong>{enrollment ? `Level ${Math.min(currentPracticeNumber || 1, practiceLevels.length)} of ${practiceLevels.length} · ${Math.round(courseProgress)}%` : `0 of ${practiceLevels.length} levels · 0%`}</strong></div>
+                <div className="student-course-overview-track" role="progressbar" aria-label="Course progress" aria-valuenow={Math.round(courseProgress)} aria-valuemin={0} aria-valuemax={100}><i style={{ width: `${courseProgress}%` }} /></div>
+                <span className="student-course-average">Average mark so far: <b>{averageCourseMark === null ? '—' : `${averageCourseMark.toFixed(1)} / 10`}</b></span>
+              </section>
+            </div>
+            <div className="student-course-hero-actions">
+              {enrollment
+                ? <>
+                    <Button disabled={!currentLevel || Boolean(currentLevel.locked)} onClick={() => currentLevel && openLevel(course.id, currentLevel.id)}>{currentLevel ? 'Continue learning' : 'Course complete'} <ArrowRight size={14} /></Button>
+                    {currentLevel && <Button outline onClick={() => navigateToCourseChat(course.id)}><MessageCircle size={14} /> Course chat</Button>}
+                  </>
+                : <Button disabled={!levels.length || enrollingCourse} onClick={() => void enrollInCertification()}>{enrollingCourse ? 'Starting…' : 'Start this course'} <ArrowRight size={14} /></Button>}
+            </div>
+          </header>
+
+          <section className="student-course-how panel">
+            <strong>How this course works</strong>
+            <ol>
+              <li>Open a level and press <b>Start level</b>. Watch the video, study the reference and practise the worksheet on art paper.</li>
+              <li>Each level shows <b>what you need to upload</b>. Send your work separately in the level’s chat.</li>
+              <li>Your teacher replies in the same chat with comments, voice notes and <b>marks out of 10</b>. 5/10 or higher opens the next level.</li>
+              <li>After every stage there is an <b className="is-assessment-text">online assessment</b> <span className="student-assessment-diamond" />. Pass it to start the next stage.</li>
+            </ol>
+            <p className="student-course-pace">Suggested pace: <span>1 level per week</span>{enrollment ? ' Keep up your steady progress.' : ' Start whenever you are ready.'}</p>
+          </section>
+
+          <div className="student-course-colour-key" aria-label="Course colour key"><strong>Colour key:</strong><span className="key-levels">Levels</span><span className="key-assessment"><i className="student-assessment-diamond" /> Assessment</span><span className="key-upload">What to upload</span><span className="key-progress">Progress</span><span className="key-marks">Marks</span></div>
+
+          {levels.length > 0 ? <section className="student-course-levels-section" aria-label="Course levels">
+            <div className="student-course-levels-heading"><div><small>2 · Levels</small><h2>{practiceLevels.length} levels in {courseStages.length || 1} {courseStages.length === 1 ? 'stage' : 'stages'}</h2></div><span>Press a stage or level to open it</span></div>
+            <div className="student-course-stages">
+              {courseStages.map((stage, stageIndex) => {
+                const stageComplete = stage.levels.filter(level => {
+                  const entry = courseEntries.find(item => item.level_id === level.id && (item.status === 'reviewed' || Number(item.mark_out_of_ten) >= 5));
+                  return Boolean(entry) || (currentPracticeNumber > 0 && practiceLevels.findIndex(item => item.id === level.id) < currentPracticeNumber - 1);
+                }).length;
+                return <details className="student-course-stage" key={stage.levels[0]?.id ?? stage.assessment?.id ?? stageIndex} open={stageIndex === 0}>
+                  <summary>
+                    <span className="student-course-stage-copy"><strong>Stage {stageIndex + 1} · Levels {stage.start}–{stage.end}</strong><span>{stage.assessment ? `◆ Ends with Online assessment ${stageIndex + 1}` : `${stage.levels.length} guided levels`}</span></span>
+                    <span className="student-course-stage-progress">{stageComplete} of {stage.levels.length} done</span><ChevronDown size={16} />
+                    <span className="student-course-stage-bar"><i style={{ width: `${stage.levels.length ? stageComplete / stage.levels.length * 100 : 0}%` }} /></span>
+                  </summary>
+                  <div className="student-course-stage-body">
+                    {stage.levels.map(level => {
+                      const number = practiceLevels.findIndex(item => item.id === level.id) + 1;
+                      const latestEntry = courseEntries.filter(entry => entry.level_id === level.id).sort((a, b) => b.created_at.localeCompare(a.created_at))[0];
+                      const completed = latestEntry?.status === 'reviewed' || Number(latestEntry?.mark_out_of_ten) >= 5 || (currentPracticeNumber > number);
+                      const isCurrent = enrollment && currentLevel?.id === level.id;
+                      const locked = !enrollment || Boolean(level.locked);
+                      return <details className={`student-course-level-row${completed ? ' is-complete' : ''}${locked ? ' is-locked' : ''}`} key={level.id} open={Boolean(isCurrent)}>
+                        <summary>
+                          <span className="student-course-level-icon">{completed ? <Check size={15} /> : locked ? <Lock size={14} /> : number}</span>
+                          <span className="student-course-level-copy"><strong>Level {number} · {level.title}</strong><small>Video · Reference · Worksheet · 1 upload</small></span>
+                          <span className={`student-course-level-status${completed ? ' is-done' : isCurrent ? ' is-current' : ''}`}>{latestEntry?.mark_out_of_ten != null ? `${latestEntry.mark_out_of_ten} / 10` : completed ? 'Completed' : isCurrent ? 'In progress' : locked ? 'Locked' : 'Ready'}</span>
+                        </summary>
+                        <div className="student-course-level-details">
+                          <div className="student-course-instructions"><small>Instructions</small><p>Watch the video, study the reference image, then practise the worksheet on art paper. Pass mark: 5/10.</p></div>
+                          <div className="student-course-upload-note"><small>What to upload · 1 item</small><span><i /> Upload 1 · Photo of your practice sheet</span></div>
+                          <button type="button" className="student-course-start-level" disabled={locked} onClick={() => openLevel(course.id, level.id)}>{locked ? 'Enroll to start' : completed ? 'Review level' : 'Start level'}</button>
+                        </div>
+                      </details>;
+                    })}
+                    {stage.assessment && <div className={`student-course-assessment-row${stage.assessment.locked ? ' is-locked' : ''}`}>
+                      <span className="student-course-assessment-icon">A{stageIndex + 1}</span><span><strong>Online assessment {stageIndex + 1} · Stage {stageIndex + 1}</strong><small>Online assessment and marking · 2 uploads</small></span><b>Assessment</b>
+                    </div>}
+                  </div>
+                </details>;
+              })}
+            </div>
+          </section> : <div className="course-preparation-note"><BookOpen size={19} /><span>Course design is in progress. Please check back soon.</span></div>}
+        </section>
       )}
       {!loading && !course && !error && <p className="muted">No certification course has been set up yet for {khatTypes[script].name} — check back soon.</p>}
-
-      <SectionHeading eyebrow="Open once enrolled" title="Secondary & self-learning" text="Explore technique, history, and composition without locks." />
-      <div className="secondary-grid">
-        {!loading && secondary.length === 0 && (
-          <div className="secondary-empty-state">
-            <div className="secondary-empty-mark" aria-hidden="true"><Sparkles size={20} /></div>
-            <div>
-              <span className="eyebrow">A space for your next chapter</span>
-              <h3>More ways to explore are on their way</h3>
-              <p>There are no open self-learning courses for {khatTypes[script].name} just yet. Check back as new lessons are added.</p>
-            </div>
-            <span className="secondary-empty-flourish" aria-hidden="true">✦</span>
-          </div>
-        )}
-        {secondary.map(item => {
-          const { course: secondaryCourse, enrollment: secondaryEnrollment, levels: secondaryLevels } = item;
-          const active = Boolean(secondaryEnrollment);
-          const currentIndex = secondaryEnrollment?.current_level_index ?? 0;
-          const currentLevel = secondaryLevels[currentIndex] ?? secondaryLevels[secondaryLevels.length - 1] ?? null;
-          const nextLevel = secondaryLevels[currentIndex + 1] ?? null;
-          const progress = Number(secondaryEnrollment?.percent_complete ?? 0);
-          const completed = Boolean(secondaryEnrollment && secondaryLevels.length > 0 && currentIndex >= secondaryLevels.length);
-
-          return (
-            <article
-              className={`progress-card secondary-course-card${active ? '' : ' not-enrolled'}`}
-              key={secondaryCourse.id}
-            >
-              <div className="card-top">
-                <span>{secondaryCourse.title}</span>
-                {active && <small><Flame size={13} /> Active</small>}
-              </div>
-
-              {active ? (
-                <>
-                  {currentLevel ? (
-                    <>
-                      <p>Level: <b>{currentLevel.title}</b> · {Math.round(progress)}%</p>
-                      <div className="progress"><i style={{ width: `${Math.min(100, Math.max(0, progress))}%` }} /></div>
-                      <small className="next">{completed ? 'Course completed — revisit any level when you like.' : nextLevel ? `Next: ${nextLevel.title}` : 'You are on the final level.'}</small>
-                      <div className="card-actions">
-                        <Button onClick={() => openLevel(secondaryCourse.id, currentLevel.id)}>{completed ? 'Review course' : 'Continue'} <ArrowRight size={14} /></Button>
-                        {!completed && currentLevel.level_type !== 'test' && <Button outline onClick={() => openLevel(secondaryCourse.id, currentLevel.id)}>Submit practice</Button>}
-                      </div>
-                    </>
-                  ) : (
-                    <p>This course has no levels available yet.</p>
-                  )}
-                </>
-              ) : (
-                <>
-                  <p className="secondary-course-description">{secondaryCourse.description || 'Explore this self-paced course and work through its lessons in your own time.'}</p>
-                  <p className="secondary-course-progress-label">Progress: <b>Not started</b> · 0%</p>
-                  <div className="progress"><i style={{ width: '0%' }} /></div>
-                  <div className="card-actions">
-                    <Button outline disabled={enrollingSecondaryId === secondaryCourse.id} onClick={() => enrollAndOpenSecondary(item)}>{enrollingSecondaryId === secondaryCourse.id ? 'Enrolling…' : 'Enroll now'} <ArrowRight size={14} /></Button>
-                  </div>
-                </>
-              )}
-            </article>
-          );
-        })}
-      </div>
     </main>
   );
 }
 
 export function CourseEnvironment() {
   const session = useCourseSession();
+  const [courseCategory, setCourseCategory] = useState<'certification' | 'secondary'>('certification');
+  const [courseTitle, setCourseTitle] = useState('Course levels');
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   const [levels, setLevels] = useState<ApiLevel[]>([]);
   const [activeLevelId, setActiveLevelId] = useState<string | null>(null);
@@ -1409,10 +1181,10 @@ export function CourseEnvironment() {
   const [uploading, setUploading] = useState(false);
   const [pickedFile, setPickedFile] = useState<File | null>(null);
   const [saved, setSaved] = useState(false);
-  const [quote] = useState(() => encouragementQuotes[Math.floor(Math.random() * encouragementQuotes.length)]);
+  const [courseChatVersion, setCourseChatVersion] = useState(0);
 
   // Checkpoint-specific state — the student's most recent entry for this level, if any.
-  const [myEntry, setMyEntry] = useState<{ id: string; status: string; feedback?: string | null; correction_image_storage_key?: string | null; correction_voice_storage_key?: string | null } | null>(null);
+  const [myEntry, setMyEntry] = useState<{ id: string; status: string; feedback?: string | null; correction_image_storage_key?: string | null; correction_voice_storage_key?: string | null; mark_out_of_ten?: number | null; mark_passed?: boolean | null; entry_kind?: string | null; time_spent_minutes?: number | null; created_at?: string } | null>(null);
   const [reviewFeedbackEntry, setReviewFeedbackEntry] = useState<{ feedback?: string | null; correction_image_storage_key?: string | null; correction_voice_storage_key?: string | null } | null>(null);
   const [teacherVoiceUrl, setTeacherVoiceUrl] = useState<string | null>(null);
   const [teacherCorrectionUrl, setTeacherCorrectionUrl] = useState<string | null>(null);
@@ -1422,8 +1194,13 @@ export function CourseEnvironment() {
     setLoading(true);
     setError(null);
     try {
-      const progress = await apiFetch<{ levels: ApiLevel[] }>(`/levels/courses/${session.courseId}/progress`);
+      const [progress, courseData] = await Promise.all([
+        apiFetch<{ levels: ApiLevel[] }>(`/levels/courses/${session.courseId}/progress`),
+        apiFetch<{ category: 'certification' | 'secondary'; title: string }>(`/courses/${session.courseId}`),
+      ]);
       setLevels(progress.levels);
+      setCourseCategory(courseData.category);
+      setCourseTitle(courseData.title);
       setActiveLevelId(session.levelId);
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Failed to load this course.');
@@ -1435,7 +1212,7 @@ export function CourseEnvironment() {
   useEffect(() => { loadLevels(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [session?.courseId, session?.levelId]);
 
   const level = levels.find(l => l.id === activeLevelId);
-  const isCheckpoint = level?.level_type === 'test';
+  const isCheckpoint = courseCategory !== 'secondary' && level?.level_type === 'test';
 
   useEffect(() => {
     setPickedFile(null);
@@ -1445,12 +1222,12 @@ export function CourseEnvironment() {
     setReviewFeedbackEntry(null);
     setTeacherVoiceUrl(null);
     setTeacherCorrectionUrl(null);
-    if (level && level.level_type === 'test') {
-      apiFetch<{ id: string; level_id: string; status: string; feedback?: string | null; correction_image_storage_key?: string | null; correction_voice_storage_key?: string | null; created_at?: string }[]>('/entries/mine')
+    if (level) {
+      apiFetch<{ id: string; level_id: string; status: string; feedback?: string | null; correction_image_storage_key?: string | null; correction_voice_storage_key?: string | null; mark_out_of_ten?: number | null; mark_passed?: boolean | null; entry_kind?: string | null; time_spent_minutes?: number | null; created_at?: string }[]>('/entries/mine')
         .then(async entries => {
-          const levelEntries = entries.filter(e => e.level_id === level.id);
+          const levelEntries = entries.filter(e => e.level_id === level.id).sort((a, b) => (b.created_at ?? '').localeCompare(a.created_at ?? ''));
           const latest = levelEntries[0];
-          const latestReview = levelEntries.find(e => e.status === 'reviewed' || e.status === 'redo_needed');
+          const latestReview = levelEntries.find(e => e.status === 'reviewed' || e.status === 'redo_needed') ?? null;
           setMyEntry(latest ?? null);
           setReviewFeedbackEntry(latestReview ?? null);
           const [voiceUrl, correctionUrl] = await Promise.all([
@@ -1479,17 +1256,32 @@ export function CourseEnvironment() {
 
   const submitPractice = async () => {
     if (!level || !pickedFile) return;
+    const numericMinutes = Number(minutes);
+    if (!Number.isFinite(numericMinutes) || numericMinutes <= 0) {
+      setError('Add how many minutes you practiced before submitting this work.');
+      return;
+    }
     setUploading(true);
     try {
-      const { storageKey, originalFilename } = await uploadFile('level-submissions', pickedFile);
-      await apiFetch(`/levels/${level.id}/submissions`, {
-        method: 'POST',
-        body: { fileStorageKey: storageKey, originalFilename, timeSpentMinutes: Number(minutes) || 0 },
-      });
+      const { storageKey, originalFilename } = await uploadFile('entries', pickedFile);
+      if (myEntry?.status === 'redo_needed') {
+        await apiFetch(`/entries/${myEntry.id}/redo`, {
+          method: 'POST',
+          body: { khatImageStorageKey: storageKey, originalFilename, timeSpentMinutes: numericMinutes },
+        });
+      } else {
+        await apiFetch('/entries', {
+          method: 'POST',
+          body: { sourceType: 'checkpoint', levelId: level.id, khatImageStorageKey: storageKey, originalFilename, timeSpentMinutes: numericMinutes },
+        });
+      }
       setSaved(true);
       await loadLevels();
+      const entries = await apiFetch<{ id: string; level_id: string; status: string; mark_out_of_ten?: number | null; feedback?: string | null; time_spent_minutes?: number | null; created_at?: string }[]>('/entries/mine');
+      setMyEntry(entries.filter(e => e.level_id === level.id).sort((a, b) => (b.created_at ?? '').localeCompare(a.created_at ?? ''))[0] ?? null);
+      setCourseChatVersion(version => version + 1);
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'Could not save your practice.');
+      setError(err instanceof ApiError ? err.message : 'Could not submit your practice for marking.');
     } finally {
       setUploading(false);
     }
@@ -1503,7 +1295,7 @@ export function CourseEnvironment() {
       if (myEntry?.status === 'redo_needed') {
         await apiFetch(`/entries/${myEntry.id}/redo`, {
           method: 'POST',
-          body: { khatImageStorageKey: storageKey, originalFilename },
+          body: { khatImageStorageKey: storageKey, originalFilename, timeSpentMinutes: null },
         });
       } else {
         await apiFetch('/entries', {
@@ -1514,6 +1306,7 @@ export function CourseEnvironment() {
       setSaved(true);
       const entries = await apiFetch<{ id: string; level_id: string; status: string }[]>('/entries/mine');
       setMyEntry(entries.filter(e => e.level_id === level.id).sort((a, b) => (a.id < b.id ? 1 : -1))[0] ?? null);
+      setCourseChatVersion(version => version + 1);
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Could not submit your test.');
     } finally {
@@ -1526,7 +1319,7 @@ export function CourseEnvironment() {
     const idx = levels.findIndex(l => l.id === level.id);
     const next = levels[idx + 1];
     if (next) openCourseLevel(session.courseId, next.id);
-    else navigate('catalog');
+    else navigateToCatalogForCourse(session.courseId);
   };
 
   return (
@@ -1538,8 +1331,8 @@ export function CourseEnvironment() {
 
       <aside className="course-env-sidebar">
         <div className="course-env-header">
-          <p className="eyebrow">Certification</p>
-          <h3>Course levels</h3>
+          <p className="eyebrow">{courseCategory === 'secondary' ? 'Self-paced course' : 'Certification course'}</p>
+          <h3>{courseTitle}</h3>
         </div>
         <div className="course-env-levels">
           {levels.map((l, i) => (
@@ -1555,7 +1348,7 @@ export function CourseEnvironment() {
             </button>
           ))}
         </div>
-        <button className="course-env-exit" onClick={() => { navigate('catalog'); setMobileSidebarOpen(false); }}><X size={16} /> Exit course</button>
+        <button className="course-env-exit" onClick={() => { navigateToCatalogForCourse(session.courseId); setMobileSidebarOpen(false); }}><X size={16} /> Exit course</button>
       </aside>
 
       {/* Backdrop for course sidebar on mobile */}
@@ -1567,13 +1360,19 @@ export function CourseEnvironment() {
           {error && <p className="error-text">{error}</p>}
           {!loading && level && (
             <>
+              <div className="lesson-course-progress-row">
+                <button type="button" onClick={() => navigateToCatalogForCourse(session.courseId)}><ChevronLeft size={14} /> {courseTitle}</button>
+                <span>Level {levels.findIndex(item => item.id === level.id) + 1} of {levels.length}</span>
+                <i><b style={{ width: `${Math.max(4, (levels.findIndex(item => item.id === level.id) + 1) / Math.max(1, levels.length) * 100)}%` }} /></i>
+              </div>
+              {myEntry?.mark_out_of_ten != null && <div className="lesson-marks-banner"><small>Marks received</small><strong>{myEntry.mark_out_of_ten} / 10</strong><span>{myEntry.mark_passed ? 'Passed' : 'Keep practising'} · Level {levels.findIndex(item => item.id === level.id) + 1} · {level.title}</span></div>}
               <div className="level-heading">
                 <div>
                   <p className="eyebrow">Level {levels.findIndex(l => l.id === level.id) + 1}</p>
                   <h1>{level.title}</h1>
-                  <p>{isCheckpoint ? 'Checkpoint test — teacher reviewed. Upload a clear photo of your completed sheet.' : 'Practice at your own pace. Uploading your practice immediately unlocks the next level.'}</p>
+                  <p>{isCheckpoint ? 'Checkpoint assessment — a teacher reviews your work, score, and any feedback.' : 'Upload a clear photo of your practice. A course reviewer will mark it out of 10; 5/10 or higher passes this level.'}</p>
                 </div>
-                <StatusChip tone={isCheckpoint ? 'amber' : 'green'}>{isCheckpoint ? 'Test · Teacher reviewed' : 'Practice · Instant unlock'}</StatusChip>
+                <StatusChip tone={isCheckpoint ? 'amber' : 'green'}>{isCheckpoint ? 'Checkpoint assessment' : courseCategory === 'secondary' ? 'Secondary · Mark only' : 'Practice · Mark only'}</StatusChip>
               </div>
 
               {isCheckpoint ? (
@@ -1618,32 +1417,51 @@ export function CourseEnvironment() {
                 </>
               ) : (
                 <>
-                  <div className="lesson-grid">
-                    {level.media.length === 0 && <p className="muted">No reference uploaded yet for this level.</p>}
-                    {level.media.map((m, i) => <CourseReferenceCard key={`${m.storageKey}-${i}`} media={m} />)}
+                  {myEntry && ['pending', 'assigned', 'in_review'].includes(myEntry.status) && <div className="lesson-submission-status"><Check size={17} /><span><strong>Sent to your review chat</strong><small>Your teacher will reply with feedback and a mark out of 10.</small></span><StatusChip tone="amber">Waiting</StatusChip></div>}
+                  {(myEntry?.status === 'reviewed' || myEntry?.status === 'redo_needed') && <div className="lesson-submission-status is-marked"><Check size={17} /><span><strong>{myEntry.status === 'redo_needed' ? 'A new attempt is needed' : 'Teacher feedback is ready'}</strong><small>{reviewFeedbackEntry?.feedback || 'Open your course chat to see the complete feedback.'}</small></span><StatusChip tone={myEntry.status === 'redo_needed' ? 'red' : 'green'}>{myEntry.status === 'redo_needed' ? 'Redo' : `${myEntry.mark_out_of_ten ?? 'Marked'} / 10`}</StatusChip></div>}
+
+                  <div className="lesson-steps">
+                    <section className="lesson-step-card">
+                      <header><span>1</span><h2>Watch the video</h2><small>{level.media.some(media => media.kind === 'video') ? 'Lesson video' : 'Lesson material'}</small></header>
+                      <div className="lesson-step-body lesson-video-list">
+                        {level.media.filter(media => media.kind === 'video').map((media, index) => <CourseReferenceCard key={`${media.storageKey}-${index}`} media={media} />)}
+                        {!level.media.some(media => media.kind === 'video') && <div className="lesson-video-placeholder"><span className="lesson-video-play"><Play size={20} fill="currentColor" /></span><small>{level.media.length ? `Study the lesson material · ${level.title}` : 'Lesson video will appear here when available'}</small></div>}
+                      </div>
+                    </section>
+
+                    <section className="lesson-step-card">
+                      <header><span>2</span><h2>Study the reference image</h2><small>Copy each form carefully</small></header>
+                      <div className="lesson-step-body lesson-reference-list">
+                        {level.media.filter(media => media.kind !== 'video').map((media, index) => <CourseReferenceCard key={`${media.storageKey}-${index}`} media={media} />)}
+                        {!level.media.some(media => media.kind !== 'video') && <div className="lesson-reference-empty">No reference image has been added to this level yet.</div>}
+                      </div>
+                    </section>
+
+                    <section className="lesson-step-card">
+                      <header><span>3</span><h2>Practise the worksheet</h2><small>Use art paper</small></header>
+                      <div className="lesson-step-body lesson-worksheet-body">
+                        {Object.values(level.sheet_files ?? {}).some(Boolean) ? <SheetPreview file={Object.values(level.sheet_files ?? {}).find(Boolean)!} /> : <div className="lesson-worksheet-preview"><i /><i /><i /><i /><i /><i /></div>}
+                        <div className="lesson-worksheet-copy"><p>Print the worksheet and practise each letter on <strong>art paper</strong> until the shapes match the reference.</p><div><SheetDownloadMenu files={level.sheet_files} label="View worksheet" /><SheetDownloadMenu files={level.sheet_files} label="Download worksheet" /></div><small>For more assistance, contact Funun al-Quran.</small></div>
+                      </div>
+                    </section>
+
+                    <section className="lesson-step-card lesson-send-step">
+                      <header><span>4</span><h2>Send your work for review</h2></header>
+                      <div className="lesson-step-body">
+                        <div className="lesson-upload-checklist"><small>What to upload for this level</small><p><i /> Upload 1 · Photo of your practice sheet</p><span>Send your upload here. Clear photo in daylight, whole page in frame.</span></div>
+                        <div className="practice-form lesson-practice-form">
+                          <label className="field-label">Minutes practised<input className="field" type="number" value={minutes} onChange={event => setMinutes(event.target.value)} placeholder="e.g. 25" /></label>
+                          <UploadBox label={pickedFile?.name || 'Choose a photo of your practice'} sublabel={pickedFile ? 'Ready to send' : 'PNG or JPG · up to 10 MB'} onChange={setPickedFile} />
+                        </div>
+                        {error && <p className="error-text" role="alert">{error}</p>}
+                        <div className="lesson-send-actions"><Button disabled={!pickedFile || uploading} onClick={submitPractice}>{uploading ? <PenLoader label="Sending work" compact tiny /> : saved ? 'Sent to chat' : 'Send your work for review'} {!uploading && <ArrowRight size={15} />}</Button></div>
+                        <CourseJourney key={`${session.courseId}-${level.id}-${courseChatVersion}`} courseId={session.courseId} levelId={level.id} compact />
+                      </div>
+                    </section>
                   </div>
-                  <div className="practice-panel">
-                    <SectionHeading eyebrow="Make it yours" title="Submit your practice" text="A clear photo in natural light is best. Your practice is saved to your profile and the next level unlocks immediately — no review needed." />
-                    <div className="practice-form">
-                      <label className="field-label">Minutes practiced<input className="field" type="number" value={minutes} onChange={e => setMinutes(e.target.value)} placeholder="e.g. 25" /></label>
-                      <UploadBox label={pickedFile?.name || 'Drop your practice sheet here'} sublabel={pickedFile ? 'Ready to save' : 'PNG, JPG up to 10 MB · tap to browse'} onChange={setPickedFile} />
-                    </div>
-                    <div className="practice-actions">
-                      <SheetDownloadMenu files={level.sheet_files} label="Practice sheets" />
-                      <Button onClick={submitPractice}>{uploading ? <PenLoader label="Saving practice" compact tiny /> : saved ? 'Saved' : 'Save practice'} {!uploading && <ArrowRight size={15} />}</Button>
-                    </div>
-                  </div>
-                  {saved && (
-                    <Modal onClose={nextUnlockedLevel}>
-                      <Sparkles size={30} className="gold-icon" />
-                      <p className="eyebrow">A note for your desk</p>
-                      <h2>"{quote}"</h2>
-                      <p>Practice saved — next level unlocked. Your upload is on your profile for your teacher to see, but it's never queued for review.</p>
-                      <Button onClick={nextUnlockedLevel}>Continue</Button>
-                    </Modal>
-                  )}
                 </>
               )}
+              {isCheckpoint && <CourseJourney key={`${session.courseId}-${level.id}-${courseChatVersion}`} courseId={session.courseId} levelId={level.id} compact />}
             </>
           )}
         </div>
@@ -1714,6 +1532,16 @@ function SheetDownloadMenu({ files, label }: { files: ApiSheetFiles; label: stri
       )}
     </div>
   );
+}
+
+function SheetPreview({ file }: { file: { storageKey: string; originalFilename?: string } }) {
+  const [url, setUrl] = useState<string | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    void getViewUrl(file.storageKey).then(value => { if (!cancelled) setUrl(value); }).catch(() => undefined);
+    return () => { cancelled = true; };
+  }, [file.storageKey]);
+  return <div className="lesson-worksheet-file-preview">{url ? <iframe src={`${url}#toolbar=0&navpanes=0&view=FitH`} title={file.originalFilename ?? 'Practice worksheet'} loading="lazy" /> : <span>{file.originalFilename ?? 'Loading worksheet…'}</span>}</div>;
 }
 
 function CourseReferenceCard({ media, checkpoint = false }: { media: ApiMediaItem; checkpoint?: boolean }) {

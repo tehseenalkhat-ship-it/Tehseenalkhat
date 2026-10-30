@@ -164,10 +164,30 @@ export async function uploadFile(
     body: { prefix, filename: file.name, contentType },
   });
 
-  const putResponse = await trackApiRequest(() => fetch(uploadUrl, { method: 'PUT', headers: { 'Content-Type': contentType }, body: file }));
-  if (!putResponse.ok) throw new Error('Upload to storage failed');
+  try {
+    const putResponse = await trackApiRequest(() => fetch(uploadUrl, { method: 'PUT', headers: { 'Content-Type': contentType }, body: file }));
+    if (putResponse.ok) return { storageKey, originalFilename: file.name };
+    if (prefix !== 'entries') throw new Error('Upload to storage failed');
+  } catch (error) {
+    if (prefix !== 'entries') throw error;
+  }
 
-  return { storageKey, originalFilename: file.name };
+  const token = getToken();
+  const proxyResponse = await trackApiRequest(() => fetch(`${API_BASE_URL}/uploads/proxy`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/octet-stream',
+      'X-File-Content-Type': contentType,
+      'X-Filename': encodeURIComponent(file.name),
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+    body: file,
+    signal: AbortSignal.timeout(30_000),
+  }));
+  const result = await proxyResponse.json().catch(() => ({})) as { storageKey?: string; originalFilename?: string; error?: string };
+  if (!proxyResponse.ok || !result.storageKey) throw new ApiError(proxyResponse.status, result.error ?? 'Could not upload this worksheet image.');
+
+  return { storageKey: result.storageKey, originalFilename: result.originalFilename ?? file.name };
 }
 
 export async function getViewUrl(storageKey: string): Promise<string> {

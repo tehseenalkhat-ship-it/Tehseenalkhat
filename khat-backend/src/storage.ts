@@ -84,3 +84,9 @@ export async function deleteObject(storageKey: string): Promise<void> {
 export async function objectExists(storageKey: string): Promise<boolean> {
   return fs.existsSync(filePath(storageKey));
 }
+
+export async function putObjectBytes(storageKey: string, body: Buffer, _contentType: string): Promise<void> {
+  const target = filePath(storageKey);
+  await fs.promises.mkdir(path.dirname(target), { recursive: true });
+  await fs.promises.writeFile(target, body);
+}

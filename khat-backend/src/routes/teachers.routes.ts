@@ -23,7 +23,7 @@ export async function teacherProfileRoutes(app: FastifyInstance) {
              (SELECT COUNT(*) FROM users u WHERE u.branch_id = b.id AND u.role = 'teacher' AND u.deleted_at IS NULL)::int AS "teacherCount",
              (SELECT COUNT(DISTINCT al.user_id) FROM activity_log al JOIN users u ON u.id = al.user_id
                WHERE u.branch_id = b.id AND u.role = 'student' AND u.deleted_at IS NULL
-                 AND al.activity_date >= CURRENT_DATE - INTERVAL '30 days')::int AS "activeStudents30d",
+                 AND al.activity_date >= DATE_SUB(CURRENT_DATE, INTERVAL 30 DAY))::int AS "activeStudents30d",
              (SELECT COUNT(*) FROM entries e JOIN users s ON s.id = e.student_id
                WHERE s.branch_id = b.id AND s.role = 'student' AND s.deleted_at IS NULL)::int AS "totalEntries",
              (SELECT COUNT(*) FROM entries e JOIN users s ON s.id = e.student_id
@@ -32,7 +32,7 @@ export async function teacherProfileRoutes(app: FastifyInstance) {
              (SELECT COUNT(*) FROM entries e JOIN users s ON s.id = e.student_id
                WHERE s.branch_id = b.id AND s.role = 'student' AND s.deleted_at IS NULL
                  AND e.status IN ('pending', 'assigned', 'in_review'))::int AS "openEntries",
-             (SELECT AVG(EXTRACT(EPOCH FROM (e.reviewed_at - e.locked_at)) / 3600)
+             (SELECT AVG(TIMESTAMPDIFF(SECOND, e.locked_at, e.reviewed_at) / 3600)
                FROM entries e JOIN users s ON s.id = e.student_id
                WHERE s.branch_id = b.id AND s.role = 'student' AND s.deleted_at IS NULL
                  AND e.reviewed_at IS NOT NULL AND e.locked_at IS NOT NULL) AS "avgResponseHours",
@@ -50,46 +50,48 @@ export async function teacherProfileRoutes(app: FastifyInstance) {
           [branchId]
         ),
         pool.query(
-          `WITH months AS (
-             SELECT generate_series(
-               date_trunc('month', CURRENT_DATE) - (($1::int - 1) * INTERVAL '1 month'),
-               date_trunc('month', CURRENT_DATE), INTERVAL '1 month'
-             ) AS month_start
+          `WITH RECURSIVE months AS (
+             SELECT DATE_SUB(CAST(DATE_FORMAT(CURRENT_DATE, '%Y-%m-01') AS DATE), INTERVAL ${months - 1} MONTH) AS month_start
+             UNION ALL
+             SELECT DATE_ADD(month_start, INTERVAL 1 MONTH)
+             FROM months
+             WHERE month_start < CAST(DATE_FORMAT(CURRENT_DATE, '%Y-%m-01') AS DATE)
            ), activity AS (
-             SELECT date_trunc('month', al.activity_date) AS month_start,
+             SELECT CAST(DATE_FORMAT(al.activity_date, '%Y-%m-01') AS DATE) AS month_start,
                     COUNT(DISTINCT u.id)::int AS active_students,
                     COALESCE(SUM(al.login_count), 0)::int AS logins
              FROM activity_log al JOIN users u ON u.id = al.user_id
              WHERE u.branch_id = $2 AND u.role = 'student' AND u.deleted_at IS NULL
                AND al.activity_date >= (SELECT MIN(month_start) FROM months)
-             GROUP BY date_trunc('month', al.activity_date)
+             GROUP BY month_start
            )
-           SELECT to_char(m.month_start, 'YYYY-MM') AS month,
+           SELECT DATE_FORMAT(m.month_start, '%Y-%m') AS month,
                   COALESCE(a.active_students, 0)::int AS "activeStudents",
                   COALESCE(a.logins, 0)::int AS logins
            FROM months m LEFT JOIN activity a USING (month_start) ORDER BY m.month_start`,
           [months, branchId]
         ),
         pool.query(
-          `WITH months AS (
-             SELECT generate_series(
-               date_trunc('month', CURRENT_DATE) - (($1::int - 1) * INTERVAL '1 month'),
-               date_trunc('month', CURRENT_DATE), INTERVAL '1 month'
-             ) AS month_start
+          `WITH RECURSIVE months AS (
+             SELECT DATE_SUB(CAST(DATE_FORMAT(CURRENT_DATE, '%Y-%m-01') AS DATE), INTERVAL ${months - 1} MONTH) AS month_start
+             UNION ALL
+             SELECT DATE_ADD(month_start, INTERVAL 1 MONTH)
+             FROM months
+             WHERE month_start < CAST(DATE_FORMAT(CURRENT_DATE, '%Y-%m-01') AS DATE)
            ), submitted AS (
-             SELECT date_trunc('month', e.created_at) AS month_start, COUNT(*)::int AS count
+             SELECT CAST(DATE_FORMAT(e.created_at, '%Y-%m-01') AS DATE) AS month_start, COUNT(*)::int AS count
              FROM entries e JOIN users s ON s.id = e.student_id
              WHERE s.branch_id = $2 AND s.role = 'student' AND s.deleted_at IS NULL
                AND e.created_at >= (SELECT MIN(month_start) FROM months)
-             GROUP BY date_trunc('month', e.created_at)
+             GROUP BY month_start
            ), reviewed AS (
-             SELECT date_trunc('month', e.reviewed_at) AS month_start, COUNT(*)::int AS count
+             SELECT CAST(DATE_FORMAT(e.reviewed_at, '%Y-%m-01') AS DATE) AS month_start, COUNT(*)::int AS count
              FROM entries e JOIN users s ON s.id = e.student_id
              WHERE s.branch_id = $2 AND s.role = 'student' AND s.deleted_at IS NULL
                AND e.reviewed_at >= (SELECT MIN(month_start) FROM months)
-             GROUP BY date_trunc('month', e.reviewed_at)
+             GROUP BY month_start
            )
-           SELECT to_char(m.month_start, 'YYYY-MM') AS month,
+           SELECT DATE_FORMAT(m.month_start, '%Y-%m') AS month,
                   COALESCE(s.count, 0)::int AS submitted,
                   COALESCE(r.count, 0)::int AS reviewed
            FROM months m LEFT JOIN submitted s USING (month_start)
@@ -98,18 +100,19 @@ export async function teacherProfileRoutes(app: FastifyInstance) {
           [months, branchId]
         ),
         pool.query(
-          `WITH months AS (
-             SELECT generate_series(
-               date_trunc('month', CURRENT_DATE) - (($1::int - 1) * INTERVAL '1 month'),
-               date_trunc('month', CURRENT_DATE), INTERVAL '1 month'
-             ) AS month_start
+          `WITH RECURSIVE months AS (
+             SELECT DATE_SUB(CAST(DATE_FORMAT(CURRENT_DATE, '%Y-%m-01') AS DATE), INTERVAL ${months - 1} MONTH) AS month_start
+             UNION ALL
+             SELECT DATE_ADD(month_start, INTERVAL 1 MONTH)
+             FROM months
+             WHERE month_start < CAST(DATE_FORMAT(CURRENT_DATE, '%Y-%m-01') AS DATE)
            ), events AS (
-             SELECT date_trunc('month', le.scheduled_at) AS month_start, COUNT(*)::int AS count
+             SELECT CAST(DATE_FORMAT(le.scheduled_at, '%Y-%m-01') AS DATE) AS month_start, COUNT(*)::int AS count
              FROM live_events le
              WHERE le.branch_id = $2 AND le.scheduled_at >= (SELECT MIN(month_start) FROM months)
-             GROUP BY date_trunc('month', le.scheduled_at)
+             GROUP BY month_start
            )
-           SELECT to_char(m.month_start, 'YYYY-MM') AS month, COALESCE(e.count, 0)::int AS events
+           SELECT DATE_FORMAT(m.month_start, '%Y-%m') AS month, COALESCE(e.count, 0)::int AS events
            FROM months m LEFT JOIN events e USING (month_start) ORDER BY m.month_start`,
           [months, branchId]
         ),
@@ -122,7 +125,7 @@ export async function teacherProfileRoutes(app: FastifyInstance) {
         ),
         pool.query(
           `SELECT t.id, t.name, COUNT(e.id)::int AS "entriesReviewed",
-                  AVG(EXTRACT(EPOCH FROM (e.reviewed_at - e.locked_at)) / 3600) AS "avgResponseHours"
+                  AVG(TIMESTAMPDIFF(SECOND, e.locked_at, e.reviewed_at) / 3600) AS "avgResponseHours"
            FROM users t
            LEFT JOIN entries e ON e.reviewed_by = t.id AND e.reviewed_at IS NOT NULL
              AND EXISTS (SELECT 1 FROM users s WHERE s.id = e.student_id AND s.branch_id = $1
@@ -204,7 +207,7 @@ export async function teacherProfileRoutes(app: FastifyInstance) {
       pool.query(
         `SELECT
            COUNT(e.id)::int AS total_reviewed,
-           AVG(EXTRACT(EPOCH FROM (e.reviewed_at - e.locked_at)) / 3600) AS avg_response_hours,
+           AVG(TIMESTAMPDIFF(SECOND, e.locked_at, e.reviewed_at) / 3600) AS avg_response_hours,
            COUNT(*) FILTER (WHERE e.is_diverted = true)::int AS escalated_away_count
          FROM entries e
          JOIN users s ON s.id = e.student_id

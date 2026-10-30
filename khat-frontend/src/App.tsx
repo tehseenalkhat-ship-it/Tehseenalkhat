@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useState } from 'react';
+import { lazy, Suspense, useEffect, useLayoutEffect, useState } from 'react';
 import { ChevronRight } from 'lucide-react';
 import type { Role } from '@/data/types';
 import { useHash, Header, navigate, PenLoader, AlertsPage } from '@/components/ui';
@@ -9,6 +9,8 @@ import {
   StudentLandingPage, StudentDashboard, Catalog, CourseEnvironment, Profile, Achievements,
   ShowcaseSubmission, Competitions, StudentEvents, Resources,
 } from '@/pages/student';
+import { Chatrooms } from '@/pages/Chatrooms';
+const MashqWorksheets = lazy(() => import('@/pages/MashqWorksheets').then(module => ({ default: module.MashqWorksheets })));
 import {
   TeacherDashboard, CoordinatorDashboard, TeacherQueue, ReviewPage, Reviews, TeacherShowcase, AssetLibrary,
   TeacherProfile, CompetitionJudging, HostEvent, BranchStats, BranchTeachers,
@@ -17,14 +19,15 @@ import {
 import { AdminLayout } from '@/pages/admin';
 import { readThemePreference, saveThemePreference, type ThemeName } from '@/theme';
 import { AssistantChat } from '@/components/AssistantChat';
+import { useLanguage } from '@/language';
 
 const PUBLIC_PAGES = ['landing', 'signup', 'login', 'forgot-password', 'reset-password'];
 
 const PAGE_LABELS: Record<string, string> = {
-  dashboard: 'Dashboard', student: 'Dashboard', 'teacher-dashboard': 'Dashboard', 'coordinator-dashboard': 'Dashboard',
+  dashboard: 'Dashboard', student: 'Dashboard', chats: 'Chats', 'teacher-chats': 'Student messages', 'teacher-dashboard': 'Dashboard', 'coordinator-dashboard': 'Dashboard',
   admin: 'Dashboard', catalog: 'Courses', achievements: 'Achievements', gallery: 'Gallery', competitions: 'Competitions', events: 'Events',
   resources: 'Resources', showcase: 'Showcase', notifications: 'Notifications', profile: 'Profile', settings: 'Settings',
-  course: 'Course', queue: 'Review queue', review: 'Review entry', reviews: 'My reviews', assets: 'Asset library',
+  course: 'Course', mashq: 'Mashq worksheets', queue: 'Review queue', review: 'Review entry', reviews: 'My reviews', assets: 'Asset library',
   judging: 'Judging', 'events-host': 'Host events', 'branch-stats': 'Branch statistics', 'branch-teachers': 'Branch teachers',
   'branch-students': 'Branch students', 'student-profile': 'Student profile', 'teacher-profile-view': 'Teacher profile',
   'admin-courses': 'Course builder', 'admin-tr-numbers': 'TR number uploads', 'admin-users': 'Teacher & load', 'admin-logs': 'Entry logs',
@@ -38,6 +41,7 @@ function pageLabel(page: string): string {
 
 function App() {
   const page = useHash();
+  const { t } = useLanguage();
   const [sessionUser, setSessionUser] = useState(() => getSessionUser());
   const userId = sessionUser?.id ?? null;
   const [theme, setTheme] = useState<ThemeName>(() => readThemePreference(getSessionUser()?.id));
@@ -132,6 +136,8 @@ function App() {
     // Student portal
     if (page === 'dashboard' || page === 'student') return <StudentDashboard />;
     if (page === 'catalog') return <Catalog />;
+    if (page === 'chats' && role === 'student') return <Chatrooms />;
+    if (page === 'mashq' && role === 'student') return <Suspense fallback={<PenLoader label="Loading worksheets…" />}><MashqWorksheets /></Suspense>;
     if (page === 'course') return <CourseEnvironment />;
     if (page === 'profile' && role === 'student') return <Profile />;
     if (page === 'achievements' && role === 'student') return <Achievements />;
@@ -146,6 +152,7 @@ function App() {
 
     // Teacher and coordinator portals
     if (page === 'teacher-dashboard') return <TeacherDashboard />;
+    if (page === 'teacher-chats' && role === 'teacher') return <Chatrooms audience="teacher" />;
     if (page === 'coordinator-dashboard') return <CoordinatorDashboard />;
     if (page === 'queue') return <TeacherQueue coordinator={role === 'coordinator'} />;
     if (page === 'review') return <ReviewPage />;
@@ -191,7 +198,7 @@ function App() {
         <nav className="app-breadcrumb" aria-label="Breadcrumb">
           <button onClick={() => navigate(dashboardRoute)}>Dashboard</button>
           <ChevronRight size={14} aria-hidden="true" />
-          <strong aria-current="page">{pageLabel(page)}</strong>
+          <strong aria-current="page">{t(pageLabel(page))}</strong>
         </nav>
         {content}
       </div>

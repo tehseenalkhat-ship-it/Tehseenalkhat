@@ -12,15 +12,17 @@ type CreateEntryBody = {
   competitionId?: string;
   khatImageStorageKey: string;
   originalFilename?: string;
+  timeSpentMinutes?: number;
 };
 type ReviewDecisionBody = {
-  decision: 'pass' | 'redo';
+  decision: 'pass' | 'redo' | 'mark';
   feedback?: string;
   correctionImageStorageKey?: string;
   correctionVoiceStorageKey?: string;
+  markOutOfTen?: number;
 };
 type DivertBody = { teacherId: string; reason?: string };
-type RedoBody = { khatImageStorageKey: string; originalFilename?: string };
+type RedoBody = { khatImageStorageKey: string; originalFilename?: string; timeSpentMinutes?: number };
 
 export async function entryRoutes(app: FastifyInstance) {
   // ---- Admin: searchable entry inventory for the control panel ----
@@ -63,7 +65,7 @@ export async function entryRoutes(app: FastifyInstance) {
     '/',
     { preHandler: [app.authenticate, app.requireRole('student')] },
     async (request, reply) => {
-      const { sourceType, levelId, eventId, competitionId, khatImageStorageKey, originalFilename } = request.body;
+      const { sourceType, levelId, eventId, competitionId, khatImageStorageKey, originalFilename, timeSpentMinutes } = request.body;
       if (!sourceType || !khatImageStorageKey) {
         return reply.code(400).send({ error: 'sourceType and khatImageStorageKey are required' });
       }
@@ -72,49 +74,57 @@ export async function entryRoutes(app: FastifyInstance) {
       }
 
       const studentId = (request.user as AuthUser).id;
+      let entryKind: 'practice_marking' | 'checkpoint_assessment' | 'secondary_marking' | null = null;
+
       if (sourceType === 'checkpoint') {
         const { rows: levelRows } = await pool.query(
-          `SELECT l.id, l.course_id, l.order_index, l.level_type, c.category
+          `SELECT l.id, l.course_id, l.order_index, l.level_type, c.category, c.title AS course_title
            FROM levels l JOIN courses c ON c.id = l.course_id WHERE l.id = $1`,
           [levelId]
         );
         const level = levelRows[0];
         if (!level) return reply.code(404).send({ error: 'Checkpoint level not found' });
-        if (level.level_type !== 'test') return reply.code(400).send({ error: 'Entries can only be submitted to checkpoint test levels' });
+        if (level.category === 'secondary' && /mashq|worksheet/i.test(level.course_title)) {
+          return reply.code(400).send({ error: 'Mashq worksheets are download-only and do not accept submissions' });
+        }
+        if (level.level_type === 'test') entryKind = 'checkpoint_assessment';
+        else if (level.category === 'secondary') entryKind = 'secondary_marking';
+        else entryKind = 'practice_marking';
+        if (entryKind !== 'checkpoint_assessment' && (!Number.isInteger(timeSpentMinutes) || Number(timeSpentMinutes) <= 0)) {
+          return reply.code(400).send({ error: 'timeSpentMinutes must be a positive whole number for marked practice' });
+        }
 
-        await pool.query(
-          `INSERT INTO enrollments (student_id, course_id) VALUES ($1, $2)
-           ON CONFLICT (student_id, course_id) DO NOTHING`,
-          [studentId, level.course_id]
-        );
         const { rows: enrollmentRows } = await pool.query(
           'SELECT current_level_index FROM enrollments WHERE student_id = $1 AND course_id = $2',
           [studentId, level.course_id]
         );
-        if (level.category !== 'secondary' && level.order_index > enrollmentRows[0].current_level_index) {
-          return reply.code(403).send({ error: 'This checkpoint is locked — complete the earlier levels first' });
+        if (!enrollmentRows[0]) return reply.code(403).send({ error: 'Enroll in this course before submitting work' });
+        if ((level.category !== 'secondary' || level.level_type === 'test') && level.order_index > enrollmentRows[0].current_level_index) {
+          return reply.code(403).send({ error: 'This level is locked — complete the earlier levels first' });
         }
 
-        const { rows: blockingCheckpoints } = await pool.query(
-          `SELECT l.title FROM levels l
-           WHERE l.course_id = $1 AND l.level_type = 'test' AND l.order_index < $2
-             AND NOT EXISTS (
-               SELECT 1 FROM entries e
-               WHERE e.student_id = $3 AND e.level_id = l.id
-                 AND e.source_type = 'checkpoint' AND e.status = 'reviewed'
-             )
-           ORDER BY l.order_index LIMIT 1`,
-          [level.course_id, level.order_index, studentId]
-        );
-        if (blockingCheckpoints[0]) {
-          return reply.code(403).send({ error: `Pass the earlier checkpoint “${blockingCheckpoints[0].title}” before continuing` });
+        if (level.level_type === 'test') {
+          const { rows: blockingCheckpoints } = await pool.query(
+            `SELECT l.title FROM levels l
+             WHERE l.course_id = $1 AND l.level_type = 'test' AND l.order_index < $2
+               AND NOT EXISTS (
+                 SELECT 1 FROM entries e
+                 WHERE e.student_id = $3 AND e.level_id = l.id
+                   AND e.source_type = 'checkpoint' AND e.status = 'reviewed'
+               )
+             ORDER BY l.order_index LIMIT 1`,
+            [level.course_id, level.order_index, studentId]
+          );
+          if (blockingCheckpoints[0]) {
+            return reply.code(403).send({ error: `Pass the earlier checkpoint “${blockingCheckpoints[0].title}” before continuing` });
+          }
         }
       }
 
       const { rows } = await pool.query(
-        `INSERT INTO entries (student_id, source_type, level_id, event_id, competition_id, khat_image_storage_key, original_filename)
-         VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *`,
-        [studentId, sourceType, levelId ?? null, eventId ?? null, competitionId ?? null, khatImageStorageKey, originalFilename ?? null]
+        `INSERT INTO entries (student_id, source_type, level_id, event_id, competition_id, khat_image_storage_key, original_filename, entry_kind, time_spent_minutes)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING *`,
+        [studentId, sourceType, levelId ?? null, eventId ?? null, competitionId ?? null, khatImageStorageKey, originalFilename ?? null, entryKind, timeSpentMinutes ?? null]
       );
       const entry = rows[0];
 
@@ -133,12 +143,16 @@ export async function entryRoutes(app: FastifyInstance) {
   app.get('/mine', { preHandler: [app.authenticate, app.requireRole('student')] }, async (request) => {
     const studentId = (request.user as AuthUser).id;
     const { rows } = await pool.query(
-      `SELECT e.*, l.title AS level_title, c.khat_type_id, reviewer.name AS reviewed_by_name
+            `SELECT e.*, l.title AS level_title, c.khat_type_id,
+              COALESCE(e.entry_kind, CASE WHEN l.level_type = 'test' THEN 'checkpoint_assessment' WHEN e.mashq_category_key IS NOT NULL THEN 'mashq_marking' WHEN c.category = 'secondary' THEN 'secondary_marking' ELSE 'practice_marking' END) AS entry_kind,
+              c.id AS course_id, c.title AS course_title, c.category AS course_category, l.order_index
        FROM entries e
        LEFT JOIN levels l ON l.id = e.level_id
        LEFT JOIN courses c ON c.id = l.course_id
-       LEFT JOIN users reviewer ON reviewer.id = e.reviewed_by
        WHERE e.student_id = $1
+         AND e.mashq_category_key IS NULL
+         AND (e.entry_kind IS NULL OR e.entry_kind <> 'mashq_marking')
+         AND (c.category IS NULL OR c.category <> 'secondary' OR (LOWER(COALESCE(c.title, '')) NOT LIKE '%mashq%' AND LOWER(COALESCE(c.title, '')) NOT LIKE '%worksheet%'))
        ORDER BY e.created_at DESC`,
       [studentId]
     );
@@ -153,8 +167,9 @@ export async function entryRoutes(app: FastifyInstance) {
     }
     if (user.role === 'admin') {
       const { rows } = await pool.query(
-        `SELECT e.id, e.source_type, e.status, e.created_at, e.locked_at,
-            l.title AS level_title, c.khat_type_id, kt.code AS khat_type_code, kt.display_name AS khat_type_name,
+        `SELECT e.id, e.source_type, e.status, e.created_at, e.locked_at, e.original_filename, e.time_spent_minutes, e.mark_out_of_ten, e.mashq_category_key,
+          COALESCE(e.entry_kind, CASE WHEN l.level_type = 'test' THEN 'checkpoint_assessment' WHEN e.mashq_category_key IS NOT NULL THEN 'mashq_marking' WHEN c.category = 'secondary' THEN 'secondary_marking' ELSE 'practice_marking' END) AS entry_kind,
+          l.title AS level_title, l.level_type, c.title AS course_title, c.category AS course_category, c.khat_type_id, kt.code AS khat_type_code, kt.display_name AS khat_type_name,
             u.name AS student_name, u.branch_id AS student_branch_id
          FROM entries e
          LEFT JOIN levels l ON l.id = e.level_id
@@ -162,14 +177,18 @@ export async function entryRoutes(app: FastifyInstance) {
           LEFT JOIN khat_types kt ON kt.id = c.khat_type_id
          JOIN users u ON u.id = e.student_id
          WHERE e.status = 'assigned'
+           AND e.mashq_category_key IS NULL
+           AND (e.entry_kind IS NULL OR e.entry_kind <> 'mashq_marking')
+           AND (c.category IS NULL OR c.category <> 'secondary' OR (LOWER(COALESCE(c.title, '')) NOT LIKE '%mashq%' AND LOWER(COALESCE(c.title, '')) NOT LIKE '%worksheet%'))
          ORDER BY e.created_at ASC LIMIT 200`
       );
       return rows;
     }
     const teacherId = user.id;
     const { rows } = await pool.query(
-      `SELECT e.id, e.source_type, e.status, e.created_at, e.locked_at,
-        l.title AS level_title, c.khat_type_id, kt.code AS khat_type_code, kt.display_name AS khat_type_name,
+      `SELECT e.id, e.source_type, e.status, e.created_at, e.locked_at, e.original_filename, e.time_spent_minutes, e.mark_out_of_ten, e.mashq_category_key,
+        COALESCE(e.entry_kind, CASE WHEN l.level_type = 'test' THEN 'checkpoint_assessment' WHEN e.mashq_category_key IS NOT NULL THEN 'mashq_marking' WHEN c.category = 'secondary' THEN 'secondary_marking' ELSE 'practice_marking' END) AS entry_kind,
+        l.title AS level_title, l.level_type, c.title AS course_title, c.category AS course_category, c.khat_type_id, kt.code AS khat_type_code, kt.display_name AS khat_type_name,
         u.name AS student_name, u.branch_id AS student_branch_id
        FROM entries e
        LEFT JOIN levels l ON l.id = e.level_id
@@ -177,6 +196,9 @@ export async function entryRoutes(app: FastifyInstance) {
       LEFT JOIN khat_types kt ON kt.id = c.khat_type_id
        JOIN users u ON u.id = e.student_id
        WHERE e.assigned_teacher_id = $1 AND e.status IN ('assigned', 'in_review')
+         AND e.mashq_category_key IS NULL
+         AND (e.entry_kind IS NULL OR e.entry_kind <> 'mashq_marking')
+         AND (c.category IS NULL OR c.category <> 'secondary' OR (LOWER(COALESCE(c.title, '')) NOT LIKE '%mashq%' AND LOWER(COALESCE(c.title, '')) NOT LIKE '%worksheet%'))
        ORDER BY e.created_at ASC`,
       [teacherId]
     );
@@ -208,7 +230,7 @@ export async function entryRoutes(app: FastifyInstance) {
       ),
       pool.query(
         `SELECT COUNT(*) AS total_reviewed,
-                AVG(EXTRACT(EPOCH FROM (reviewed_at - locked_at)) / 3600) AS avg_response_hours,
+                AVG(TIMESTAMPDIFF(SECOND, locked_at, reviewed_at) / 3600) AS avg_response_hours,
                 COUNT(*) FILTER (WHERE is_diverted = true) AS escalated_away_count
          FROM entries WHERE reviewed_by = $1`,
         [teacherId]
@@ -233,20 +255,31 @@ export async function entryRoutes(app: FastifyInstance) {
   app.get<{ Params: { id: string } }>('/:id', { preHandler: [app.authenticate] }, async (request, reply) => {
     const user = request.user as AuthUser;
     const { rows } = await pool.query(
-      `SELECT e.*, u.name AS student_name FROM entries e JOIN users u ON u.id = e.student_id WHERE e.id = $1`,
+            `SELECT e.*, u.name AS student_name, l.level_type AS level_type,
+                COALESCE(e.entry_kind, CASE WHEN l.level_type = 'test' THEN 'checkpoint_assessment' WHEN e.mashq_category_key IS NOT NULL THEN 'mashq_marking' WHEN c.category = 'secondary' THEN 'secondary_marking' ELSE 'practice_marking' END) AS review_type,
+              c.id AS course_id, c.title AS course_title, c.category AS course_category, e.mashq_category_key
+       FROM entries e
+       JOIN users u ON u.id = e.student_id
+       LEFT JOIN levels l ON l.id = e.level_id
+       LEFT JOIN courses c ON c.id = l.course_id
+       WHERE e.id = $1`,
       [request.params.id]
     );
     const entry = rows[0];
     if (!entry) return reply.code(404).send({ error: 'Entry not found' });
+    if (entry.review_type === 'mashq_marking' || (entry.course_category === 'secondary' && /mashq|worksheet/i.test(entry.course_title ?? ''))) {
+      return reply.code(410).send({ error: 'Mashq worksheets are download-only and are no longer reviewed' });
+    }
 
     const isOwner = entry.student_id === user.id;
     const isAssignedTeacher = entry.assigned_teacher_id === user.id;
-    if (!isOwner && !isAssignedTeacher && user.role !== 'admin') {
+    const isReviewingTeacher = entry.reviewed_by === user.id;
+    if (!isOwner && !isAssignedTeacher && !isReviewingTeacher && user.role !== 'admin') {
       return reply.code(403).send({ error: 'Not authorized to view this entry' });
     }
 
     let scopedSubmissions: unknown[] = [];
-    if (entry.source_type === 'checkpoint' && entry.level_id) {
+    if (entry.review_type === 'checkpoint_assessment' && entry.level_id) {
       const { rows: levelRows } = await pool.query(
         `SELECT l.order_index, l.course_id FROM levels l WHERE l.id = $1`,
         [entry.level_id]
@@ -323,9 +356,13 @@ export async function entryRoutes(app: FastifyInstance) {
         return reply.code(403).send({ error: 'Not authorized to review entries' });
       }
       const teacherId = user.id;
-      const { decision, feedback, correctionImageStorageKey, correctionVoiceStorageKey } = request.body;
-      if (decision !== 'pass' && decision !== 'redo') {
-        return reply.code(400).send({ error: "decision must be 'pass' or 'redo'" });
+      const { decision, feedback, correctionImageStorageKey, correctionVoiceStorageKey, markOutOfTen } = request.body;
+      if (decision !== 'pass' && decision !== 'redo' && decision !== 'mark') {
+        return reply.code(400).send({ error: "decision must be 'pass', 'redo', or 'mark'" });
+      }
+      const normalizedMark = markOutOfTen === undefined || markOutOfTen === null ? null : Number(markOutOfTen);
+      if (normalizedMark !== null && (!Number.isFinite(normalizedMark) || normalizedMark < 0 || normalizedMark > 10)) {
+        return reply.code(400).send({ error: 'markOutOfTen must be a number between 0 and 10' });
       }
 
       const { rows } = await pool.query('SELECT * FROM entries WHERE id = $1', [request.params.id]);
@@ -334,26 +371,56 @@ export async function entryRoutes(app: FastifyInstance) {
       if (entry.assigned_teacher_id !== teacherId || entry.status !== 'in_review') {
         return reply.code(403).send({ error: 'You do not have this entry locked for review' });
       }
+      const { rows: typeRows } = await pool.query(
+        `SELECT COALESCE(e.entry_kind, CASE WHEN l.level_type = 'test' THEN 'checkpoint_assessment' WHEN e.mashq_category_key IS NOT NULL THEN 'mashq_marking' WHEN c.category = 'secondary' THEN 'secondary_marking' ELSE 'practice_marking' END) AS entry_kind,
+          c.category AS course_category, c.title AS course_title
+         FROM entries e LEFT JOIN levels l ON l.id = e.level_id LEFT JOIN courses c ON c.id = l.course_id WHERE e.id = $1`,
+        [entry.id]
+      );
+      const entryKind = typeRows[0]?.entry_kind;
+      if (entryKind === 'mashq_marking' || (typeRows[0]?.course_category === 'secondary' && /mashq|worksheet/i.test(typeRows[0]?.course_title ?? ''))) {
+        return reply.code(410).send({ error: 'Mashq worksheets are download-only and are no longer reviewed' });
+      }
+      const isMarkOnly = entryKind === 'practice_marking' || entryKind === 'secondary_marking' || entryKind === 'mashq_marking';
+      if (isMarkOnly && decision !== 'mark') {
+        return reply.code(400).send({ error: 'Practice and secondary course entries require a mark-only decision.' });
+      }
+      if (entryKind === 'checkpoint_assessment' && decision === 'mark') {
+        return reply.code(400).send({ error: 'Checkpoint tests require a thorough pass-or-redo assessment.' });
+      }
+      if (entryKind === 'checkpoint_assessment' && normalizedMark === null) {
+        return reply.code(400).send({ error: 'A checkpoint score out of ten is required for a thorough assessment.' });
+      }
+      if (isMarkOnly && normalizedMark === null) {
+        return reply.code(400).send({ error: 'A mark out of ten is required for this entry type.' });
+      }
+      if (entryKind === 'checkpoint_assessment' && decision === 'pass' && normalizedMark !== null && normalizedMark < 5) {
+        return reply.code(400).send({ error: 'A checkpoint cannot pass below the 5/10 threshold.' });
+      }
 
-      const newStatus = decision === 'pass' ? 'reviewed' : 'redo_needed';
+      const markPassed = normalizedMark !== null ? normalizedMark >= 5 : false;
+      const isRedoResult = decision === 'redo' || (decision === 'mark' && !markPassed);
+      const newStatus = isRedoResult ? 'redo_needed' : 'reviewed';
+      const passedFlag = decision === 'pass' ? true : decision === 'redo' ? false : decision === 'mark' ? markPassed : null;
       const { rows: updated } = await pool.query(
         `UPDATE entries
          SET status = $1, feedback = $2, correction_image_storage_key = $3,
-           correction_voice_storage_key = $4, reviewed_at = now(), reviewed_by = $5
-         WHERE id = $6 RETURNING *`,
-        [newStatus, feedback ?? null, correctionImageStorageKey ?? null, correctionVoiceStorageKey ?? null, teacherId, entry.id]
+           correction_voice_storage_key = $4, reviewed_at = now(), reviewed_by = $5,
+           mark_out_of_ten = $6, mark_passed = $7
+         WHERE id = $8 RETURNING *`,
+        [newStatus, feedback ?? null, correctionImageStorageKey ?? null, correctionVoiceStorageKey ?? null, teacherId, normalizedMark, passedFlag, entry.id]
       );
       await pool.query(`INSERT INTO entry_logs (entry_id, action, actor_id, notes) VALUES ($1, 'reviewed', $2, $3)`, [
         entry.id,
         teacherId,
-        `Decision: ${decision}`,
+        `Decision: ${decision}${normalizedMark !== null ? ` | Mark: ${normalizedMark}/10` : ''}`,
       ]);
 
       // On a pass: unlock the next block of levels, recompute progress,
       // auto-allocate a certificate (pending admin approval) if a template
       // exists for this checkpoint, and auto-award the badge tier if
       // configured — badges are NOT gated on admin approval, certificates are.
-      if (decision === 'pass' && entry.level_id) {
+      if ((decision === 'pass' || (decision === 'mark' && markPassed)) && entry.level_id && entryKind !== 'mashq_marking') {
         const { rows: levelRows } = await pool.query(
           `SELECT l.course_id, l.order_index, l.badge_tier, c.category
            FROM levels l JOIN courses c ON c.id = l.course_id WHERE l.id = $1`,
@@ -450,7 +517,14 @@ export async function entryRoutes(app: FastifyInstance) {
         }
       }
 
-      await notify(entry.student_id, 'test_result', { entryId: entry.id, decision });
+      await notify(entry.student_id, isMarkOnly ? 'entry_marked' : 'test_result', {
+        entryId: entry.id,
+        entryKind,
+        mashqCategoryKey: entry.mashq_category_key ?? null,
+        decision,
+        markOutOfTen: normalizedMark,
+        passed: isMarkOnly ? markPassed : decision === 'pass',
+      });
 
       return updated[0];
     }
@@ -462,7 +536,7 @@ export async function entryRoutes(app: FastifyInstance) {
     { preHandler: [app.authenticate, app.requireRole('student')] },
     async (request, reply) => {
       const studentId = (request.user as AuthUser).id;
-      const { khatImageStorageKey, originalFilename } = request.body;
+      const { khatImageStorageKey, originalFilename, timeSpentMinutes } = request.body;
       if (!khatImageStorageKey) return reply.code(400).send({ error: 'khatImageStorageKey is required' });
 
       const { rows } = await pool.query('SELECT * FROM entries WHERE id = $1', [request.params.id]);
@@ -472,6 +546,11 @@ export async function entryRoutes(app: FastifyInstance) {
       if (original.status !== 'redo_needed') {
         return reply.code(409).send({ error: 'This entry is not awaiting a redo' });
       }
+      const originalKind = original.entry_kind as string | null;
+      const isMarkOnly = originalKind === 'practice_marking' || originalKind === 'secondary_marking' || originalKind === 'mashq_marking';
+      if (isMarkOnly && (!Number.isInteger(timeSpentMinutes) || Number(timeSpentMinutes) <= 0)) {
+        return reply.code(400).send({ error: 'timeSpentMinutes must be a positive whole number for marked practice' });
+      }
 
       // A NEW row, linked back for history — never a status reset on the old one.
       // Explicitly clear both teacher-only correction assets: the redo's assigned
@@ -479,9 +558,9 @@ export async function entryRoutes(app: FastifyInstance) {
       const { rows: created } = await pool.query(
         `INSERT INTO entries (
            student_id, source_type, level_id, khat_image_storage_key, original_filename, redo_of_entry_id,
-           correction_image_storage_key, correction_voice_storage_key
-         ) VALUES ($1, 'checkpoint', $2, $3, $4, $5, NULL, NULL) RETURNING *`,
-        [studentId, original.level_id, khatImageStorageKey, originalFilename ?? null, original.id]
+           correction_image_storage_key, correction_voice_storage_key, entry_kind, time_spent_minutes, mashq_category_key
+         ) VALUES ($1, 'checkpoint', $2, $3, $4, $5, NULL, NULL, $6, $7, $8) RETURNING *`,
+        [studentId, original.level_id, khatImageStorageKey, originalFilename ?? null, original.id, originalKind, timeSpentMinutes ?? null, original.mashq_category_key ?? null]
       );
       const newEntry = created[0];
       await autoAssignEntry(newEntry.id);

@@ -28,8 +28,14 @@ import { referenceDataRoutes } from './routes/referenceData.routes.js';
 import { runDiversionAndIdleFlagSweep } from './services/diversionSweep.js';
 import { badgeRoutes } from './routes/badges.routes.js';
 import { assistantRoutes } from './routes/assistant.routes.js';
+import { journeyRoutes } from './routes/journeys.routes.js';
+import { chatRoutes } from './routes/chat.routes.js';
 
 const app = Fastify({ logger: true });
+
+app.addContentTypeParser('application/octet-stream', { parseAs: 'buffer', bodyLimit: 10 * 1024 * 1024 }, (_request, body, done) => {
+  done(null, body);
+});
 
 async function main() {
   await app.register(cors, { origin: true }); // tighten this to your real frontend URL before going live
@@ -41,6 +47,8 @@ async function main() {
   await app.register(levelRoutes, { prefix: '/levels' });
   await app.register(uploadRoutes, { prefix: '/uploads' });
   await app.register(entryRoutes, { prefix: '/entries' });
+  await app.register(journeyRoutes, { prefix: '/journeys' });
+  await app.register(chatRoutes, { prefix: '/chat' });
   await app.register(showcaseRoutes, { prefix: '/showcase' });
   await app.register(competitionRoutes, { prefix: '/competitions' });
   await app.register(eventRoutes, { prefix: '/events' });

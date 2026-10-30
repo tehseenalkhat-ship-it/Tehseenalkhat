@@ -11,9 +11,29 @@ function required(name: string): string {
   return value;
 }
 
+// Either DATABASE_URL=mysql://user:pass@host:3306/name (as set on the hosting panel)
+// or the separate DB_HOST / DB_PORT / DB_NAME / DB_USER / DB_PASSWORD variables.
+const databaseUrl = process.env.DATABASE_URL?.trim() ? new URL(process.env.DATABASE_URL.trim()) : undefined;
+
 export const config = {
   port: Number(process.env.PORT ?? 4000),
-  databaseUrl: required('DATABASE_URL'),
+  database: databaseUrl
+    ? {
+        host: databaseUrl.hostname,
+        port: Number(databaseUrl.port || 3306),
+        name: decodeURIComponent(databaseUrl.pathname.replace(/^\//, '')),
+        user: decodeURIComponent(databaseUrl.username),
+        password: decodeURIComponent(databaseUrl.password),
+        sslCa: process.env.DB_SSL_CA?.trim() || undefined,
+      }
+    : {
+        host: required('DB_HOST'),
+        port: Number(process.env.DB_PORT ?? 3306),
+        name: required('DB_NAME'),
+        user: required('DB_USER'),
+        password: required('DB_PASSWORD'),
+        sslCa: process.env.DB_SSL_CA?.trim() || undefined,
+      },
   jwtSecret: required('JWT_SECRET'),
   // Uploads are stored on the server's disk (see storage.ts). These S3 settings are only used by
   // LiveKit Egress to save event recordings, and are optional.

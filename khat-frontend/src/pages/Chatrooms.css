@@ -1,0 +1,106 @@
+.chatrooms-page{display:grid;gap:18px;padding-top:38px;padding-bottom:70px}.chatrooms-page>.section-heading{margin:0}.chatrooms-unread-total{display:inline-flex;align-items:center;min-height:30px;padding:6px 11px;border-radius:99px;background:var(--surface-tint);color:var(--gold);font-size:10px;font-weight:750}.chatrooms-layout{display:grid;grid-template-columns:minmax(250px,320px) minmax(0,1fr);min-height:min(710px,calc(100dvh - 240px));overflow:hidden;border:1px solid var(--line);border-radius:13px;background:var(--card);box-shadow:0 10px 34px color-mix(in srgb,var(--surface-deep) 7%,transparent)}.chatrooms-sidebar{display:grid;grid-template-rows:auto minmax(0,1fr);min-height:0;border-right:1px solid var(--line);background:var(--card)}.chatrooms-toolbar{display:grid;gap:10px;padding:12px;border-bottom:1px solid var(--line)}.chatrooms-filters{display:flex;gap:5px}.chatrooms-filters button{padding:6px 11px;border:1px solid var(--line);border-radius:99px;background:var(--card);color:var(--muted);font-size:9px;font-weight:750}.chatrooms-filters button.active{border-color:var(--surface-deep);background:var(--surface-deep);color:var(--text-on-deep)}.chatrooms-search{display:flex;align-items:center;gap:7px;min-width:0;padding:0 9px;border:1px solid var(--line);border-radius:8px;background:var(--surface-tint-2);color:var(--muted)}.chatrooms-search input{width:100%;min-width:0;height:34px;border:0;outline:0;background:transparent;color:var(--ink);font:inherit;font-size:9px}.chatrooms-thread-list{min-height:0;overflow:auto}.chatrooms-list-label{position:sticky;top:0;z-index:1;display:flex;align-items:center;gap:7px;padding:9px 12px;background:var(--surface-tint-2);color:var(--muted);font-size:8px;font-weight:850;letter-spacing:.08em;text-transform:uppercase}.chatrooms-list-label>span{margin-left:auto;font-variant-numeric:tabular-nums}.chatrooms-list-state{padding:14px 12px;color:var(--muted);font-size:9px;line-height:1.5}.chatrooms-thread{display:flex;align-items:center;gap:9px;width:100%;min-height:61px;padding:9px 10px;border-bottom:1px solid color-mix(in srgb,var(--line) 65%,transparent);text-align:left;transition:background .14s ease}.chatrooms-thread:hover{background:var(--surface-tint-2)}.chatrooms-thread.active{background:color-mix(in srgb,var(--surface-tint) 72%,var(--card));box-shadow:inset 3px 0 var(--gold)}.chatrooms-thread-icon{width:35px;height:35px;flex:none;display:grid;place-items:center;border-radius:10px;background:var(--surface-tint);color:var(--gold);font-size:10px;font-weight:800}.chatrooms-thread-icon.teacher{border-radius:50%;background:var(--surface-deep);color:var(--text-on-deep)}.chatrooms-thread-copy{display:grid;gap:3px;min-width:0;flex:1}.chatrooms-thread-copy strong{overflow:hidden;color:var(--ink);font-size:10px;text-overflow:ellipsis;white-space:nowrap}.chatrooms-thread-copy small{overflow:hidden;color:var(--muted);font-size:8px;text-overflow:ellipsis;white-space:nowrap}.chatrooms-thread time,.chatrooms-waiting{flex:none;color:var(--muted);font-size:8px}.chatrooms-unread-badge{min-width:18px;height:18px;display:grid;place-items:center;padding:0 5px;border-radius:99px;background:var(--gold);color:#fff;font-size:8px;font-weight:800}.chatrooms-panel{min-width:0;min-height:0;background:var(--card)}.chatrooms-panel>.course-journey{height:100%;min-height:600px;max-height:none;border:0;border-radius:0;box-shadow:none}.chatrooms-panel .course-chat{grid-template-rows:auto minmax(0,1fr) auto auto}.chatrooms-panel .course-chat-feed{min-height:0;padding:20px clamp(14px,3vw,30px);background-color:#efeae2!important;background-image:none!important}.chatrooms-panel .course-chat-message{max-width:min(78%,500px);padding:10px 12px 7px;font-size:12px}.chatrooms-panel .course-chat-message p{font-size:11px}.chatrooms-panel .course-chat-message time{font-size:8px}.chatrooms-panel .course-chat-sender,.chatrooms-panel .course-chat-entry-label{font-size:9px}.chatrooms-panel .course-chat-entry-title{font-size:11px}.chatrooms-panel .course-chat-entry-meta{font-size:8px}.chatrooms-panel .course-chat-empty{max-width:360px;padding:20px;font-size:10px}.chatroom-conversation{height:100%;min-height:580px;display:grid;grid-template-rows:auto minmax(0,1fr) auto auto;background:var(--card)}.chatroom-conversation-header{display:flex;align-items:center;gap:10px;min-height:68px;padding:10px 14px;border-bottom:1px solid var(--line);background:var(--surface-deep);color:var(--text-on-deep)}.chatroom-avatar{width:37px;height:37px;flex:none;display:grid;place-items:center;border-radius:50%;background:color-mix(in srgb,var(--text-on-deep) 18%,transparent);color:var(--gold-soft);font-size:10px;font-weight:800}.chatroom-conversation-header>span:nth-child(2){display:grid;gap:3px;min-width:0;flex:1}.chatroom-conversation-header strong{overflow:hidden;font-size:11px;text-overflow:ellipsis;white-space:nowrap}.chatroom-conversation-header small{color:var(--text-soft-on-deep);font-size:8px}.chatroom-secure{display:flex;align-items:center;gap:5px;color:var(--text-soft-on-deep);font-size:8px}.chatroom-secure i{width:6px;height:6px;border-radius:50%;background:#75c496}.chatroom-feed{min-height:0;display:flex;flex-direction:column;gap:10px;overflow-y:auto;padding:18px clamp(12px,3vw,26px);background:#efeae2;scroll-behavior:smooth}.chatroom-empty{align-self:center;margin:auto;color:var(--muted);font-size:10px;text-align:center}.chatroom-bubble{display:grid;gap:5px;align-self:flex-start;width:fit-content;max-width:min(82%,460px);padding:9px 11px 6px;border:1px solid #e0d9ce;border-radius:10px 10px 10px 3px;background:#fff;color:var(--ink);box-shadow:0 1px 2px #2020200c}.chatroom-bubble.is-mine{align-self:flex-end;border-color:#c6dfbf;border-radius:10px 10px 3px 10px;background:#dcf3d3}.chatroom-bubble p{margin:0;color:inherit;font-size:10px;line-height:1.5;white-space:pre-wrap;overflow-wrap:anywhere}.chatroom-bubble small{color:var(--gold);font-size:8px;font-weight:800}.chatroom-bubble time{justify-self:end;color:var(--muted);font-size:7px}.chatroom-bubble audio{width:min(250px,65vw);height:34px}.chatroom-voice-loading{display:flex;align-items:center;gap:6px;color:var(--muted);font-size:9px}.chatroom-error{margin:0;padding:7px 12px;background:var(--danger-soft);color:var(--danger);font-size:9px}.chatroom-composer{display:flex;align-items:center;gap:7px;padding:9px 11px;border-top:1px solid var(--line);background:var(--card)}.chatroom-composer textarea{min-height:38px;max-height:100px;flex:1;resize:vertical;padding:10px 13px;border:1px solid var(--line);border-radius:20px;background:var(--surface-tint-2);color:var(--ink);font:inherit;font-size:10px;outline:0}.chatroom-composer textarea:focus{border-color:var(--gold)}.chatroom-composer button{width:37px;height:37px;flex:none;display:grid;place-items:center;border-radius:50%;background:var(--surface-deep);color:var(--text-on-deep)}.chatroom-composer button:first-of-type{background:transparent;color:var(--muted)}.chatroom-composer button.is-recording{background:#b44f49;color:#fff}.chatroom-composer button:disabled{opacity:.4}.chatrooms-welcome{display:grid;align-content:center;justify-items:center;gap:10px;height:100%;min-height:500px;padding:28px;text-align:center}.chatrooms-welcome>span{width:52px;height:52px;display:grid;place-items:center;border-radius:50%;background:var(--surface-tint);color:var(--gold)}.chatrooms-welcome h2{font-size:21px}.chatrooms-welcome p{max-width:340px;color:var(--muted);font-size:10px;line-height:1.6}
+/* Keep the chat workspace inside the app viewport; scroll only its lists and feeds. */
+.chatrooms-page{height:calc(100dvh - var(--global-header-height, 64px) - 42px - 68px);min-height:0;grid-template-rows:auto auto minmax(0,1fr);overflow:hidden}
+.chatrooms-layout{height:100%;min-height:0}
+.chatrooms-sidebar,.chatrooms-panel{min-height:0;overflow:hidden}
+.chatrooms-panel{display:flex;height:100%}
+.chatrooms-panel>*{flex:1;min-height:0}
+.chatrooms-panel>.course-journey{height:100%;min-height:0}
+.chatroom-conversation{height:100%;min-height:0}
+.chatroom-feed{min-height:0;overscroll-behavior:contain}
+.chatrooms-thread-list{overscroll-behavior:contain}
+@media(max-width:760px){.chatrooms-page{height:calc(100dvh - var(--global-header-height, 58px) - 40px - 126px);grid-template-rows:auto auto minmax(0,1fr)}.chatrooms-panel{min-height:0}.chatrooms-panel>.course-journey,.chatroom-conversation{min-height:0}}
+@media(max-width:480px){.chatrooms-panel>.course-journey,.chatroom-conversation{min-height:0}}
+@media(max-width:760px){.chatrooms-layout{grid-template-columns:minmax(0,1fr);grid-template-rows:minmax(0,.7fr) minmax(0,1.3fr)}}
+
+/* WhatsApp-style chat workspace: fixed shell, scrollable thread/message lists. */
+.chatrooms-page{grid-template-rows:auto minmax(0,1fr);gap:14px}
+.chatrooms-page>.section-heading{margin:0;padding-bottom:8px}
+html[data-theme] .chatrooms-page>.section-heading{margin:0!important;padding:0!important;border:0!important}
+.chatrooms-page .section-heading .heading-row{width:100%;flex-direction:row!important;align-items:center;justify-content:space-between;gap:8px}
+.chatrooms-page .section-heading .heading-row>div{display:flex;align-items:center;gap:10px}
+.chatrooms-page>.section-heading .eyebrow{margin-bottom:3px}
+.chatrooms-page>.section-heading h2{margin:0;font-size:22px}
+.chatrooms-page>.section-heading p:not(.eyebrow){display:none}
+.chatrooms-layout{grid-template-columns:minmax(300px,34%) minmax(0,1fr);height:100%;min-height:0}
+.chatrooms-sidebar,.chatrooms-panel{min-width:0;min-height:0;overflow:hidden}
+.chatrooms-sidebar{grid-template-rows:auto minmax(0,1fr)}
+.chatrooms-panel{display:flex;height:100%}
+.chatrooms-panel>*{flex:1;min-width:0;min-height:0}
+.chatrooms-panel>.course-journey.is-compact{grid-template-rows:auto minmax(0,1fr);width:100%;height:100%;min-height:0;max-height:none;overflow:hidden;border:0;border-radius:0;box-shadow:none}
+.chatrooms-panel>.course-journey.is-compact .course-journey-header{min-height:72px;padding:12px 18px}
+.chatrooms-panel>.course-journey.is-compact .course-journey-footer{display:none}
+.chatrooms-panel .course-journey-back,.chatroom-back{display:none}
+.chatrooms-panel .course-chat{min-height:0;grid-template-rows:minmax(0,1fr) auto auto;overflow:hidden}
+.chatrooms-panel .course-chat-feed,.chatroom-feed{min-height:0;overscroll-behavior:contain;scrollbar-width:thin;scrollbar-color:color-mix(in srgb,var(--gold) 28%,var(--line)) transparent;background-color:color-mix(in srgb,var(--surface-tint-2) 56%,var(--card))!important;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='112' height='112' viewBox='0 0 112 112'%3E%3Cg fill='none' stroke='%237c9f8b' stroke-opacity='.18' stroke-width='1.5'%3E%3Cpath d='M16 19c8-8 17 4 9 10-5 4-12 0-9-5m48-8 3 5 6 1-4 4 1 6-6-3-5 3 1-6-4-4 6-1zm21 42c8-8 17 4 9 10-5 4-12 0-9-5M20 79l8 8-8 8-8-8zm49 12c0-7 13-7 13 0s-13 7-13 0zm-49-51c3-5 9-5 12 0m34 9c-3 4-3 8 0 12m35 30-7-7 7-7 7 7z'/%3E%3Ccircle cx='57' cy='63' r='6'/%3E%3Cpath d='M54 64q3 3 6 0m-3-4v2M4 39l5 5m-2-8-5 5m97 36q4-5 8 0m-4-5v10'/%3E%3C/g%3E%3C/svg%3E")!important;background-size:112px 112px!important}
+.chatrooms-panel .course-chat-feed{gap:10px;padding:22px clamp(18px,4vw,54px)}
+.chatrooms-panel .course-chat-message,.chatroom-bubble{max-width:min(76%,680px);padding:9px 12px 7px;border-radius:12px 12px 12px 4px;font-size:13px;box-shadow:0 1px 2px color-mix(in srgb,var(--surface-deep) 10%,transparent)}
+.chatrooms-panel .course-chat-message.course-chat-submission{width:max-content;max-width:min(66%,480px);padding:9px 10px 7px}
+.chatrooms-panel .course-chat-submission .course-journey-submission-image{max-height:190px;background:var(--surface-tint-2)}
+.chatrooms-panel .course-chat-submission .course-journey-submission-image img{width:100%;max-height:190px;object-fit:contain}
+.chatrooms-panel .course-chat-message.is-mine,.chatroom-bubble.is-mine{border-radius:12px 12px 4px 12px}
+.chatrooms-panel .course-chat-message p,.chatroom-bubble p{font-size:13px;line-height:1.5}
+.chatrooms-panel .course-chat-message time,.chatroom-bubble time{font-size:10px}
+.chatrooms-panel .course-chat-sender,.chatroom-bubble small{font-size:10px}
+.chatrooms-panel .course-chat-composer,.chatroom-composer{min-height:72px;gap:9px;padding:12px 18px;background:var(--surface-tint-2);border-top:1px solid var(--line)}
+.chatrooms-panel .course-chat-composer textarea,.chatroom-composer textarea{min-height:44px;max-height:120px;resize:none;padding:12px 16px;border-radius:24px;background:var(--card);font-size:13px}
+.chatrooms-panel .course-chat-composer>button,.chatroom-composer button{width:42px;height:42px}
+.chatroom-conversation{height:100%;min-height:0;grid-template-rows:auto minmax(0,1fr) auto auto;overflow:hidden}
+.chatroom-conversation-header{min-height:72px;padding:12px 18px}
+.chatroom-feed{gap:10px;padding:22px clamp(18px,4vw,54px)}
+.chatroom-secure{font-size:10px}
+.chatrooms-thread{min-height:72px;padding:12px 14px}
+.chatrooms-thread-icon{width:44px;height:44px;border-radius:50%}
+.chatrooms-thread-copy strong{font-size:13px}
+.chatrooms-thread-copy small{font-size:10px}
+.chatrooms-list-label{padding:11px 14px;font-size:9px}
+.chatrooms-filters button{padding:8px 14px;font-size:11px}
+.chatrooms-search input{height:40px;font-size:12px}
+.chatrooms-thread-list{overscroll-behavior:contain;scrollbar-width:thin;scrollbar-color:var(--line) transparent}
+.chatroom-empty{font-size:12px}
+.chatrooms-welcome{min-height:0}
+@media(max-width:760px){
+	.chatrooms-page{height:calc(100dvh - var(--global-header-height,58px) - 40px - 126px);min-height:0;grid-template-rows:auto minmax(0,1fr);gap:10px;padding-top:18px;padding-bottom:20px;overflow:hidden}
+	.chatrooms-page>.section-heading{padding:0;border:0}
+	.chatrooms-page>.section-heading .eyebrow{display:none}
+	.chatrooms-page>.section-heading h2{font-size:19px}
+	.chatrooms-page>.section-heading .heading-row{align-items:center}
+	.chatrooms-page .section-heading{margin-bottom:0}
+	.chatrooms-layout{height:100%;min-height:0;grid-template-columns:minmax(0,1fr);grid-template-rows:minmax(0,1fr);border-radius:12px}
+	.chatrooms-layout.is-mobile-list .chatrooms-sidebar{display:grid;grid-column:1;grid-row:1;border:0}
+	.chatrooms-layout.is-mobile-list .chatrooms-panel{display:none}
+	.chatrooms-layout.is-mobile-chat .chatrooms-sidebar{display:none}
+	.chatrooms-layout.is-mobile-chat .chatrooms-panel{display:flex;grid-column:1;grid-row:1}
+	.chatrooms-panel>.course-journey.is-compact{min-height:0}
+	.chatrooms-panel>.course-journey.is-compact .course-journey-header,.chatroom-conversation-header{min-height:62px;padding:8px 12px;gap:8px}
+	.chatrooms-panel .course-journey-back,.chatroom-back{width:36px;height:36px;flex:none;display:grid;place-items:center;border:0;border-radius:50%;background:transparent;color:var(--ink)}
+	.chatrooms-panel .course-journey-avatar,.chatroom-avatar{width:40px;height:40px}
+	.chatrooms-panel .course-journey-heading-copy strong,.chatroom-conversation-header strong{font-size:13px}
+	.chatrooms-panel .course-journey-heading-copy small,.chatroom-conversation-header small{font-size:9px}
+	.chatrooms-panel .course-journey-presence{font-size:9px}
+	.chatrooms-panel .course-journey-refresh{width:34px;height:34px}
+	.chatrooms-panel .course-chat-feed,.chatroom-feed{padding:14px 12px}
+	.chatrooms-panel .course-chat-message,.chatroom-bubble{max-width:88%;padding:8px 10px 6px}
+	.chatrooms-panel .course-chat-message.course-chat-submission{max-width:min(88%,460px)}
+	.chatrooms-panel .course-chat-submission .course-journey-submission-image,.chatrooms-panel .course-chat-submission .course-journey-submission-image img{max-height:160px}
+	.chatrooms-panel .course-chat-composer,.chatroom-composer{min-height:62px;padding:8px 10px;gap:5px}
+	.chatrooms-panel .course-chat-composer textarea,.chatroom-composer textarea{min-height:42px;padding:10px 13px;font-size:12px}
+	.chatrooms-panel .course-chat-composer>button,.chatroom-composer button{width:38px;height:38px}
+	.chatrooms-sidebar{grid-template-rows:auto minmax(0,1fr);border:0}
+	.chatrooms-toolbar{gap:9px;padding:12px;border-bottom:1px solid var(--line)}
+	.chatrooms-thread-list{display:block;overflow:auto}
+	.chatrooms-list-label{position:sticky;top:0}
+	.chatrooms-panel .course-chat{grid-template-rows:minmax(0,1fr) auto auto}
+}
+@media(max-width:480px){
+	.chatrooms-page{height:calc(100dvh - var(--global-header-height,58px) - 40px - 126px);padding:14px 10px 14px}
+	.chatrooms-page>.section-heading h2{font-size:18px}
+	.chatrooms-panel .course-chat-feed,.chatroom-feed{padding:12px 9px}
+	.chatrooms-thread{min-height:68px}
+}
+
+/* Extend the chat workspace to just above the floating Guild Guide launcher. */
+html[data-theme] .app-shell-content>.chatrooms-page{height:calc(100dvh - var(--global-header-height,64px) - 42px - 80px)!important;padding-bottom:0}
+html[data-theme] .app-shell-content>.page.chatrooms-page{padding-bottom:0!important}
+@media(max-width:740px){html[data-theme] .app-shell-content>.chatrooms-page{height:calc(100dvh - 112px - 40px - 70px)!important}html[data-theme] .app-shell-content>.page.chatrooms-page{padding-bottom:0!important}}
+@media(max-width:740px){html[data-theme] .app-shell-content:has(>.chatrooms-page){padding-bottom:0!important}}

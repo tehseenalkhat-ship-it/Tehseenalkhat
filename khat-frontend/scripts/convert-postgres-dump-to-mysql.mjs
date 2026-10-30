@@ -187,7 +187,7 @@ function createTableSql(tableName, body) {
     definitions.push('`certification_guard` TINYINT GENERATED ALWAYS AS (CASE WHEN `category` = \'certification\' THEN 1 ELSE NULL END) STORED');
   }
   tables.set(tableName, true);
-  return `CREATE TABLE \`${tableName}\` (\n  ${definitions.join(',\n  ')}\n) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;`;
+  return `CREATE TABLE \`${tableName}\` (\n  ${definitions.join(',\n  ')}\n) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;`;
 }
 
 // Parse regular pg_dump table definitions.
@@ -229,20 +229,19 @@ while ((copyMatch = copyPattern.exec(source))) {
 }
 if (totalRows === 0) throw new Error('No COPY data blocks were converted.');
 
-// Convert ordinary btree indexes; full-text GIN and partial predicates are translated separately.
+// Convert ordinary btree indexes and partial predicates.
 for (const match of source.matchAll(/CREATE INDEX (\w+) ON public\.(\w+) USING btree \(([^)]+)\)(?: WHERE \(([^;]+)\))?;/g)) {
   const [, name, table, columns] = match;
   indexes.push(`CREATE INDEX \`${name}\` ON \`${table}\` (${columns.split(',').map(column => column.trim().replace(/\s+DESC$/i, ' DESC').replace(/\s+ASC$/i, ' ASC').replace(/^(\w+)/, '`$1`')).join(', ')});`);
 }
-indexes.push('CREATE FULLTEXT INDEX `idx_assets_search` ON `assets` (`title`);');
 indexes.push('CREATE UNIQUE INDEX `uq_one_certification_course_per_khat_type` ON `courses` (`khat_type_id`, `certification_guard`);');
 
 mysql.unshift(
   '-- Converted from a plain PostgreSQL pg_dump for MySQL 8.0.16+.',
   '-- UUIDs are stored as CHAR(36); PostgreSQL text arrays are converted to JSON.',
-  '-- PostgreSQL tsvector data is retained as LONGTEXT; its trigger/index requires a separate MySQL application-search implementation.',
-  '-- This translates the SQL dump only. The current Node backend uses PostgreSQL/pg-specific SQL and is NOT MySQL-compatible without a separate application port.',
-  'SET NAMES utf8mb4;',
+  '-- PostgreSQL tsvector data is retained as LONGTEXT; application search uses portable title substring and JSON tag matching.',
+  '-- This translates the database dump; the Node backend connects through mysql2 and its MySQL compatibility adapter.',
+  'SET NAMES utf8mb4 COLLATE utf8mb4_unicode_ci;',
   'SET FOREIGN_KEY_CHECKS = 0;',
   'START TRANSACTION;'
 );

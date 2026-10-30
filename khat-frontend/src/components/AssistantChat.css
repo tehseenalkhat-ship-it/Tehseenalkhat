@@ -1,8 +1,11 @@
 .assistant-chat-root{position:fixed;right:22px;bottom:20px;z-index:4700;font-family:inherit;color:var(--ink)}
-.assistant-chat-launcher{display:flex;align-items:center;gap:9px;min-height:48px;padding:0 17px;border:1px solid color-mix(in srgb,var(--gold) 38%,var(--line));border-radius:999px;background:var(--surface-deep);color:var(--text-on-deep);box-shadow:0 8px 28px color-mix(in srgb,var(--surface-deep) 26%,transparent);font-size:12px;font-weight:700;letter-spacing:.01em;transition:transform .18s,box-shadow .18s,background .18s}
-.assistant-chat-launcher:hover{transform:translateY(-2px);box-shadow:0 12px 34px color-mix(in srgb,var(--surface-deep) 34%,transparent)}
+.assistant-chat-launcher{width:48px;min-height:48px;display:flex;align-items:center;justify-content:center;gap:0;overflow:hidden;padding:0;border:1px solid color-mix(in srgb,var(--gold) 38%,var(--line));border-radius:999px;background:var(--surface-deep);color:var(--text-on-deep);box-shadow:0 8px 28px color-mix(in srgb,var(--surface-deep) 26%,transparent);font-size:12px;font-weight:700;letter-spacing:.01em;transition:width .2s ease,gap .2s ease,padding .2s ease,transform .18s,box-shadow .18s,background .18s}
+.assistant-chat-launcher:hover,.assistant-chat-launcher:focus-visible{width:174px;justify-content:flex-start;gap:9px;padding:0 17px;transform:translateY(-2px);box-shadow:0 12px 34px color-mix(in srgb,var(--surface-deep) 34%,transparent)}
 .assistant-chat-launcher>svg{color:var(--gold-soft)}
-.assistant-chat-launcher.is-open{width:46px;min-height:46px;justify-content:center;padding:0;background:var(--card);color:var(--ink)}
+.assistant-chat-launcher>span{max-width:0;overflow:hidden;opacity:0;white-space:nowrap;transition:max-width .2s ease,opacity .15s ease}
+.assistant-chat-launcher:hover>span,.assistant-chat-launcher:focus-visible>span{max-width:130px;opacity:1}
+.assistant-chat-launcher.is-open,.assistant-chat-launcher.is-open:hover,.assistant-chat-launcher.is-open:focus-visible{width:46px;min-height:46px;justify-content:center;gap:0;padding:0;background:var(--card);color:var(--ink);transform:none}
+.assistant-chat-launcher.is-open>span{max-width:0;opacity:0}
 .assistant-chat-launcher.is-open>svg{color:var(--gold)}
 .assistant-chat-panel{position:absolute;right:0;bottom:62px;width:min(390px,calc(100vw - 28px));height:min(590px,calc(100dvh - 112px));display:flex;flex-direction:column;overflow:hidden;border:1px solid color-mix(in srgb,var(--gold) 22%,var(--line));border-radius:18px;background:var(--card);box-shadow:0 22px 75px rgba(20,28,25,.24);animation:assistant-panel-enter .18s ease-out}
 @keyframes assistant-panel-enter{from{opacity:0;transform:translateY(8px) scale(.985)}to{opacity:1;transform:translateY(0) scale(1)}}
@@ -39,5 +42,5 @@
 .assistant-chat-composer>button:disabled{opacity:.42;cursor:not-allowed}
 .assistant-chat-composer>button svg{color:var(--gold-soft)}
 .assistant-chat-composer small{position:absolute;right:13px;bottom:8px;color:var(--muted);font-size:8px}
-@media(max-width:600px){.assistant-chat-root{right:12px;bottom:12px}.assistant-chat-panel{position:fixed;right:10px;bottom:68px;width:calc(100vw - 20px);height:min(650px,calc(100dvh - 92px));border-radius:16px}.assistant-chat-launcher{min-height:45px;padding:0 14px;font-size:11px}.assistant-chat-launcher.is-open{width:44px;min-height:44px}}
+@media(max-width:600px){.assistant-chat-root{right:12px;bottom:12px}.assistant-chat-panel{position:fixed;right:10px;bottom:68px;width:calc(100vw - 20px);height:min(650px,calc(100dvh - 92px));border-radius:16px}.assistant-chat-launcher{width:45px;min-height:45px;padding:0;font-size:11px}.assistant-chat-launcher:hover,.assistant-chat-launcher:focus-visible{width:160px;padding:0 14px}.assistant-chat-launcher.is-open,.assistant-chat-launcher.is-open:hover,.assistant-chat-launcher.is-open:focus-visible{width:44px;min-height:44px;padding:0}}
 @media(prefers-reduced-motion:reduce){.assistant-chat-panel{animation:none}.assistant-chat-launcher,.assistant-chat-icon-button,.assistant-chat-suggestions button,.assistant-chat-composer>button{transition:none}.assistant-spin{animation-duration:1.8s}}

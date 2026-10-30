@@ -23,12 +23,12 @@ export async function adminSettingsRoutes(app: FastifyInstance) {
       const { value } = request.body;
       if (value === undefined) return reply.code(400).send({ error: 'value is required' });
 
-      const { rows } = await pool.query(
+      await pool.query(
         `INSERT INTO site_settings (key, value) VALUES ($1, $2)
-         ON CONFLICT (key) DO UPDATE SET value = $2, updated_at = now()
-         RETURNING *`,
+         ON CONFLICT (key) DO UPDATE SET value = $2, updated_at = now()`,
         [request.params.key, JSON.stringify(value)]
       );
+      const { rows } = await pool.query('SELECT * FROM site_settings WHERE key = $1', [request.params.key]);
       return rows[0];
     }
   );

@@ -71,7 +71,7 @@ export async function studentProfileRoutes(app: FastifyInstance) {
       // Every regular upload, individually — not just a count — so a teacher
       // can actually look at what was produced, not only how much.
       pool.query(
-        `SELECT ls.*, l.title AS level_title, l.order_index, l.level_type, c.khat_type_id, c.id AS course_id
+        `SELECT ls.*, l.title AS level_title, l.order_index, l.level_type, c.khat_type_id, c.id AS course_id, c.category AS course_category
          FROM level_submissions ls
          JOIN levels l ON l.id = ls.level_id
          JOIN courses c ON c.id = l.course_id

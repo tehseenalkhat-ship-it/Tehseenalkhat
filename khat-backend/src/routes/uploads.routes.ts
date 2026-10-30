@@ -8,6 +8,7 @@ import {
   getUploadUrl,
   getDownloadUrl,
   getObjectBytes,
+  putObjectBytes,
   filePath,
   verifySignature,
   contentTypeFor,
@@ -32,10 +33,38 @@ const PREFIX_ROLES: Record<string, Role[]> = {
   'competition-entries': ['student'],
   assets: ['teacher', 'admin'],
   corrections: ['teacher'],
+  'chat-audio': ['student', 'teacher'],
   'profile-photos': ['student', 'teacher', 'admin'],
 };
 
 export async function uploadRoutes(app: FastifyInstance) {
+  app.post<{ Body: Buffer; Headers: { 'x-file-content-type'?: string; 'x-filename'?: string } }>(
+    '/proxy',
+    { preHandler: [app.authenticate, app.requireRole('student')], bodyLimit: 10 * 1024 * 1024 },
+    async (request, reply) => {
+      const contentType = request.headers['x-file-content-type']?.split(';')[0]?.trim().toLowerCase();
+      const filename = request.headers['x-filename'] ? decodeURIComponent(request.headers['x-filename']) : 'mashq-practice';
+      if (!['image/jpeg', 'image/png', 'image/webp'].includes(contentType ?? '')) {
+        return reply.code(400).send({ error: 'Mashq uploads must be JPG, PNG, or WebP images' });
+      }
+      const body = request.body;
+      if (!Buffer.isBuffer(body) || body.length === 0) return reply.code(400).send({ error: 'A non-empty worksheet image is required' });
+      if (body.length > 10 * 1024 * 1024) return reply.code(413).send({ error: 'Worksheet image must be no larger than 10 MB' });
+      const isJpeg = contentType === 'image/jpeg' && body.length >= 3 && body[0] === 0xff && body[1] === 0xd8 && body[2] === 0xff;
+      const isPng = contentType === 'image/png' && body.length >= 8 && body.subarray(0, 8).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]));
+      const isWebp = contentType === 'image/webp' && body.length >= 12 && body.toString('ascii', 0, 4) === 'RIFF' && body.toString('ascii', 8, 12) === 'WEBP';
+      if (!isJpeg && !isPng && !isWebp) return reply.code(400).send({ error: 'The uploaded file does not match its image format' });
+      const storageKey = buildStorageKey('entries', filename);
+      try {
+        await putObjectBytes(storageKey, body, contentType!);
+        return reply.code(201).send({ storageKey, originalFilename: filename });
+      } catch (err) {
+        request.log.error(err);
+        return reply.code(502).send({ error: 'Could not store this worksheet image. Please retry.' });
+      }
+    }
+  );
+
   app.post<{ Body: PresignBody }>('/presign', { preHandler: [app.authenticate] }, async (request, reply) => {
     const { prefix, filename, contentType } = request.body;
     if (!prefix || !filename || !contentType) {

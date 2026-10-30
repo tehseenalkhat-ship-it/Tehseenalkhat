@@ -5,7 +5,6 @@ import {
   RefreshCw, Upload, Users, Zap, Eye, MapPin, PenTool, Mic, Pause, Play, Trash2,
   StopCircle,
   Radio,
-  ExternalLink,
 } from 'lucide-react';
 import type { Script } from '@/data/types';
 import { khatTypes, scriptList, scriptToCode, scriptFromCode as mapScriptFromCode } from '@/data/mock';
@@ -19,6 +18,7 @@ import { viewStudentProfile, useActiveStudentId } from '@/studentViewSession';
 import { viewTeacherProfile, useViewedTeacherId, clearViewedTeacher } from '@/teacherViewSession';
 import { ShowcaseImageEditor } from '@/components/ShowcaseImageEditor';
 import { SubmissionAnnotator } from '@/components/SubmissionAnnotator';
+import { CourseJourney } from '@/components/CourseJourney';
 import type { LiveKitRoomAccess } from '@/components/LiveKitEventRoom';
 import {
   ActivityTrendChart, EntryStatusChart, EntryTrendChart, EventTrendChart, StudentProgressChart, TeacherThroughputChart,
@@ -28,7 +28,12 @@ import {
 const LiveKitEventRoom = lazy(() => import('@/components/LiveKitEventRoom').then(module => ({ default: module.LiveKitEventRoom })));
 
 type ApiQueueRow = {
-  id: string; source_type: string; status: string; created_at: string; locked_at: string | null;
+  id: string; source_type: string; status: string; created_at: string; locked_at: string | null; original_filename?: string | null;
+  entry_kind?: 'practice_marking' | 'checkpoint_assessment' | 'secondary_marking' | 'mashq_marking' | null;
+  review_type?: 'practice_marking' | 'checkpoint_assessment' | 'secondary_marking' | 'mashq_marking' | null;
+  mashq_category_key?: string | null;
+  time_spent_minutes?: number | null; mark_out_of_ten?: number | null; level_type?: string | null;
+  course_title?: string | null; course_category?: string | null;
   level_title: string | null; khat_type_id: string | null; khat_type_code?: string | null; khat_type_name?: string | null;
   student_name: string; student_branch_id: string;
 };
@@ -151,20 +156,25 @@ export function TeacherDashboard({ coordinator = false }: { coordinator?: boolea
     if (!userId) return;
   
     apiFetch<ApiQueueRow[]>('/entries/queue')
-      .then(setQueue)
+      .then(items => setQueue(Array.isArray(items) ? items : []))
       .catch(err => setDashboardError(err instanceof ApiError ? err.message : 'Could not load your review queue.'))
       .finally(() => setQueueLoading(false));
   
     apiFetch<{
-      assignedScripts: ApiAssignedScript[];
-      totalReviewed: number;
-      avgResponseHours: number | null;
-      activity: ApiActivity[];
+      assignedScripts?: ApiAssignedScript[];
+      totalReviewed?: number;
+      avgResponseHours?: number | null;
+      activity?: ApiActivity[];
     }>(`/teachers/${userId}/profile`)
       .then(profile => {
-        setAssignedScripts(profile.assignedScripts);
-        setStats(profile);
-        setActivity(profile.activity);
+        const assigned = Array.isArray(profile.assignedScripts) ? profile.assignedScripts : [];
+        const activityRows = Array.isArray(profile.activity) ? profile.activity : [];
+        setAssignedScripts(assigned);
+        setStats({
+          totalReviewed: Number(profile.totalReviewed ?? 0),
+          avgResponseHours: profile.avgResponseHours ?? null,
+        });
+        setActivity(activityRows);
         setActivityLoading(false);
       })
       .catch(() => {
@@ -173,7 +183,8 @@ export function TeacherDashboard({ coordinator = false }: { coordinator?: boolea
       });
   
     apiFetch<ApiShowcasePost[]>('/showcase')
-      .then(async posts => {
+      .then(async postsResponse => {
+        const posts = Array.isArray(postsResponse) ? postsResponse : [];
         const resolvedPosts = await Promise.all(
           posts.map(async post => {
             if (!post.image_storage_key) return post;
@@ -208,18 +219,18 @@ export function TeacherDashboard({ coordinator = false }: { coordinator?: boolea
         apiFetch<ApiStaffRow[]>('/admin/users?role=teacher'),
         apiFetch<ApiLiveEvent[]>('/events'),
       ]).then(async ([branches, students, staff, events]) => {
-        const branch = branches.find(item => item.id === userBranchId);
+        const branch = (Array.isArray(branches) ? branches : []).find(item => item.id === userBranchId);
         if (!branch) throw new Error('Your appointed branch could not be found.');
 
-        const teachers = await Promise.all(staff.map(async teacher => {
-          const profile = await apiFetch<{ totalReviewed: number }>(`/teachers/${teacher.id}/profile`).catch(() => ({ totalReviewed: 0 }));
-          return { id: teacher.id, name: teacher.name, entriesReviewed: profile.totalReviewed };
+        const teachers = await Promise.all((Array.isArray(staff) ? staff : []).map(async teacher => {
+          const profile = await apiFetch<{ totalReviewed?: number }>(`/teachers/${teacher.id}/profile`).catch(() => ({ totalReviewed: 0 }));
+          return { id: teacher.id, name: teacher.name, entriesReviewed: Number(profile.totalReviewed ?? 0) };
         }));
 
         setCoordinatorData({
           branchName: branch.name,
-          studentCount: students.length,
-          eventCount: events.filter(event => event.branch_id === userBranchId).length,
+          studentCount: Array.isArray(students) ? students.length : 0,
+          eventCount: Array.isArray(events) ? events.filter(event => event.branch_id === userBranchId).length : 0,
           teachers,
         });
       }).catch(err => {
@@ -234,7 +245,8 @@ export function TeacherDashboard({ coordinator = false }: { coordinator?: boolea
     try {
       await apiFetch(`/showcase/${id}/like`, { method: liked ? 'DELETE' : 'POST' });
       const refreshed = await apiFetch<ApiShowcasePost[]>('/showcase');
-      const resolved = await Promise.all(refreshed.map(async item => {
+      const refreshedList = Array.isArray(refreshed) ? refreshed : [];
+      const resolved = await Promise.all(refreshedList.map(async item => {
         if (!item.image_storage_key) return item;
         try {
           return { ...item, imageUrl: await getViewUrl(item.image_storage_key) };
@@ -360,6 +372,7 @@ export function CoordinatorDashboard() {
 
 export function TeacherQueue({ coordinator = false }: { coordinator?: boolean }) {
   const [filter, setFilter] = useState<Script | 'All'>('All');
+  const [reviewTypeFilter, setReviewTypeFilter] = useState<'all' | 'practice' | 'checkpoint_assessment' | 'marked'>('all');
   const [rows, setRows] = useState<ApiQueueRow[]>([]);
   const [assignedScripts, setAssignedScripts] = useState<ApiAssignedScript[]>([]);
   const [branchMap, setBranchMap] = useState<Record<string, string>>({});
@@ -374,12 +387,12 @@ export function TeacherQueue({ coordinator = false }: { coordinator?: boolean })
     try {
       const [queue, profile, branchList] = await Promise.all([
         apiFetch<ApiQueueRow[]>('/entries/queue'),
-        apiFetch<{ assignedScripts: ApiAssignedScript[] }>(`/teachers/${user.id}/profile`),
+        apiFetch<{ assignedScripts?: ApiAssignedScript[] }>(`/teachers/${user.id}/profile`),
         apiFetch<ApiBranch[]>('/branches'),
       ]);
-      setRows(queue);
-      setAssignedScripts(profile.assignedScripts);
-      setBranchMap(Object.fromEntries(branchList.map(b => [b.id, b.name])));
+      setRows(Array.isArray(queue) ? queue : []);
+      setAssignedScripts(Array.isArray(profile.assignedScripts) ? profile.assignedScripts : []);
+      setBranchMap(Object.fromEntries((Array.isArray(branchList) ? branchList : []).map(b => [b.id, b.name])));
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Failed to load your queue.');
     } finally {
@@ -389,10 +402,28 @@ export function TeacherQueue({ coordinator = false }: { coordinator?: boolean })
 
   useEffect(() => { load(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [user?.id]);
 
-  const filtered = filter === 'All' ? rows : rows.filter(row => {
+  const filtered = rows.filter(row => {
     const assignedCode = assignedScripts.find(item => item.id === row.khat_type_id)?.code;
-    return scriptFromCode(row.khat_type_code ?? assignedCode) === filter;
+    const matchesScript = filter === 'All' || scriptFromCode(row.khat_type_code ?? assignedCode) === filter;
+    const matchesType = reviewTypeFilter === 'all'
+      || (reviewTypeFilter === 'practice' && row.entry_kind !== 'checkpoint_assessment')
+      || (reviewTypeFilter === 'checkpoint_assessment' && row.entry_kind === 'checkpoint_assessment')
+      || (reviewTypeFilter === 'marked' && false);
+    return matchesScript && matchesType;
   });
+  const reviewTypeCount = (kind: typeof reviewTypeFilter) => {
+    if (kind === 'all') return rows.length;
+    if (kind === 'practice') return rows.filter(row => row.entry_kind !== 'checkpoint_assessment').length;
+    if (kind === 'checkpoint_assessment') return rows.filter(row => row.entry_kind === kind).length;
+    return 0;
+  };
+  const overdueCount = rows.filter(row => row.status !== 'in_review' && hoursRemaining(row.created_at) === 0).length;
+  const reviewTypeNames = {
+    all: 'All work',
+    practice: 'Practice',
+    checkpoint_assessment: 'Online assessments',
+    marked: 'Marked',
+  };
 
   const openRow = async (row: ApiQueueRow) => {
     if (row.status === 'assigned') {
@@ -408,25 +439,34 @@ export function TeacherQueue({ coordinator = false }: { coordinator?: boolean })
   };
 
   return (
-    <main className="page portal-page">
-      <div className="portal-welcome">
+    <main className="page portal-page teacher-queue-page">
+      <div className="teacher-queue-heading">
         <div>
-          <p className="eyebrow">Teacher portal {coordinator && '· Branch coordinator'}</p>
-          <h1>Review Queue</h1>
-          <p>Submissions assigned to you, ordered by how soon they're due. Only entries matching your assigned khat type(s) appear here.</p>
+          <p className="eyebrow">Teacher portal{coordinator && ' · Branch coordinator'}</p>
+          <h1>Review queue</h1>
+          <p>Work sent to you, oldest first. Open a row to reply, annotate, record a voice note and give marks in the same chat.</p>
         </div>
-        <div className="queue-count"><strong>{filtered.length}</strong><span>awaiting review</span></div>
+        <div className="teacher-queue-stats" aria-label="Queue summary">
+          <div className="teacher-queue-stat waiting"><small>Waiting</small><strong>{loading ? '—' : rows.filter(row => row.status === 'assigned').length}</strong></div>
+          <div className="teacher-queue-stat assessments"><small>Assessments</small><strong>{loading ? '—' : reviewTypeCount('checkpoint_assessment')}</strong></div>
+          <div className="teacher-queue-stat overdue"><small>Overdue</small><strong>{loading ? '—' : overdueCount}</strong></div>
+        </div>
       </div>
-      {error && <p className="error-text">{error}</p>}
-      {!coordinator && assignedScripts.length > 0 && (
-        <div className="info-banner"><Check size={16} /><span>Your assigned scripts: {assignedScripts.map(s => s.display_name).join(', ')}. Entries from other scripts are routed to their assigned teachers.</span></div>
-      )}
-      <div className="tabs">
-        <button className={filter === 'All' ? 'active' : ''} onClick={() => setFilter('All')}>All</button>
+      {error && <p className="error-text" role="alert">{error}</p>}
+      <div className="teacher-review-type-filters" role="group" aria-label="Filter by review type">
+        {(Object.keys(reviewTypeNames) as (keyof typeof reviewTypeNames)[]).map(kind => (
+          <button type="button" key={kind} className={reviewTypeFilter === kind ? 'active' : ''} aria-pressed={reviewTypeFilter === kind} onClick={() => setReviewTypeFilter(kind)}>
+            <span>{reviewTypeNames[kind]}</span><b>{reviewTypeCount(kind)}</b>
+          </button>
+        ))}
+      </div>
+      <div className="teacher-queue-course-filters" role="group" aria-label="Filter by course">
+        <span>Course:</span>
+        <button type="button" key="all-courses" className={filter === 'All' ? 'active' : ''} aria-pressed={filter === 'All'} onClick={() => setFilter('All')}>All</button>
         {assignedScripts.map(s => {
           const assignedScript = scriptFromCode(s.code);
           if (!assignedScript) return null;
-          return <button key={s.id} className={filter === assignedScript ? 'active' : ''} onClick={() => setFilter(assignedScript)}>{s.display_name}</button>;
+          return <button type="button" key={s.id} className={filter === assignedScript ? 'active' : ''} aria-pressed={filter === assignedScript} onClick={() => setFilter(assignedScript)}>{s.display_name}</button>;
         })}
       </div>
       {loading ? (
@@ -435,43 +475,51 @@ export function TeacherQueue({ coordinator = false }: { coordinator?: boolean })
         <div className="queue-empty-state">
           <div className="queue-empty-icon"><Inbox size={24} strokeWidth={1.7} /></div>
           <p className="eyebrow">Review queue</p>
-          <h3>{filter === 'All' ? 'You’re all caught up' : `No ${filter} entries right now`}</h3>
-          <p>{filter === 'All' ? 'There are no entries waiting for review. New student work will appear here as it arrives.' : `There are no entries matching ${filter} in your current queue. Try another script or check back later.`}</p>
-          {filter !== 'All' && <button className="text-link" onClick={() => setFilter('All')}>View all assigned scripts <ArrowRight size={14} /></button>}
+          <h3>{reviewTypeFilter === 'marked' ? 'No marked work in this queue' : filter === 'All' ? 'You’re all caught up' : `No ${filter} entries right now`}</h3>
+          <p>{reviewTypeFilter === 'marked' ? 'Completed reviews are available in My reviews.' : filter === 'All' ? 'There is no work waiting for review. New student work will appear here as it arrives.' : `There are no entries matching ${filter} in your current queue. Try another course or check back later.`}</p>
+          {(filter !== 'All' || reviewTypeFilter !== 'all') && <button className="text-link" onClick={() => { setFilter('All'); setReviewTypeFilter('all'); }}>View all work <ArrowRight size={14} /></button>}
         </div>
       ) : (
-        <div className="entry-table">
-          <div className="table-head">
-            <span>Student</span><span>Script</span><span>Level / exercise</span><span>Branch</span><span>Time remaining</span><span />
-          </div>
+        <div className="teacher-queue-table-wrap">
+          <table className="teacher-queue-table">
+            <thead><tr><th>Student</th><th>Course</th><th>Level</th><th>Work sent</th><th>Type</th><th>Sent</th><th>Due</th><th>Status</th><th>Marks</th><th aria-label="Actions" /></tr></thead>
+            <tbody>
           {filtered.map((row) => {
-            const script = assignedScripts.find(s => s.id === row.khat_type_id);
-            const scriptName = row.khat_type_name ?? script?.display_name ?? 'Unknown script';
-            const scriptType = scriptFromCode(row.khat_type_code ?? script?.code);
+            const scriptName = row.khat_type_name ?? 'Unknown script';
             const hrs = hoursRemaining(row.created_at);
+            const sentDate = new Date(row.created_at);
+            const typeName = row.entry_kind === 'checkpoint_assessment' ? 'Online assessment' : row.entry_kind === 'mashq_marking' ? 'Mashq worksheet' : row.entry_kind === 'secondary_marking' ? 'Practice' : 'Practice';
+            const dueLabel = row.status === 'in_review' ? 'In review' : hrs === 0 ? 'Overdue' : hrs < 24 ? `${hrs} hrs left` : `${Math.ceil(hrs / 24)} days left`;
             return (
-              <div className="entry-row" key={row.id}>
-                <div><strong>{row.student_name}</strong><small>Submitted {new Date(row.created_at).toLocaleDateString()} · {row.source_type}</small></div>
-                <span style={{ color: scriptType ? khatTypes[scriptType].color : undefined }}>{scriptName}</span>
-                <span>{row.level_title ?? '—'}</span>
-                <span>{branchMap[row.student_branch_id] ?? '—'}</span>
-                {row.status === 'in_review' ? (
-                  <StatusChip tone="blue"><Lock size={13} /> In review</StatusChip>
-                ) : (
-                  <StatusChip tone={hrs < 12 ? 'red' : hrs < 24 ? 'amber' : 'green'}>{hrs} hrs left</StatusChip>
-                )}
-                <Button onClick={() => openRow(row)}>{row.status === 'in_review' ? 'Continue review' : 'Open'} <ArrowRight size={14} /></Button>
-              </div>
+              <tr key={row.id} className={row.entry_kind === 'checkpoint_assessment' ? 'assessment' : ''}>
+                <td><strong>{row.student_name}</strong><small>{branchMap[row.student_branch_id] ?? '—'}</small></td>
+                <td><span className="teacher-queue-course"><b>{row.khat_type_code ? row.khat_type_code.slice(0, 1).toUpperCase() : '•'}</b>{scriptName}</span></td>
+                <td>{row.level_title ?? '—'}</td>
+                <td><span className="teacher-queue-work">{row.original_filename ?? (row.entry_kind === 'checkpoint_assessment' ? 'Assessment submission' : row.entry_kind === 'mashq_marking' ? 'Mashq worksheet' : 'Practice sheet')}</span></td>
+                <td><span className={`teacher-queue-type ${row.entry_kind === 'checkpoint_assessment' ? 'assessment' : 'practice'}`}>{typeName}</span></td>
+                <td className="nowrap">{Number.isNaN(sentDate.getTime()) ? '—' : sentDate.toLocaleDateString(undefined, { day: 'numeric', month: 'short' })}</td>
+                <td className={`nowrap ${hrs === 0 && row.status !== 'in_review' ? 'late' : ''}`}>{dueLabel}</td>
+                <td><span className={`teacher-queue-status ${row.status === 'in_review' ? 'in-review' : 'waiting'}`}>{row.status === 'in_review' ? 'In review' : 'Waiting'}</span></td>
+                <td className="nowrap">{row.mark_out_of_ten != null ? `${row.mark_out_of_ten} / 10` : '—'}</td>
+                <td><Button onClick={() => openRow(row)}>{row.status === 'in_review' ? 'Continue review' : 'Open & mark'}</Button></td>
+              </tr>
             );
           })}
+            </tbody>
+          </table>
         </div>
       )}
+      {!loading && filtered.length > 0 && <p className="teacher-queue-note">Rows with an orange edge are online assessments. Marks you give are sent to the student as a chat message and shown on their course page.</p>}
     </main>
   );
 }
 
 type ApiEntryDetail = {
-  id: string; student_id: string; status: string; khat_image_storage_key: string; original_filename?: string | null;
+  id: string; student_id: string; status: string; source_type?: string; level_id?: string | null; level_type?: string; khat_image_storage_key: string; original_filename?: string | null;
+  entry_kind?: 'practice_marking' | 'checkpoint_assessment' | 'secondary_marking' | 'mashq_marking' | null;
+  review_type?: 'practice_marking' | 'checkpoint_assessment' | 'secondary_marking' | 'mashq_marking' | null;
+  level_title?: string | null;
+  course_id?: string | null; course_title?: string | null; course_category?: string | null; time_spent_minutes?: number | null; mashq_category_key?: string | null;
   scopedSubmissions: { id: string; file_storage_key: string; original_filename?: string | null; time_spent_minutes: number; submitted_at: string }[];
 };
 
@@ -480,7 +528,6 @@ export function ReviewPage() {
   const [entry, setEntry] = useState<ApiEntryDetail | null>(null);
   const [submissionImageUrl, setSubmissionImageUrl] = useState<string | null>(null);
   const [submissionDownloadUrl, setSubmissionDownloadUrl] = useState<string | null>(null);
-  const [practiceImageUrls, setPracticeImageUrls] = useState<Record<string, string>>({});
   const [studentName, setStudentName] = useState('');
   const [feedback, setFeedback] = useState('');
   const [correctionFile, setCorrectionFile] = useState<File | null>(null);
@@ -499,7 +546,8 @@ export function ReviewPage() {
   const [uploadedCorrectionKey, setUploadedCorrectionKey] = useState<string | null>(null);
   const [uploadedCorrectionName, setUploadedCorrectionName] = useState<string | null>(null);
   const [showAnnotator, setShowAnnotator] = useState(false);
-  const [decision, setDecision] = useState<'pass' | 'redo' | ''>('');
+  const [decision, setDecision] = useState<'pass' | 'redo' | 'mark' | ''>('');
+  const [markOutOfTen, setMarkOutOfTen] = useState(7);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [reviewSidebarOpen, setReviewSidebarOpen] = useState(false);
@@ -539,22 +587,18 @@ export function ReviewPage() {
       .then(async data => {
         setEntry(data);
         setStudentName(data.student_name ?? '');
-        const [submissionUrl, downloadUrl, practiceImages] = await Promise.all([
+        setMarkOutOfTen((data.review_type ?? data.entry_kind) === 'checkpoint_assessment' ? 7 : 5);
+        const [submissionUrl, downloadUrl] = await Promise.all([
           data.khat_image_storage_key ? getViewUrl(data.khat_image_storage_key).catch(() => null) : Promise.resolve(null),
           data.khat_image_storage_key ? getDownloadUrl(data.khat_image_storage_key, data.original_filename ?? `checkpoint-submission-${data.id}`).catch(() => null) : Promise.resolve(null),
-          Promise.all(data.scopedSubmissions.map(async submission => {
-            try { return [submission.id, await getViewUrl(submission.file_storage_key)] as const; }
-            catch { return [submission.id, ''] as const; }
-          })),
         ]);
         setSubmissionImageUrl(submissionUrl);
         setSubmissionDownloadUrl(downloadUrl);
-        setPracticeImageUrls(Object.fromEntries(practiceImages.filter(([, url]) => url)));
       })
       .catch(err => setError(err instanceof ApiError ? err.message : 'Failed to load this entry.'));
   }, [entryId]);
 
-  const submitDecision = async (choice: 'pass' | 'redo') => {
+  const submitDecision = async (choice: 'pass' | 'redo' | 'mark') => {
     if (!entry) return;
     setSubmitting(true);
     setError(null);
@@ -569,12 +613,11 @@ export function ReviewPage() {
         const uploaded = await uploadFile('corrections', voiceNoteFile);
         correctionVoiceStorageKey = uploaded.storageKey;
       }
-        await apiFetch(`/entries/${entry.id}/review`, {
+      await apiFetch(`/entries/${entry.id}/review`, {
         method: 'POST',
-        body: { decision: choice, feedback, correctionImageStorageKey, correctionVoiceStorageKey },
+        body: { decision: choice, feedback, correctionImageStorageKey, correctionVoiceStorageKey, markOutOfTen: markOutOfTen },
       });
       setDecision(choice);
-      // Close mobile sidebar after submitting decision for a smoother mobile flow
       setReviewSidebarOpen(false);
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Failed to submit your decision.');
@@ -687,6 +730,15 @@ export function ReviewPage() {
   };
 
   const formatRecordingTime = (seconds: number) => `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}`;
+  const reviewType = entry?.review_type ?? entry?.entry_kind;
+  const isMarkOnlyEntry = reviewType === 'practice_marking' || reviewType === 'secondary_marking' || reviewType === 'mashq_marking';
+  const reviewHeading = reviewType === 'checkpoint_assessment'
+    ? 'Checkpoint assessment'
+      : reviewType === 'mashq_marking'
+        ? 'Mashq worksheet · marking only'
+      : reviewType === 'secondary_marking'
+      ? 'Secondary course · marking only'
+      : 'Certification practice · marking only';
 
   if (!entryId || !entry) {
     return (
@@ -702,9 +754,9 @@ export function ReviewPage() {
       <BackLink to="queue" label="Back to Review Queue" />
       <div className="review-context">
         <div>
-          <p className="eyebrow">Checkpoint review</p>
+          <p className="eyebrow">{reviewHeading}</p>
           <h1>{studentName || 'Student'}</h1>
-          <p className="review-context-note">Review the submitted checkpoint and course-specific practice uploads below.</p>
+          <p className="review-context-note">{entry.course_title ?? 'Course'} · {entry.level_title ?? 'Course level'}{entry.time_spent_minutes ? ` · ${entry.time_spent_minutes} minutes practiced` : ''}</p>
         </div>
         <StatusChip tone="blue"><Lock size={13} /> Locked by you — won't be reassigned while open</StatusChip>
       </div>
@@ -725,12 +777,12 @@ export function ReviewPage() {
         <span className="hamburger-icon">☰</span>
       </button>
 
-      <aside className={`rubric ${reviewSidebarOpen ? 'mobile-open' : ''}`}>
-        <p className="eyebrow">Feedback</p>
+      <aside className={`rubric${isMarkOnlyEntry ? ' is-mark-only' : ''} ${reviewSidebarOpen ? 'mobile-open' : ''}`}>
+        <p className="eyebrow">{isMarkOnlyEntry ? 'Mark and voice note' : 'Feedback'}</p>
         <div className="review-feedback-box">
-          <label className="field-label">Feedback<textarea className="field textarea" value={feedback} onChange={e => setFeedback(e.target.value)} placeholder="Write feedback here..." /></label>
+          {!isMarkOnlyEntry && <label className="field-label">Feedback<textarea className="field textarea" value={feedback} onChange={e => setFeedback(e.target.value)} placeholder="Write feedback here..." /></label>}
           <div className="review-voice-note">
-            <div className="review-voice-heading"><div><strong>Voice note</strong><small>Add a spoken explanation with your written feedback</small></div><Mic size={16} /></div>
+            <div className="review-voice-heading"><div><strong>Voice note</strong><small>{isMarkOnlyEntry ? 'Add an optional spoken note about this mark' : 'Add a spoken explanation with your written feedback'}</small></div><Mic size={16} /></div>
             {recording ? (
               <div className={`voice-message-bar is-recording${recordingPaused ? ' is-paused' : ''}`}>
                 <button type="button" className="voice-message-delete" onClick={cancelVoiceRecording} aria-label="Discard recording"><Trash2 size={18} /></button>
@@ -763,7 +815,7 @@ export function ReviewPage() {
             {recordingError && <p className="review-voice-error" role="alert">{recordingError}</p>}
           </div>
         </div>
-        <div className="review-annotation-tools">
+        {!isMarkOnlyEntry && <div className="review-annotation-tools">
           <Button outline disabled={!submissionImageUrl} onClick={() => setShowAnnotator(true)}><PenTool size={15} /> Annotate submitted sheet</Button>
           <p>Use touch, Apple Pencil, mouse, or trackpad to mark directly on the student's sheet.</p>
           {(uploadedCorrectionName || correctionFile) && <div className="review-annotation-attached"><Check size={14} /><span>{uploadedCorrectionName ?? correctionFile?.name} attached as correction</span><button type="button" className="text-link danger" onClick={() => { setCorrectionFile(null); setUploadedCorrectionKey(null); setUploadedCorrectionName(null); }}>Remove</button></div>}
@@ -771,39 +823,46 @@ export function ReviewPage() {
             <summary>Upload an existing annotated image instead</summary>
             <UploadBox label={correctionFile?.name ?? 'Choose annotated image'} sublabel="For this student's reference only" icon={FileImage} accept="image/*" onChange={file => { setCorrectionFile(file); setUploadedCorrectionKey(null); setUploadedCorrectionName(null); }} />
           </details>
+        </div>}
+        <div className="review-mark-box">
+          <div className="review-mark-header">
+            <span className="field-label">Mark out of 10</span>
+            <strong>{markOutOfTen}/10</strong>
+          </div>
+          {isMarkOnlyEntry ? <div className="review-mark-options" role="group" aria-label="Select a mark out of ten">
+            {Array.from({ length: 10 }, (_, index) => index + 1).map(mark => <button
+              key={mark}
+              type="button"
+              className={`review-mark-option${markOutOfTen === mark ? ' is-selected' : ''}`}
+              aria-pressed={markOutOfTen === mark}
+              onClick={() => setMarkOutOfTen(mark)}
+            >{mark}</button>)}
+          </div> : <input type="range" min="0" max="10" step="1" value={markOutOfTen} onChange={event => setMarkOutOfTen(Number(event.target.value))} aria-label="Mark out of ten" />}
+          <small className="muted">Passing threshold is 5/10. Any score below 5 requires the student to redo the level.</small>
         </div>
-        <div className="review-actions">
-          <Button disabled={submitting || recording} onClick={() => submitDecision('pass')}>{submitting ? <PenLoader label="Submitting review" compact tiny /> : 'Pass'} {!submitting && <Check size={15} />}</Button>
-          <Button outline disabled={submitting || recording} onClick={() => submitDecision('redo')}>{submitting ? <PenLoader label="Submitting review" compact tiny /> : 'Needs redo'}</Button>
-        </div>
+        {!isMarkOnlyEntry ? (
+          <div className="review-actions">
+            <Button disabled={submitting || recording} onClick={() => submitDecision('pass')}>{submitting ? <PenLoader label="Submitting review" compact tiny /> : 'Pass'} {!submitting && <Check size={15} />}</Button>
+            <Button outline disabled={submitting || recording} onClick={() => submitDecision('redo')}>{submitting ? <PenLoader label="Submitting review" compact tiny /> : 'Needs redo'}</Button>
+          </div>
+        ) : (
+          <div className="review-actions">
+            <Button disabled={submitting || recording} onClick={() => submitDecision('mark')}>{submitting ? <PenLoader label="Submitting mark" compact tiny /> : markOutOfTen >= 5 ? 'Submit pass mark' : 'Submit redo mark'} {!submitting && <Check size={15} />}</Button>
+          </div>
+        )}
         {decision && (
           <div className="review-result">
-            <StatusChip tone={decision === 'pass' ? 'green' : 'red'}>{decision === 'pass' ? 'Passed' : 'Needs redo'} · student notified</StatusChip>
+            <StatusChip tone={decision === 'pass' || (decision === 'mark' && markOutOfTen >= 5) ? 'green' : 'red'}>{decision === 'pass' ? 'Passed' : decision === 'mark' ? (markOutOfTen >= 5 ? 'Passed' : 'Needs redo') : 'Needs redo'} · student notified</StatusChip>
             {decision === 'pass' && <p>Next levels are now unlocked for this student. If a certificate template exists for this checkpoint, it's now pending your approval in Certificates & Data.</p>}
             {decision === 'redo' && <p>The student will re-attempt with the same letters and text, submitted as a brand-new entry. It will go through normal routing and may land with a different teacher. Your annotated sheet is for the student's reference only — it will NOT be shown to whoever reviews the redo.</p>}
+            {decision === 'mark' && <p>{markOutOfTen >= 5 ? 'This level is now marked as passed and the student can continue to the next level.' : 'This level was marked below the pass threshold and the student will need to redo it until they reach 5 or above.'}</p>}
           </div>
         )}
       </aside>
 
       {reviewSidebarOpen && <div className="rubric-backdrop" onClick={() => setReviewSidebarOpen(false)} /> }
       </div>
-      {entry.scopedSubmissions.length > 0 ? (
-        <section className="scoped-submissions review-practice-gallery">
-          <div className="scoped-submissions-heading"><div><p className="eyebrow">Course practice uploads</p><span>{entry.scopedSubmissions.length} upload{entry.scopedSubmissions.length === 1 ? '' : 's'} from this checkpoint range</span></div></div>
-          <div className="scoped-submission-grid">
-            {entry.scopedSubmissions.map(s => (
-              <article key={s.id} className="scoped-submission-card">
-                <div className="scoped-submission-image">
-                  {practiceImageUrls[s.id]
-                    ? <img src={practiceImageUrls[s.id]} alt={s.original_filename ?? 'Student practice upload'} loading="lazy" />
-                    : <div className="review-image-unavailable"><FileImage size={24} /><span>Image unavailable</span></div>}
-                </div>
-                <div className="scoped-submission-meta"><strong>{s.time_spent_minutes} min practiced</strong><small>{new Date(s.submitted_at).toLocaleDateString()}</small></div>
-              </article>
-            ))}
-          </div>
-        </section>
-      ) : <section className="scoped-submissions scoped-submissions-empty review-practice-gallery"><p className="eyebrow">Course practice uploads</p><p>No regular practice uploads were submitted in the levels covered by this checkpoint.</p></section>}
+      {entry.course_id && reviewType !== 'mashq_marking' && <CourseJourney anchorEntryId={entry.id} levelId={entry.level_id ?? undefined} compact />}
       {showAnnotator && submissionImageUrl && <SubmissionAnnotator
         imageStorageKey={entry.khat_image_storage_key}
         fallbackImageUrl={submissionImageUrl}

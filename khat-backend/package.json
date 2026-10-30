@@ -7,6 +7,12 @@
     "dev": "tsx watch src/server.ts",
     "build": "tsc -p tsconfig.json",
     "start": "node dist/server.js",
+    "import:test-dump": "tsx scripts/import-test-dump.ts",
+    "migrate:test-dashboard": "tsx scripts/apply-test-dashboard-migration.ts",
+    "migrate:test-mashq": "tsx scripts/apply-test-mashq-migration.ts",
+    "migrate:test-cut-styles": "tsx scripts/apply-test-cut-pen-style-migration.ts",
+    "export:mysql": "node scripts/export-mysql-database.mjs",
+    "migrate:test-student-chatroom": "tsx scripts/apply-test-student-chatroom-migration.ts",
     "create-admin": "tsx scripts/create-admin.ts",
     "seed-demo": "tsx scripts/seed-demo-data.ts",
     "bundle": "esbuild src/server.ts --bundle --platform=node --target=node18 --format=cjs --outfile=dist/server.cjs --log-level=warning"
@@ -20,7 +26,7 @@
     "fastify": "^4.28.1",
     "fastify-plugin": "^4.5.1",
     "livekit-server-sdk": "^2.19.1",
-    "mysql2": "^3.11.0"
+    "mysql2": "^3.24.5"
   },
   "devDependencies": {
     "@types/bcryptjs": "^2.4.6",

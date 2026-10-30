@@ -1,260 +1,325 @@
+import { randomUUID } from 'node:crypto';
+import { readFileSync } from 'node:fs';
 import mysql from 'mysql2/promise';
-import type { Pool as MysqlPool, PoolConnection } from 'mysql2/promise';
+import type { PoolConnection, ResultSetHeader, RowDataPacket } from 'mysql2/promise';
 import { config } from './config.js';
 
-// MariaDB/MySQL adapter that keeps the original `pg`-style API (`pool.query(sql, params)`
-// -> `{ rows, rowCount }`, `pool.connect()` -> client with `query`/`release`) so route code
-// can keep its PostgreSQL-flavoured SQL. `translate()` rewrites the handful of PostgreSQL-only
-// constructs the app uses ($n placeholders, ::casts, ILIKE, ON CONFLICT, "quoted" identifiers,
-// UPDATE ... RETURNING). Anything fancier (generate_series, FILTER, date_trunc ...) is written
-// in MariaDB syntax directly in the routes.
+type DbRow = any;
+type DbResult = { rows: DbRow[]; rowCount: number };
+type DbParams = readonly unknown[];
 
-export type QueryResult<T = any> = { rows: T[]; rowCount: number | null };
-
-// MariaDB stores JSON as LONGTEXT, so parse these columns back into values like pg did.
-const JSON_COLUMNS = new Set(['tags', 'media', 'sheet_files', 'payload', 'value']);
-
-type Tok = { sql: string; params: unknown[] };
-
-// Walk the SQL, calling `fn` for text outside '...' strings and "..." identifiers.
-function mapOutsideStrings(sql: string, fn: (chunk: string) => string, dq?: (ident: string) => string): string {
-  let out = '';
-  let buf = '';
-  let i = 0;
-  const flush = () => {
-    out += fn(buf);
-    buf = '';
-  };
-  while (i < sql.length) {
-    const c = sql[i];
-    if (c === "'") {
-      flush();
-      let j = i + 1;
-      while (j < sql.length) {
-        if (sql[j] === '\\') j += 2;
-        else if (sql[j] === "'" && sql[j + 1] === "'") j += 2;
-        else if (sql[j] === "'") break;
-        else j++;
-      }
-      out += sql.slice(i, j + 1);
-      i = j + 1;
-    } else if (c === '"') {
-      flush();
-      const j = sql.indexOf('"', i + 1);
-      const ident = sql.slice(i + 1, j);
-      out += dq ? dq(ident) : sql.slice(i, j + 1);
-      i = j + 1;
-    } else if (c === '-' && sql[i + 1] === '-') {
-      flush();
-      const j = sql.indexOf('\n', i);
-      const end = j === -1 ? sql.length : j;
-      out += sql.slice(i, end); // keep SQL comments verbatim, they may contain quotes/$n
-      i = end;
-    } else {
-      buf += c;
-      i++;
-    }
-  }
-  flush();
-  return out;
-}
-
-
-const MONTH_START = `CAST(DATE_FORMAT(CURRENT_DATE, '%Y-%m-01') AS DATE)`;
-
-// Rewrites that need to see string literals (so they run before the quote-aware pass).
-function rewriteFunctions(sql: string): string {
-  return (
-    sql
-      // WITH months AS (SELECT generate_series(first_of_month - N months, first_of_month, 1 month) AS month_start)
-      .replace(
-        /WITH\s+months\s+AS\s*\(\s*SELECT\s+generate_series\(\s*date_trunc\('month',\s*CURRENT_DATE\)\s*-\s*(?:INTERVAL\s+'(\d+)\s+months?'|\(\(\s*(\$\d+)(?:::int)?\s*-\s*1\)\s*\*\s*INTERVAL\s+'1 month'\))\s*,\s*date_trunc\('month',\s*CURRENT_DATE\)\s*,\s*INTERVAL\s+'1 month'\s*\)\s*AS\s+month_start\s*\)/gi,
-        (_m, fixed, param) =>
-          `WITH RECURSIVE months(month_start) AS (SELECT DATE_SUB(${MONTH_START}, INTERVAL ${fixed ?? `(${param} - 1)`} MONTH) ` +
-          `UNION ALL SELECT DATE_ADD(month_start, INTERVAL 1 MONTH) FROM months WHERE month_start < ${MONTH_START})`
-      )
-      .replace(/date_trunc\(\s*'month'\s*,\s*([^(),]+?)\s*\)/gi, `CAST(DATE_FORMAT($1, '%Y-%m-01') AS DATE)`)
-      .replace(/INTERVAL\s+'(\d+)\s+(day|month|hour|minute)s?'/gi, (_m, n, u) => `INTERVAL ${n} ${u.toUpperCase()}`)
-      .replace(/to_char\(\s*([^(),]+?)\s*,\s*'YYYY-MM'\s*\)/gi, `DATE_FORMAT($1, '%Y-%m')`)
-      .replace(
-        /EXTRACT\(\s*EPOCH\s+FROM\s*\(\s*([\w.]+)\s*-\s*([\w.]+)\s*\)\s*\)/gi,
-        'TIMESTAMPDIFF(SECOND, $2, $1)'
-      )
-      // COUNT(x) FILTER (WHERE cond)  ->  COUNT(CASE WHEN cond THEN x END)
-      .replace(
-        /COUNT\(\s*(\*|[\w.]+)\s*\)\s+FILTER\s*\(\s*WHERE\s+((?:[^()]|\([^()]*\))+)\)/gi,
-        (_m, arg, cond) => `COUNT(CASE WHEN ${cond.trim()} THEN ${arg === '*' ? '1' : arg} END)`
-      )
-  );
-}
-
-function translate(text: string, values: unknown[] = []): Tok {
-  const params: unknown[] = [];
-  let sql = mapOutsideStrings(
-    rewriteFunctions(text),
-    (chunk) =>
-      chunk
-        .replace(/::(?:int|integer|bigint|boolean|text|uuid|numeric|date|timestamptz|timestamp|jsonb|json)(?:\[\])?/gi, '')
-        .replace(/\bILIKE\b/gi, 'LIKE')
-        .replace(/(?<![`\w])(key|read)\b(?![`\w])/gi, '`$1`') // reserved words in MariaDB
-        .replace(/(\b(?:LIMIT|OFFSET)\s+)\$(\d+)/gi, (_m, kw, n) => {
-          params.push(Number(values[Number(n) - 1]));
-          return `${kw}?`;
-        })
-        .replace(/\$(\d+)/g, (_m, n) => {
-          params.push(toParam(values[Number(n) - 1]));
-          return '?';
-        }),
-    (ident) => '`' + ident + '`'
-  );
-
-  // ON CONFLICT ... DO NOTHING  ->  INSERT IGNORE
-  if (/\bON\s+CONFLICT\b[^;]*?\bDO\s+NOTHING\b/i.test(sql)) {
-    sql = sql
-      .replace(/\bON\s+CONFLICT\s*(\([^)]*\))?\s*DO\s+NOTHING\b/i, '')
-      .replace(/^(\s*)INSERT\s+INTO\b/i, '$1INSERT IGNORE INTO');
-  }
-  // ON CONFLICT (...) DO UPDATE SET a = EXCLUDED.a  ->  ON DUPLICATE KEY UPDATE a = VALUES(a)
-  sql = sql
-    .replace(/\bON\s+CONFLICT\s*(\([^)]*\))?\s*DO\s+UPDATE\s+SET\b/i, 'ON DUPLICATE KEY UPDATE')
-    .replace(/\bEXCLUDED\.(\w+)/gi, 'VALUES($1)');
-
-  return { sql, params };
-}
-
-function toParam(v: unknown): unknown {
-  if (v === undefined) return null;
-  if (v === null || v instanceof Date || Buffer.isBuffer(v)) return v;
-  if (Array.isArray(v) || typeof v === 'object') return JSON.stringify(v);
-  return v;
-}
-
-// Positions of top-level (outside parentheses/strings) keywords.
-function topLevel(sql: string, word: string): number {
-  let depth = 0;
-  let found = -1;
-  const re = new RegExp(`^${word}\\b`, 'i');
-  for (let i = 0; i < sql.length; i++) {
-    const c = sql[i];
-    if (c === "'") {
-      i++;
-      while (i < sql.length && !(sql[i] === "'" && sql[i + 1] !== "'")) i += sql[i] === "'" ? 2 : 1;
-    } else if (c === '(') depth++;
-    else if (c === ')') depth--;
-    else if (depth === 0 && /\s/.test(sql[i - 1] ?? ' ') && re.test(sql.slice(i))) found = i; // last occurrence
-  }
-  return found;
-}
-
-// count '?' placeholders, ignoring any inside string literals
-const countParams = (s: string) => {
-  let n = 0;
-  mapOutsideStrings(s, (c) => ((n += (c.match(/\?/g) ?? []).length), c));
-  return n;
-};
-
-function fixRow(row: any) {
-  for (const col of JSON_COLUMNS) {
-    const v = row[col];
-    if (typeof v === 'string') {
-      try {
-        row[col] = JSON.parse(v);
-      } catch {
-        /* leave as plain text */
-      }
-    }
-  }
-  return row;
-}
-
-function mapError(err: any) {
-  const code = err?.code;
-  if (code === 'ER_DUP_ENTRY') err.code = '23505';
-  else if (code === 'ER_NO_REFERENCED_ROW_2' || code === 'ER_ROW_IS_REFERENCED_2') err.code = '23503';
-  else if (code === 'ER_CONSTRAINT_FAILED' || code === 'ER_CHECK_CONSTRAINT_VIOLATED') err.code = '23514';
-  return err;
-}
-
-type Queryable = Pick<MysqlPool, 'query'>;
-
-async function raw(conn: Queryable, sql: string, params: unknown[]): Promise<QueryResult> {
-  try {
-    const [res] = await conn.query(sql, params);
-    if (Array.isArray(res)) {
-      const rows = (res as any[]).map(fixRow);
-      return { rows, rowCount: rows.length };
-    }
-    return { rows: [], rowCount: (res as any).affectedRows ?? 0 };
-  } catch (err) {
-    throw mapError(err);
-  }
-}
-
-async function run(conn: Queryable, text: string, values?: unknown[]): Promise<QueryResult> {
-  const { sql, params } = translate(text, values);
-
-  // MariaDB has no UPDATE ... RETURNING: find the matching ids first, update, then re-select them.
-  const ret = /^\s*UPDATE\b/i.test(sql) ? topLevel(sql, 'RETURNING') : -1;
-  if (ret !== -1) {
-    const m = /^\s*UPDATE\s+(\w+)\s+(?:(?:AS\s+)?(?!SET\b)(\w+)\s+)?SET\b/i.exec(sql);
-    if (!m) throw new Error('Unsupported UPDATE ... RETURNING: ' + sql.slice(0, 80));
-    const [, table, alias] = m;
-    const retCols = sql.slice(ret).replace(/^RETURNING\s+/i, '').trim();
-    const body = sql.slice(0, ret);
-    const w = topLevel(body, 'WHERE');
-    const where = w === -1 ? '' : body.slice(w + 5);
-    const setPart = w === -1 ? body : body.slice(0, w);
-    const wherePrms = w === -1 ? [] : params.slice(countParams(setPart), countParams(setPart) + countParams(where));
-    const from = `${table}${alias ? ' ' + alias : ''}`;
-    const idCol = alias ? `${alias}.id` : 'id';
-
-    const { rows: idRows } = await raw(conn, `SELECT ${idCol} AS id FROM ${from}${where ? ' WHERE ' + where : ''}`, wherePrms);
-    if (!idRows.length) return { rows: [], rowCount: 0 };
-    const upd = await raw(conn, body, params);
-    const ids = idRows.map((r) => r.id);
-    const sel = await raw(conn, `SELECT ${retCols} FROM ${from} WHERE ${idCol} IN (?)`, [ids]);
-    return { rows: sel.rows, rowCount: upd.rowCount };
-  }
-
-  return raw(conn, sql, params);
-}
-
-const pool0 = mysql.createPool({
-  uri: config.databaseUrl,
-  connectionLimit: 10,
+const mysqlPool = mysql.createPool({
+  host: config.database.host,
+  port: config.database.port,
+  database: config.database.name,
+  user: config.database.user,
+  password: config.database.password,
+  ...(config.database.sslCa ? {
+    ssl: {
+      ca: readFileSync(config.database.sslCa),
+      rejectUnauthorized: true,
+    },
+  } : {}),
   waitForConnections: true,
+  connectionLimit: 10,
+  queueLimit: 0,
   connectTimeout: 10_000,
-  charset: 'utf8mb4',
+  maxIdle: 2,
+  idleTimeout: 60_000,
   timezone: 'Z',
-  decimalNumbers: true, // SUM()/AVG() come back as numbers, like the ::int / numeric casts expected
-  flags: ['+FOUND_ROWS'], // rowCount = rows matched, like PostgreSQL
+  // Keep DATE columns as calendar strings, while DATETIME values become UTC
+  // Date objects and serialize like node-postgres timestamp responses did.
+  dateStrings: ['DATE'],
+  charset: 'utf8mb4',
   typeCast(field, next) {
+    // PostgreSQL returned booleans as JS booleans; the converted MySQL schema
+    // stores them as TINYINT(1), so preserve that API behavior.
     if (field.type === 'TINY' && field.length === 1) {
-      const v = field.string();
-      return v === null ? null : v === '1';
+      const value = field.string();
+      return value === null ? null : value === '1';
     }
     return next();
   },
 });
 
-// Every new connection: UTC, `||` as string concatenation (PostgreSQL behaviour).
-pool0.pool.on('connection', (conn: any) => {
-  conn.query("SET time_zone = '+00:00', sql_mode = CONCAT(@@sql_mode, ',PIPES_AS_CONCAT')");
+mysqlPool.on('connection', connection => {
+  const callbackConnection = connection as unknown as {
+    query: (sql: string, callback: (error: Error | null) => void) => unknown;
+  };
+  callbackConnection.query("SET time_zone = '+00:00'", error => {
+    if (error) console.error('Failed to set MySQL session timezone to UTC', error);
+  });
 });
 
-export type DbClient = {
-  query: (text: string, values?: unknown[]) => Promise<QueryResult>;
-  release: () => void;
-};
+const RESERVED_COLUMNS = new Set(['key', 'read', 'value', 'rank']);
 
-export const pool = {
-  query: (text: string, values?: unknown[]) => run(pool0, text, values),
-  async connect(): Promise<DbClient> {
-    const conn: PoolConnection = await pool0.getConnection();
-    return {
-      query: (text, values) => run(conn, text, values),
-      release: () => conn.release(),
-    };
-  },
-  end: () => pool0.end(),
-};
+function quoteIdentifiers(sql: string): string {
+  let result = '';
+  for (let i = 0; i < sql.length;) {
+    const char = sql[i];
+    if (char === "'") {
+      const start = i++;
+      while (i < sql.length) {
+        if (sql[i] === "'" && sql[i + 1] === "'") { i += 2; continue; }
+        if (sql[i] === '\\') { i += 2; continue; }
+        if (sql[i++] === "'") break;
+      }
+      result += sql.slice(start, i);
+      continue;
+    }
+    if (char === '"') {
+      let value = '';
+      i++;
+      while (i < sql.length && sql[i] !== '"') value += sql[i++];
+      if (sql[i] === '"') i++;
+      result += `\`${value}\``;
+      continue;
+    }
+    if (char === '`') {
+      const start = i++;
+      while (i < sql.length && sql[i] !== '`') i++;
+      if (sql[i] === '`') i++;
+      result += sql.slice(start, i);
+      continue;
+    }
+    if (/[A-Za-z_]/.test(char)) {
+      const start = i++;
+      while (i < sql.length && /[A-Za-z0-9_$]/.test(sql[i])) i++;
+      const word = sql.slice(start, i);
+      const previousText = sql.slice(0, start).trimEnd();
+      const isDuplicateKeyClause = word.toUpperCase() === 'KEY' && /\bDUPLICATE$/i.test(previousText);
+      result += RESERVED_COLUMNS.has(word.toLowerCase()) && !isDuplicateKeyClause ? `\`${word}\`` : word;
+      continue;
+    }
+    result += char;
+    i++;
+  }
+  return result;
+}
+
+function conflictNoopColumn(sql: string): string {
+  const match = sql.match(/\bINSERT(?:\s+IGNORE)?\s+INTO\s+[`\w]+\s*\(([^)]+)\)/i);
+  const firstColumn = match?.[1].split(',')[0]?.trim();
+  return firstColumn || 'id';
+}
+
+function translateFilteredCounts(sql: string): string {
+  let result = '';
+  let cursor = 0;
+  const countPattern = /COUNT\s*\(/ig;
+  let match: RegExpExecArray | null;
+
+  while ((match = countPattern.exec(sql))) {
+    let depth = 1;
+    let end = match.index + match[0].length;
+    for (; end < sql.length && depth > 0; end++) {
+      if (sql[end] === '(') depth++;
+      else if (sql[end] === ')') depth--;
+    }
+    if (depth !== 0) continue;
+    const aggregateEnd = end;
+    const suffix = sql.slice(aggregateEnd).match(/^\s*FILTER\s*\(/i);
+    if (!suffix) continue;
+
+    let filterStart = aggregateEnd + suffix[0].length;
+    depth = 1;
+    let filterEnd = filterStart;
+    for (; filterEnd < sql.length && depth > 0; filterEnd++) {
+      if (sql[filterEnd] === '(') depth++;
+      else if (sql[filterEnd] === ')') depth--;
+    }
+    if (depth !== 0) continue;
+
+    const expression = sql.slice(match.index + match[0].length, aggregateEnd - 1).trim();
+    const condition = sql.slice(filterStart, filterEnd - 1).replace(/^\s*WHERE\s+/i, '').trim();
+    const replacement = expression === '*'
+      ? `COALESCE(SUM(CASE WHEN ${condition} THEN 1 ELSE 0 END), 0)`
+      : `COUNT(CASE WHEN ${condition} THEN ${expression} ELSE NULL END)`;
+    result += sql.slice(cursor, match.index) + replacement;
+    cursor = filterEnd;
+    countPattern.lastIndex = filterEnd;
+  }
+  return result ? result + sql.slice(cursor) : sql;
+}
+
+export function translatePostgresSql(sql: string, params: DbParams = []): { sql: string; values: unknown[] } {
+  let translated = translateFilteredCounts(sql);
+  translated = translated
+    .replace(/\bON\s+CONFLICT(?:\s*\([^)]*\))?\s+DO\s+NOTHING\b/gi, () => {
+      const column = conflictNoopColumn(sql);
+      return `ON DUPLICATE KEY UPDATE ${column} = ${column}`;
+    })
+    .replace(/\bON\s+CONFLICT\s*\([^)]*\)\s*DO\s+UPDATE\s+SET\b/gi, 'ON DUPLICATE KEY UPDATE')
+    .replace(/\bEXCLUDED\.([A-Za-z_][\w]*)/gi, 'VALUES(`$1`)')
+    .replace(/\bILIKE\b/gi, 'LIKE')
+    .replace(/::\s*[A-Za-z_][\w]*(?:\[\])?/g, '');
+  translated = quoteIdentifiers(translated);
+
+  const values: unknown[] = [];
+  translated = translated.replace(/\$(\d+)/g, (_placeholder, indexText: string) => {
+    const index = Number(indexText) - 1;
+    if (index < 0 || index >= params.length) {
+      throw new Error(`SQL placeholder $${index + 1} has no matching parameter`);
+    }
+    const value = params[index];
+    values.push(value instanceof Date || Buffer.isBuffer(value) || value === null || value === undefined
+      ? value ?? null
+      : Array.isArray(value) || (typeof value === 'object' && value !== null)
+        ? JSON.stringify(value)
+        : value);
+    return '?';
+  });
+
+  return { sql: translated, values };
+}
+
+function resultFromMysql(result: unknown): DbResult {
+  if (Array.isArray(result)) {
+    const rows = result as (RowDataPacket & DbRow)[];
+    return { rows, rowCount: rows.length };
+  }
+  const header = result as ResultSetHeader;
+  return { rows: [], rowCount: header.affectedRows ?? 0 };
+}
+
+class MysqlConnectionAdapter {
+  private inTransaction = false;
+
+  constructor(private readonly connection: PoolConnection) {}
+
+  async query(sql: string, params: DbParams = []): Promise<DbResult> {
+    const command = sql.trim().replace(/;$/, '').toUpperCase();
+    if (command === 'BEGIN' || command === 'BEGIN TRANSACTION') {
+      await this.connection.beginTransaction();
+      this.inTransaction = true;
+      return { rows: [], rowCount: 0 };
+    }
+    if (command === 'COMMIT') {
+      await this.connection.commit();
+      this.inTransaction = false;
+      return { rows: [], rowCount: 0 };
+    }
+    if (command === 'ROLLBACK') {
+      await this.connection.rollback();
+      this.inTransaction = false;
+      return { rows: [], rowCount: 0 };
+    }
+
+    const returning = sql.match(/\s+RETURNING\s+([\s\S]*?)\s*;?\s*$/i);
+    if (returning) return this.queryReturning(sql.slice(0, returning.index), returning[1], params);
+    return this.queryRaw(sql, params);
+  }
+
+  release(): void {
+    if (this.inTransaction) void this.connection.rollback().finally(() => this.connection.release());
+    else this.connection.release();
+  }
+
+  private async queryRaw(sql: string, params: DbParams = []): Promise<DbResult> {
+    const converted = translatePostgresSql(sql, params);
+    const [result] = await this.connection.query(converted.sql, converted.values as never[]);
+    return resultFromMysql(result);
+  }
+
+  private async queryReturning(sql: string, projection: string, params: DbParams): Promise<DbResult> {
+    const insert = sql.match(/^\s*INSERT(?:\s+IGNORE)?\s+INTO\s+(`?[A-Za-z_][\w]*`?)\s*\(([^)]*)\)([\s\S]*)$/i);
+    const update = sql.match(/^\s*UPDATE\s+(`?[A-Za-z_][\w]*`?)([\s\S]*)$/i);
+    const deletion = sql.match(/^\s*DELETE\s+FROM\s+(`?[A-Za-z_][\w]*`?)([\s\S]*)$/i);
+    const table = insert?.[1] ?? update?.[1] ?? deletion?.[1];
+    if (!table) throw new Error('MySQL RETURNING compatibility supports simple INSERT, UPDATE, and DELETE statements only');
+
+    const ownsTransaction = !this.inTransaction;
+    if (ownsTransaction) {
+      await this.connection.beginTransaction();
+      this.inTransaction = true;
+    }
+
+    try {
+      let result: DbResult;
+      if (insert) {
+        const generatedId = randomUUID();
+        const insertSql = this.addGeneratedId(sql, insert[1], insert[2], insert[3], generatedId);
+        const insertResult = await this.queryRaw(insertSql, params);
+        if (insertResult.rowCount === 0) {
+          result = { rows: [], rowCount: 0 };
+        } else {
+          const selected = await this.queryRaw(`SELECT ${projection} FROM ${table} WHERE id = '${generatedId}'`);
+          result = { rows: selected.rows, rowCount: selected.rows.length };
+        }
+      } else {
+        const match = update ?? deletion;
+        const where = match?.[2].match(/\bWHERE\s+([\s\S]+)$/i);
+        if (!where) throw new Error('MySQL RETURNING compatibility requires a WHERE clause for UPDATE and DELETE');
+        const ids = await this.queryRaw(`SELECT id FROM ${table} WHERE ${where[1]} FOR UPDATE`, params);
+        if (!ids.rows.length) {
+          await this.queryRaw(sql, params);
+          result = { rows: [], rowCount: 0 };
+        } else if (update) {
+          await this.queryRaw(sql, params);
+          const idValues = ids.rows.map(row => row.id);
+          const placeholders = idValues.map((_, index) => `$${index + 1}`);
+          const orderPlaceholders = idValues.map((_, index) => `$${idValues.length + index + 1}`);
+          const selectSql = `SELECT ${projection} FROM ${table} WHERE id IN (${placeholders.join(', ')}) ORDER BY FIELD(id, ${orderPlaceholders.join(', ')})`;
+          const selected = await this.queryRaw(selectSql, [...idValues, ...idValues]);
+          result = { rows: selected.rows, rowCount: selected.rows.length };
+        } else {
+          const idValues = ids.rows.map(row => row.id);
+          const placeholders = idValues.map((_, index) => `$${index + 1}`).join(', ');
+          const selected = await this.queryRaw(`SELECT ${projection} FROM ${table} WHERE id IN (${placeholders})`, idValues);
+          await this.queryRaw(sql, params);
+          result = { rows: selected.rows, rowCount: selected.rows.length };
+        }
+      }
+
+      if (ownsTransaction) {
+        await this.connection.commit();
+        this.inTransaction = false;
+      }
+      return result;
+    } catch (error) {
+      if (ownsTransaction) {
+        await this.connection.rollback();
+        this.inTransaction = false;
+      }
+      throw error;
+    }
+  }
+
+  private addGeneratedId(sql: string, table: string, columnsText: string, tail: string, id: string): string {
+    if (columnsText.split(',').some(column => column.trim().replace(/`/g, '').toLowerCase() === 'id')) {
+      throw new Error(`Cannot emulate RETURNING for ${table}: insert explicitly supplies its id`);
+    }
+    let insertTail: string;
+    if (/\bVALUES\s*\(/i.test(tail)) {
+      insertTail = tail.replace(/\bVALUES\s*\(/i, `VALUES ('${id}', `);
+    } else if (/\bSELECT\b/i.test(tail)) {
+      insertTail = tail.replace(/\bSELECT\b/i, `SELECT '${id}',`);
+    } else {
+      throw new Error(`Cannot emulate RETURNING for ${table}: unsupported INSERT form`);
+    }
+    const prefix = sql.slice(0, sql.indexOf('('));
+    return `${prefix}(id, ${columnsText})${insertTail}`;
+  }
+}
+
+class MysqlPoolAdapter {
+  async query(sql: string, params: DbParams = []): Promise<DbResult> {
+    const connection = await mysqlPool.getConnection();
+    const adapter = new MysqlConnectionAdapter(connection);
+    try {
+      return await adapter.query(sql, params);
+    } finally {
+      adapter.release();
+    }
+  }
+
+  async connect(): Promise<MysqlConnectionAdapter> {
+    return new MysqlConnectionAdapter(await mysqlPool.getConnection());
+  }
+
+  async end(): Promise<void> {
+    await mysqlPool.end();
+  }
+}
+
+export const pool = new MysqlPoolAdapter();

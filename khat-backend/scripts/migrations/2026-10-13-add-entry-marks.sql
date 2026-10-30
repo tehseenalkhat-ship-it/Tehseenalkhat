@@ -1,0 +1,3 @@
+ALTER TABLE entries
+  ADD COLUMN IF NOT EXISTS mark_out_of_ten SMALLINT,
+  ADD COLUMN IF NOT EXISTS mark_passed BOOLEAN;

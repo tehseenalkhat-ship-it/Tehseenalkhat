@@ -1,10 +1,10 @@
 import { useEffect, useState } from 'react';
-import { ArrowRight, Camera, Check, ChevronDown, ChevronRight, Lock, LogIn, Palette, Settings, UserRound } from 'lucide-react';
+import { ArrowRight, Camera, Check, ChevronDown, ChevronRight, Lock, Palette, Settings, UserRound } from 'lucide-react';
 import { navigate, Button, Logo } from '@/components/ui';
 import { ProfilePhotoCropper } from '@/components/ProfilePhotoCropper';
 import { THEME_OPTIONS, type ThemeName } from '@/theme';
 import type { Role } from '@/data/types';
-import jameaPhoto from '../public/jamea-photo2.jpeg';
+import jameaPhoto from '../public/jamea-photo.jpg';
 import { apiFetch, saveSession, clearSession, getSessionUser, ApiError, getViewUrl, uploadFile, broadcastProfilePhotoUpdated } from '@/api';
 
 const roleCards: { role: Role; label: string; desc: string; icon: string }[] = [
@@ -40,17 +40,8 @@ export function LandingRoleSelect() {
       />
       <section className="landing-panel">
         <div className="landing-panel-brand">
-          <span className="landing-seal" aria-hidden="true">
-            <svg className="landing-seal-mark" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <path d="M43.6 12.9C41.4 11.8 38.9 13.2 36.8 16.9L24.1 39.4L29.5 42.5L44.1 21.3C46.7 17.6 46.2 14.2 43.6 12.9Z" fill="currentColor" />
-              <path d="M24.1 39.4L20.7 46.1L29.5 42.5" fill="currentColor" />
-              <path d="M18.2 47.3C25.6 48.3 33.7 45.9 40.5 41.6C44.1 39.3 47.3 36.7 50.8 34.9C46.5 35.3 42.2 37.8 38.6 40.1C32 44.2 25.1 46.8 18.2 47.3Z" fill="currentColor" />
-              <path d="M46.3 20.7L49.2 17.8L52.1 20.7L49.2 23.6L46.3 20.7Z" fill="currentColor" />
-            </svg>
-          </span>
           <Logo />
         </div>
-        <p className="landing-panel-kicker">Tehseen al-khat Studio</p>
         <h1>Welcome to your learning path.</h1>
         <p className="landing-panel-copy">Choose your place in the guild to continue.</p>
         <div className="role-card-grid">
@@ -62,7 +53,6 @@ export function LandingRoleSelect() {
             </button>
           ))}
         </div>
-        <p className="landing-panel-note"><LogIn size={14} /> Every role begins with sign in. Students can create an account from the login page.</p>
       </section>
     </main>
   );
@@ -142,7 +132,7 @@ export function Auth({ signup = false, initialRole = 'student' }: { signup?: boo
     <main className="auth-page">
       <div className="auth-art">
         <Logo />
-        <div>
+        <div className="auth-art-copy">
           <p className="eyebrow">{signup ? 'Student signup' : 'Welcome back'}</p>
           <h1>{signup ? 'Begin your path.' : 'Sign in to the Studio.'}</h1>
           <p>{signup ? 'Your TR number connects you to your learning record. Only students create accounts here.' : 'Faculty, coordinators, and admins use pre-created credentials. Students, sign in here too.'}</p>
@@ -442,28 +432,34 @@ export function SettingsPage({ role, theme, onThemeChange }: { role: Role; theme
           <div className="settings-theme-heading">
             <span><Palette size={14} /> Appearance</span>
             <h2 id="settings-theme-title">Choose your theme</h2>
-            <p>Give your workspace a color palette that feels like yours.</p>
+            <p>Choose a three-color palette built around navy and white.</p>
           </div>
-          <div className="settings-theme-grid" role="group" aria-label="Choose a site theme">
-            {THEME_OPTIONS.map(option => {
-              const selected = theme === option.id;
-              return (
-                <button
-                  type="button"
-                  key={option.id}
-                  className={`settings-theme-option theme-option-${option.id}${selected ? ' selected' : ''}`}
-                  onClick={() => onThemeChange(option.id)}
-                  aria-pressed={selected}
-                  aria-label={`${option.label} theme${selected ? ', selected' : ''}`}
-                >
-                  <span className="settings-theme-swatch" aria-hidden="true">
-                    {option.colors.map((color, index) => <i key={index} style={{ backgroundColor: color }} />)}
-                    {selected && <span className="settings-theme-check"><Check size={12} /></span>}
-                  </span>
-                </button>
-              );
-            })}
-          </div>
+          {Array.from(new Set(THEME_OPTIONS.map(option => option.family))).map(family => (
+            <div className="settings-theme-family" key={family}>
+              <h3>{family}</h3>
+              <div className="settings-theme-grid" role="group" aria-label={`${family} themes`}>
+                {THEME_OPTIONS.filter(option => option.family === family).map(option => {
+                  const selected = theme === option.id;
+                  return (
+                    <button
+                      type="button"
+                      key={option.id}
+                      className={`settings-theme-option theme-option-${option.id}${selected ? ' selected' : ''}`}
+                      onClick={() => onThemeChange(option.id)}
+                      aria-pressed={selected}
+                      aria-label={`${option.label} theme${selected ? ', selected' : ''}`}
+                    >
+                      <span className="settings-theme-swatch" aria-hidden="true">
+                        {option.colors.map((color, index) => <i key={index} style={{ backgroundColor: color }} />)}
+                        {selected && <span className="settings-theme-check"><Check size={12} /></span>}
+                      </span>
+                      <strong>{option.label}</strong>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          ))}
           <small className="settings-theme-note">Theme preference is saved separately for each account on this device.</small>
         </section>
         {error && <p className="error-text">{error}</p>}
