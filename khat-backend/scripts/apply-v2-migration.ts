@@ -48,12 +48,16 @@ async function main() {
   const file = process.argv[2] ?? '2026-11-10-course-builder-v2.sql';
   const sql = await readFile(new URL(`./migrations/${file.replace(/^.*[\\/]/, '')}`, import.meta.url), 'utf8');
   const sslCa = process.env.DB_SSL_CA?.trim();
+  // DATABASE_URL (as on the hosting panel) or the separate DB_* variables.
+  const databaseUrl = process.env.DATABASE_URL?.trim();
   const connection = await mysql.createConnection({
-    host: required('DB_HOST'),
-    port: Number(process.env.DB_PORT ?? 3306),
-    database: required('DB_NAME'),
-    user: required('DB_USER'),
-    password: required('DB_PASSWORD'),
+    ...(databaseUrl ? { uri: databaseUrl } : {
+      host: required('DB_HOST'),
+      port: Number(process.env.DB_PORT ?? 3306),
+      database: required('DB_NAME'),
+      user: required('DB_USER'),
+      password: required('DB_PASSWORD'),
+    }),
     ...(sslCa ? { ssl: { ca: await readFile(sslCa), rejectUnauthorized: true } } : {}),
     connectTimeout: 15_000,
     timezone: 'Z',
@@ -61,7 +65,7 @@ async function main() {
   let applied = 0;
   let skipped = 0;
   try {
-    console.log(`Applying ${file} to database ${process.env.DB_NAME} …`);
+    console.log(`Applying ${file} to database ${databaseUrl ? new URL(databaseUrl).pathname.slice(1) : process.env.DB_NAME} …`);
     for (const statement of splitSql(sql)) {
       const first = statement.replace(/\s+/g, ' ').slice(0, 90);
       try {

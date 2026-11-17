@@ -4,6 +4,7 @@ import { ArrowRight, Award, BarChart3, Clock, Compass, Flame, MessageCircle, Pen
 import { apiFetch, getSessionUser } from '@/api';
 import { navigate, PenLoader } from '@/components/ui';
 import { FixedReportsCard } from '@/components/ReportProblem';
+import { V3OlderCoursesSection } from '@/v2/content/OlderCoursesSection';
 import { openV2 } from '../../nav';
 import { ensureAmiri, InlineError, SignedImage } from '../shared';
 import type { StudentAnalysis } from '../../insights/analysisTypes';
@@ -146,6 +147,9 @@ export function V2StudentHomePage(_props: Props) {
               ))}
             </div>
           </section>
+
+          {/* Courses made before the Course builder (all live courses until they are rebuilt there). */}
+          <V3OlderCoursesSection />
 
           {/* ---------- chat ---------- */}
           <section className="v3-sd-chat-strip" data-guide="chat" aria-label="Chat">
