@@ -4,7 +4,7 @@ import { navigate, Button, Logo } from '@/components/ui';
 import { ProfilePhotoCropper } from '@/components/ProfilePhotoCropper';
 import { THEME_OPTIONS, type ThemeName } from '@/theme';
 import type { Role } from '@/data/types';
-import jameaPhoto from '../public/jamea-photo.jpg';
+import jameaPhoto from '@/public/jamea-photo.jpg';
 import { apiFetch, saveSession, clearSession, getSessionUser, ApiError, getViewUrl, uploadFile, broadcastProfilePhotoUpdated } from '@/api';
 
 const roleCards: { role: Role; label: string; desc: string; icon: string }[] = [
@@ -23,10 +23,10 @@ function resolveFrontendRole(user: { role: string; isCoordinator?: boolean }): R
 }
 
 function roleHomePage(role: Role): string {
-  if (role === 'admin') return 'admin';
+  if (role === 'admin') return 'v2-admin-home';
   if (role === 'teacher') return 'teacher-dashboard';
   if (role === 'coordinator') return 'coordinator-dashboard';
-  return 'dashboard';
+  return 'v2-home';
 }
 
 export function LandingRoleSelect() {
@@ -34,7 +34,7 @@ export function LandingRoleSelect() {
     <main className="landing-page reference-landing">
       <div 
         className="landing-photo" 
-        style={{ backgroundImage: `url('${jameaPhoto}')` }}
+        style={{ backgroundImage: `url('${jameaPhoto}')` }} 
         role="img" 
         aria-label="Al-Jamea-tus-Saifiyah campus architecture" 
       />
@@ -43,7 +43,7 @@ export function LandingRoleSelect() {
           <Logo />
         </div>
         <h1>Welcome to your learning path.</h1>
-        <p className="landing-panel-copy">Choose your place in the guild to continue.</p>
+        <p className="landing-panel-copy">Choose how you take part in Funun al-Quran to continue.</p>
         <div className="role-card-grid">
           {roleCards.map(card => (
             <button key={card.role} className="reference-role-card" onClick={() => navigate(`login-${card.role}`)}>
@@ -391,7 +391,7 @@ export function SettingsPage({ role, theme, onThemeChange }: { role: Role; theme
   };
 
   const logout = () => { clearSession(); navigate('landing'); };
-  const dashboardPage = role === 'admin' ? 'admin' : role === 'teacher' ? 'teacher-dashboard' : role === 'coordinator' ? 'coordinator-dashboard' : 'dashboard';
+  const dashboardPage = role === 'admin' ? 'v2-admin-home' : role === 'teacher' ? 'teacher-dashboard' : role === 'coordinator' ? 'coordinator-dashboard' : 'v2-home';
 
   return (
     <main className="page settings-page">

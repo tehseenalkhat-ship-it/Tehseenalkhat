@@ -1,6 +1,11 @@
 import type { FastifyInstance } from 'fastify';
 import { pool } from '../db.js';
 import type { AuthUser } from '../plugins/auth.js';
+import { allowedTypesSql } from '../services/notify.js';
+
+// v3 (admin-comms): the bell only shows the allowed types (see services/notify.ts) —
+// older rows of other types (nudges, theme changes, course edits …) stay in the table but are no longer shown or toasted.
+const allowed = allowedTypesSql(2);
 
 type CreateNotificationBody = { type: string; payload?: Record<string, unknown> };
 
@@ -8,8 +13,8 @@ export async function notificationRoutes(app: FastifyInstance) {
   app.get('/unread-count', { preHandler: [app.authenticate] }, async (request) => {
     const userId = (request.user as AuthUser).id;
     const { rows } = await pool.query(
-      `SELECT COUNT(*)::int AS count FROM notifications WHERE user_id = $1 AND read = false`,
-      [userId]
+      `SELECT COUNT(*)::int AS count FROM notifications WHERE user_id = $1 AND read = false AND ${allowed.sql}`,
+      [userId, ...allowed.params]
     );
     return { count: Number(rows[0]?.count ?? 0) };
   });
@@ -39,8 +44,8 @@ export async function notificationRoutes(app: FastifyInstance) {
   app.get('/', { preHandler: [app.authenticate] }, async (request) => {
     const userId = (request.user as AuthUser).id;
     const { rows } = await pool.query(
-      `SELECT * FROM notifications WHERE user_id = $1 ORDER BY read ASC, created_at DESC LIMIT 100`,
-      [userId]
+      `SELECT * FROM notifications WHERE user_id = $1 AND ${allowed.sql} ORDER BY read ASC, created_at DESC LIMIT 100`,
+      [userId, ...allowed.params]
     );
     return rows;
   });

@@ -1,3 +1,10 @@
+import { V2StudentCatalogSection } from '@/v2/student/StudentCatalogSection';
+import { V2DashboardHighlights } from '@/v2/competitions/DashboardHighlights';
+import { V3AchievementsPage } from '@/v2/content/AchievementsPage';
+import { V3MyShowcasePage } from '@/v2/content/MyShowcasePage';
+import { V3EventsPage } from '@/v2/content/EventsPage';
+import { V3OlderCoursesSection } from '@/v2/content/OlderCoursesSection';
+import '@/v2/content/content-v3.css';
 import { lazy, Suspense, useEffect, useRef, useState } from 'react';
 import {
   ArrowRight, Award, Bell, BookOpen, CalendarDays, Check, ChevronDown, ChevronLeft, ChevronRight,
@@ -26,14 +33,11 @@ import {
 import './StudentCourseStyles.css';
 import { useLanguage } from '@/language';
 import { openCourseLevel, useCourseSession } from '@/courseSession';
-import { ShowcaseImageEditor } from '@/components/ShowcaseImageEditor';
 import { CourseJourney } from '@/components/CourseJourney';
-import type { LiveKitRoomAccess } from '@/components/LiveKitEventRoom';
 import '@/components/StudentCourseOverview.css';
 import '@/components/CourseEnvironmentLesson.css';
 const ResourcePdfViewer = lazy(() => import('@/components/ResourcePdfViewer'));
 const ResourceBookCover = lazy(() => import('@/components/ResourcePdfViewer').then(module => ({ default: module.ResourceBookCover })));
-const LiveKitEventRoom = lazy(() => import('@/components/LiveKitEventRoom').then(module => ({ default: module.LiveKitEventRoom })));
 
 type ApiMediaItem = { kind: 'video' | 'image' | 'pdf'; storageKey: string; originalFilename?: string };
 type SheetSize = '1mm' | '2mm' | '3mm';
@@ -77,32 +81,7 @@ type ApiEvent = {
   branch_name: string;
 };
 
-type CourseStage = { levels: ApiLevel[]; assessment: ApiLevel | null; start: number; end: number };
 
-function groupLevelsIntoStages(levels: ApiLevel[]): CourseStage[] {
-  const stages: CourseStage[] = [];
-  let current: CourseStage = { levels: [], assessment: null, start: 1, end: 0 };
-  let practiceNumber = 0;
-  const finishStage = () => {
-    if (current.levels.length || current.assessment) stages.push(current);
-    current = { levels: [], assessment: null, start: practiceNumber + 1, end: practiceNumber };
-  };
-
-  levels.forEach(level => {
-    if (level.level_type === 'test') {
-      current.assessment = level;
-      finishStage();
-      return;
-    }
-    if (current.levels.length === 6) finishStage();
-    practiceNumber += 1;
-    if (!current.levels.length) current.start = practiceNumber;
-    current.end = practiceNumber;
-    current.levels.push(level);
-  });
-  finishStage();
-  return stages;
-}
 
 type ApiCheckpoint = {
   id: string;
@@ -232,20 +211,12 @@ function openDashboardCourse(course: ApiCourse, khatType: ApiKhatType) {
   navigateToCatalogForCourse(course.id, scriptForCourseCode(khatType.code));
 }
 
-function navigateToCourseChat(courseId: string) {
-  window.sessionStorage.setItem(CHAT_COURSE_REQUEST_KEY, courseId);
-  navigate('chats');
-}
 
 function navigateToMashqWorksheets(filter = 'all') {
   window.sessionStorage.setItem(MASHQ_FILTER_KEY, filter);
-  navigate('mashq');
+  navigate('catalog'); // v3: Mashq worksheets are courses now
 }
 
-function preferredCatalogScript(): Script {
-  const requested = window.sessionStorage.getItem(CATALOG_SCRIPT_KEY);
-  return requested && scriptList.includes(requested as Script) ? requested as Script : 'Naskh';
-}
 
 export function StudentLandingPage() {
   return (
@@ -269,7 +240,7 @@ export function StudentLandingPage() {
               <Trophy size={18} />
               <div><strong>Latest competition winners</strong><span>Celebrating patience, proportion, and practice.</span></div>
             </div>
-            <button onClick={() => navigate('competitions')}>See results <ArrowRight size={15} /></button>
+            <button onClick={() => navigate('v2-competitions')}>See results <ArrowRight size={15} /></button>
           </div>
         </section>
       </main>
@@ -290,7 +261,7 @@ export function StudentDashboard() {
 
   const [courses, setCourses] = useState<DashboardCourse[]>([]);
   const [secondaryCourses, setSecondaryCourses] = useState<ApiSecondaryCourse[]>([]);
-  const [penTrack, setPenTrack] = useState<'cut' | 'normal'>('cut');
+  const [penTrack, setPenTrack] = useState<'cut' | 'normal'>('normal');
   const [selectedCutStyles, setSelectedCutStyles] = useState<Record<'naskh' | 'istinsaakh', 1 | 2>>({ naskh: 1, istinsaakh: 1 });
   const [secondaryFilter, setSecondaryFilter] = useState<string | 'all'>('all');
   const [secondaryLoading, setSecondaryLoading] = useState(true);
@@ -796,6 +767,7 @@ export function StudentDashboard() {
 
   return (
     <main className="page portal-page student-home-redesign">
+      <V2DashboardHighlights />
       <header className="student-home-heading">
         <div>
           <p className="eyebrow">{t('Your learning path')}</p>
@@ -810,11 +782,11 @@ export function StudentDashboard() {
       <section className="student-home-section" aria-label="Choose your pen">
         <span className="student-home-step">{t('Step 1 · Choose your pen')}</span>
         <div className="student-pen-options">
-          <button type="button" className={`student-pen-option${penTrack === 'cut' ? ' active' : ''}`} aria-pressed={penTrack === 'cut'} onClick={() => setPenTrack('cut')}>
-            <span><strong>{t('Cut pen courses')}</strong><small><b>Qalam al-Qasab</b> (wooden) or <b>Qalam al-Hadeed</b> (metal)</small><em>{t('Courses')} {cutPenCourses.length + cutCrashCourses.length} · {t('Worksheets')} {mashqCourses.length || 1}</em></span>
-          </button>
           <button type="button" className={`student-pen-option${penTrack === 'normal' ? ' active' : ''}`} aria-pressed={penTrack === 'normal'} onClick={() => setPenTrack('normal')}>
             <span><strong>{t('Normal pen courses')}</strong><small>{t('An everyday pen, for better daily handwriting')}</small><em>{t('Courses')} {normalPenCourses.length + normalCrashCourses.length} · {t('Worksheets soon')}</em></span>
+          </button>
+          <button type="button" className={`student-pen-option${penTrack === 'cut' ? ' active' : ''}`} aria-pressed={penTrack === 'cut'} onClick={() => setPenTrack('cut')}>
+            <span><strong>{t('Cut pen courses')}</strong><small><b>Qalam al-Qasab</b> (wooden) or <b>Qalam al-Hadeed</b> (metal)</small><em>{t('Courses')} {cutPenCourses.length + cutCrashCourses.length} · {t('Worksheets')} {mashqCourses.length || 1}</em></span>
           </button>
         </div>
       </section>
@@ -923,246 +895,20 @@ export function StudentDashboard() {
         <ActivityHeatmap activity={activity} />
       </section>
 
-      <ShowcaseHeading title="From the guild" text="Recent shares from students and faculty." action={<button className="text-link" onClick={() => navigate('gallery')}>Visit gallery <ArrowRight size={14} /></button>} />
+      <ShowcaseHeading title="From Funun al-Quran" text="Recent shares from students and faculty." action={<button className="text-link" onClick={() => navigate('gallery')}>Visit gallery <ArrowRight size={14} /></button>} />
       {showcaseLoading ? <PenLoader label="Loading gallery…" compact /> : <DashboardShowcaseCarousels posts={showcasePosts.map(post => ({ id: post.id, role: post.user_role ?? 'student', imageUrl: post.imageUrl, caption: post.caption, authorName: post.author_name, branch: post.branch_name ?? post.branch, likes: Number(post.like_count), liked: post.liked_by_me }))} onLike={toggleShowcaseLike} />}
-      {winners.length > 0 && <section className="dashboard-winners-section" aria-label="Latest competition winners"><SectionHeading eyebrow="Guild honors" title="Latest competition winners" text="Celebrating the students and their work across the guild." action={<button className="text-link" onClick={() => navigate('competitions')}>See all results <ArrowRight size={15} /></button>} /><div className="dashboard-winner-grid">{winners.map((winner, index) => <article className="dashboard-winner-card" key={`${winner.competitionTitle}-${winner.student_name}-${index}`}><span className="dashboard-winner-trophy"><Trophy size={17} /></span><div><strong>{winner.student_name}</strong><span>{winner.competitionTitle}</span></div><span className="dashboard-winner-rank">Winner</span></article>)}</div></section>}
+      {winners.length > 0 && <section className="dashboard-winners-section" aria-label="Latest competition winners"><SectionHeading eyebrow="Competitions" title="Latest competition winners" text="Celebrating our students and their calligraphy." action={<button className="text-link" onClick={() => navigate('v2-competitions')}>See all results <ArrowRight size={15} /></button>} /><div className="dashboard-winner-grid">{winners.map((winner, index) => <article className="dashboard-winner-card" key={`${winner.competitionTitle}-${winner.student_name}-${index}`}><span className="dashboard-winner-trophy"><Trophy size={17} /></span><div><strong>{winner.student_name}</strong><span>{winner.competitionTitle}</span></div><span className="dashboard-winner-rank">Winner</span></article>)}</div></section>}
     </main>
   );
 }
 
+// v3 note 4.9 + curriculum audit: new-system courses once (V2StudentCatalogSection), then only the
+// old-system courses that are published for this branch and have levels (src/v2/content).
 export function Catalog() {
-  const script = preferredCatalogScript();
-  const [selectedCourseId] = useState(() => window.sessionStorage.getItem(CATALOG_COURSE_KEY));
-  const [course, setCourse] = useState<ApiCourse | null>(null);
-  const [courseKhatType, setCourseKhatType] = useState<ApiKhatType | null>(null);
-  const [levels, setLevels] = useState<ApiLevel[]>([]);
-  const [enrollment, setEnrollment] = useState<ApiEnrollment | null>(null);
-  const [courseEntries, setCourseEntries] = useState<ApiDashboardEntry[]>([]);
-  const [enrollingCourse, setEnrollingCourse] = useState(false);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    window.sessionStorage.removeItem(CATALOG_SCRIPT_KEY);
-    window.sessionStorage.removeItem(CATALOG_COURSE_KEY);
-  }, []);
-
-  useEffect(() => {
-    let cancelled = false;
-    if (!course?.id) {
-      setCourseEntries([]);
-      return;
-    }
-    void apiFetch<ApiDashboardEntry[]>('/entries/mine', { silent: true })
-      .then(entries => {
-        if (!cancelled) {
-          const levelIds = new Set(levels.map(level => level.id));
-          setCourseEntries((Array.isArray(entries) ? entries : []).filter(entry => entry.level_id && levelIds.has(entry.level_id)));
-        }
-      })
-      .catch(() => { if (!cancelled) setCourseEntries([]); });
-    return () => { cancelled = true; };
-  }, [course?.id, levels]);
-
-  useEffect(() => {
-    let cancelled = false;
-    async function load() {
-      setLoading(true);
-      setError(null);
-      try {
-        const khatTypesList = await apiFetch<ApiKhatType[]>('/khat-types');
-        let targetCourse: ApiCourse | null = null;
-        let targetKhatType: ApiKhatType | undefined;
-        if (selectedCourseId) {
-          targetCourse = await apiFetch<ApiCourse>(`/courses/${selectedCourseId}`);
-          targetKhatType = khatTypesList.find(item => item.id === targetCourse?.khat_type_id);
-        } else {
-          targetKhatType = khatTypesList.find(item => item.code === scriptCode(script));
-          if (targetKhatType) {
-            const courses = await apiFetch<ApiCourse[]>(`/courses?khatTypeId=${targetKhatType.id}&category=certification`);
-            targetCourse = courses[0] ?? null;
-          }
-        }
-        if (!targetKhatType) throw new Error('This khat type is not set up on the server yet.');
-        if (!cancelled) setCourseKhatType(targetKhatType);
-
-        if (targetCourse) {
-          const authoredLevels = await apiFetch<ApiLevel[]>(`/courses/${targetCourse.id}/levels`);
-          if (!cancelled) {
-            setCourse(targetCourse);
-            setLevels(authoredLevels);
-            setEnrollment(null);
-          }
-          if (authoredLevels.length > 0) {
-            try {
-            const progress = await apiFetch<{ enrollment: ApiEnrollment; levels: ApiLevel[] }>(
-              `/levels/courses/${targetCourse.id}/progress`
-            );
-            if (!cancelled) {
-              setLevels(progress.levels);
-              setEnrollment(progress.enrollment);
-            }
-            } catch (progressError) {
-              if (!(progressError instanceof ApiError) || progressError.status !== 404) throw progressError;
-              if (!cancelled) { setLevels(authoredLevels); setEnrollment(null); }
-            }
-          } else if (!cancelled) {
-            setEnrollment(null);
-          }
-        } else if (!cancelled) {
-          setCourse(null);
-          setLevels([]);
-          setEnrollment(null);
-        }
-      } catch (err) {
-        if (!cancelled) setError(err instanceof ApiError ? err.message : 'Failed to load this course.');
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    }
-    load();
-    return () => { cancelled = true; };
-  }, [script, selectedCourseId]);
-
-  const openLevel = (courseId: string, levelId: string) => {
-    if (course?.id === courseId && !enrollment) return;
-    openCourseLevel(courseId, levelId);
-    navigate('course');
-  };
-
-  const enrollInCertification = async () => {
-    if (!course || enrollingCourse) return;
-    setEnrollingCourse(true);
-    setError(null);
-    try {
-      await apiFetch('/levels/enroll', { method: 'POST', body: { courseId: course.id } });
-      const progress = await apiFetch<{ enrollment: ApiEnrollment; levels: ApiLevel[] }>(`/levels/courses/${course.id}/progress`);
-      setEnrollment(progress.enrollment);
-      setLevels(progress.levels);
-      if (progress.levels[0]) {
-        openCourseLevel(course.id, progress.levels[0].id);
-        navigate('course');
-      }
-    } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'Could not start this course.');
-    } finally {
-      setEnrollingCourse(false);
-    }
-  };
-
-  const courseStages = groupLevelsIntoStages(levels);
-  const practiceLevels = levels.filter(level => level.level_type !== 'test');
-  const currentLevel = enrollment ? levels[enrollment.current_level_index] ?? null : null;
-  const currentPracticeNumber = currentLevel && currentLevel.level_type !== 'test'
-    ? practiceLevels.findIndex(level => level.id === currentLevel.id) + 1
-    : Math.min(practiceLevels.length, Math.max(0, enrollment?.current_level_index ?? 0));
-  const courseProgress = Math.min(100, Math.max(0, Number(enrollment?.percent_complete ?? 0)));
-  const courseMarks = courseEntries.filter(entry => typeof entry.mark_out_of_ten === 'number');
-  const averageCourseMark = courseMarks.length
-    ? courseMarks.reduce((total, entry) => total + Number(entry.mark_out_of_ten), 0) / courseMarks.length
-    : null;
-  const courseStartedDate = enrollment?.enrolled_at
-    ? new Date(enrollment.enrolled_at).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' })
-    : null;
-  const displayScript = scriptForCourseCode(courseKhatType?.code ?? scriptCode(script));
-  const courseNumber = Math.max(1, dashboardCourseOrder(courseKhatType?.code ?? scriptCode(script)) + 1);
-
   return (
     <main className="page portal-page">
-      {loading && <PenLoader label="Loading course…" />}
-      {error && <p className="error-text">{error}</p>}
-
-      {!loading && course && (
-        <section className="student-course-overview" style={{ '--script': khatTypes[displayScript].color, '--script-soft': khatTypes[displayScript].soft } as React.CSSProperties}>
-          <div className="student-course-overview-backrow">
-            <button type="button" className="student-course-back" onClick={() => navigate('dashboard')}><ChevronLeft size={15} /> Your Path</button>
-          </div>
-          <header className="student-course-hero">
-            <div className="student-course-hero-top">
-              <div className="student-course-tags"><span className="student-course-number">{courseNumber}</span><span className="student-course-tag">{course.category === 'secondary' ? 'Crash course' : 'Certification'}</span>{courseKhatType?.code.endsWith('_normal_pen') && <span className="student-course-tag is-pen">Normal pen</span>}</div>
-              <span className="student-course-arabic" lang="ar" dir="rtl">{khatTypes[displayScript].arabic}</span>
-            </div>
-            <div className="student-course-title"><h1>{khatTypes[displayScript].name}</h1><p>{course.description || `${khatTypes[displayScript].name}-centric`}</p></div>
-            <div className="student-course-hero-panels">
-              <section className="student-course-panel is-question">
-                <small>1 · Is this for you?</small>
-                <p>“{courseGuidanceQuestion(course, script)}”</p>
-              </section>
-              <section className="student-course-panel is-progress">
-                <small>3 · Your progress</small>
-                <div className="student-course-progress-meta"><span>{courseStartedDate ? `Started ${courseStartedDate}` : enrollment ? 'Course started' : 'Not started yet'}</span><strong>{enrollment ? `Level ${Math.min(currentPracticeNumber || 1, practiceLevels.length)} of ${practiceLevels.length} · ${Math.round(courseProgress)}%` : `0 of ${practiceLevels.length} levels · 0%`}</strong></div>
-                <div className="student-course-overview-track" role="progressbar" aria-label="Course progress" aria-valuenow={Math.round(courseProgress)} aria-valuemin={0} aria-valuemax={100}><i style={{ width: `${courseProgress}%` }} /></div>
-                <span className="student-course-average">Average mark so far: <b>{averageCourseMark === null ? '—' : `${averageCourseMark.toFixed(1)} / 10`}</b></span>
-              </section>
-            </div>
-            <div className="student-course-hero-actions">
-              {enrollment
-                ? <>
-                    <Button disabled={!currentLevel || Boolean(currentLevel.locked)} onClick={() => currentLevel && openLevel(course.id, currentLevel.id)}>{currentLevel ? 'Continue learning' : 'Course complete'} <ArrowRight size={14} /></Button>
-                    {currentLevel && <Button outline onClick={() => navigateToCourseChat(course.id)}><MessageCircle size={14} /> Course chat</Button>}
-                  </>
-                : <Button disabled={!levels.length || enrollingCourse} onClick={() => void enrollInCertification()}>{enrollingCourse ? 'Starting…' : 'Start this course'} <ArrowRight size={14} /></Button>}
-            </div>
-          </header>
-
-          <section className="student-course-how panel">
-            <strong>How this course works</strong>
-            <ol>
-              <li>Open a level and press <b>Start level</b>. Watch the video, study the reference and practise the worksheet on art paper.</li>
-              <li>Each level shows <b>what you need to upload</b>. Send your work separately in the level’s chat.</li>
-              <li>Your teacher replies in the same chat with comments, voice notes and <b>marks out of 10</b>. 5/10 or higher opens the next level.</li>
-              <li>After every stage there is an <b className="is-assessment-text">online assessment</b> <span className="student-assessment-diamond" />. Pass it to start the next stage.</li>
-            </ol>
-            <p className="student-course-pace">Suggested pace: <span>1 level per week</span>{enrollment ? ' Keep up your steady progress.' : ' Start whenever you are ready.'}</p>
-          </section>
-
-          <div className="student-course-colour-key" aria-label="Course colour key"><strong>Colour key:</strong><span className="key-levels">Levels</span><span className="key-assessment"><i className="student-assessment-diamond" /> Assessment</span><span className="key-upload">What to upload</span><span className="key-progress">Progress</span><span className="key-marks">Marks</span></div>
-
-          {levels.length > 0 ? <section className="student-course-levels-section" aria-label="Course levels">
-            <div className="student-course-levels-heading"><div><small>2 · Levels</small><h2>{practiceLevels.length} levels in {courseStages.length || 1} {courseStages.length === 1 ? 'stage' : 'stages'}</h2></div><span>Press a stage or level to open it</span></div>
-            <div className="student-course-stages">
-              {courseStages.map((stage, stageIndex) => {
-                const stageComplete = stage.levels.filter(level => {
-                  const entry = courseEntries.find(item => item.level_id === level.id && (item.status === 'reviewed' || Number(item.mark_out_of_ten) >= 5));
-                  return Boolean(entry) || (currentPracticeNumber > 0 && practiceLevels.findIndex(item => item.id === level.id) < currentPracticeNumber - 1);
-                }).length;
-                return <details className="student-course-stage" key={stage.levels[0]?.id ?? stage.assessment?.id ?? stageIndex} open={stageIndex === 0}>
-                  <summary>
-                    <span className="student-course-stage-copy"><strong>Stage {stageIndex + 1} · Levels {stage.start}–{stage.end}</strong><span>{stage.assessment ? `◆ Ends with Online assessment ${stageIndex + 1}` : `${stage.levels.length} guided levels`}</span></span>
-                    <span className="student-course-stage-progress">{stageComplete} of {stage.levels.length} done</span><ChevronDown size={16} />
-                    <span className="student-course-stage-bar"><i style={{ width: `${stage.levels.length ? stageComplete / stage.levels.length * 100 : 0}%` }} /></span>
-                  </summary>
-                  <div className="student-course-stage-body">
-                    {stage.levels.map(level => {
-                      const number = practiceLevels.findIndex(item => item.id === level.id) + 1;
-                      const latestEntry = courseEntries.filter(entry => entry.level_id === level.id).sort((a, b) => b.created_at.localeCompare(a.created_at))[0];
-                      const completed = latestEntry?.status === 'reviewed' || Number(latestEntry?.mark_out_of_ten) >= 5 || (currentPracticeNumber > number);
-                      const isCurrent = enrollment && currentLevel?.id === level.id;
-                      const locked = !enrollment || Boolean(level.locked);
-                      return <details className={`student-course-level-row${completed ? ' is-complete' : ''}${locked ? ' is-locked' : ''}`} key={level.id} open={Boolean(isCurrent)}>
-                        <summary>
-                          <span className="student-course-level-icon">{completed ? <Check size={15} /> : locked ? <Lock size={14} /> : number}</span>
-                          <span className="student-course-level-copy"><strong>Level {number} · {level.title}</strong><small>Video · Reference · Worksheet · 1 upload</small></span>
-                          <span className={`student-course-level-status${completed ? ' is-done' : isCurrent ? ' is-current' : ''}`}>{latestEntry?.mark_out_of_ten != null ? `${latestEntry.mark_out_of_ten} / 10` : completed ? 'Completed' : isCurrent ? 'In progress' : locked ? 'Locked' : 'Ready'}</span>
-                        </summary>
-                        <div className="student-course-level-details">
-                          <div className="student-course-instructions"><small>Instructions</small><p>Watch the video, study the reference image, then practise the worksheet on art paper. Pass mark: 5/10.</p></div>
-                          <div className="student-course-upload-note"><small>What to upload · 1 item</small><span><i /> Upload 1 · Photo of your practice sheet</span></div>
-                          <button type="button" className="student-course-start-level" disabled={locked} onClick={() => openLevel(course.id, level.id)}>{locked ? 'Enroll to start' : completed ? 'Review level' : 'Start level'}</button>
-                        </div>
-                      </details>;
-                    })}
-                    {stage.assessment && <div className={`student-course-assessment-row${stage.assessment.locked ? ' is-locked' : ''}`}>
-                      <span className="student-course-assessment-icon">A{stageIndex + 1}</span><span><strong>Online assessment {stageIndex + 1} · Stage {stageIndex + 1}</strong><small>Online assessment and marking · 2 uploads</small></span><b>Assessment</b>
-                    </div>}
-                  </div>
-                </details>;
-              })}
-            </div>
-          </section> : <div className="course-preparation-note"><BookOpen size={19} /><span>Course design is in progress. Please check back soon.</span></div>}
-        </section>
-      )}
-      {!loading && !course && !error && <p className="muted">No certification course has been set up yet for {khatTypes[script].name} — check back soon.</p>}
+      <V2StudentCatalogSection />
+      <V3OlderCoursesSection />
     </main>
   );
 }
@@ -1365,7 +1111,7 @@ export function CourseEnvironment() {
                 <span>Level {levels.findIndex(item => item.id === level.id) + 1} of {levels.length}</span>
                 <i><b style={{ width: `${Math.max(4, (levels.findIndex(item => item.id === level.id) + 1) / Math.max(1, levels.length) * 100)}%` }} /></i>
               </div>
-              {myEntry?.mark_out_of_ten != null && <div className="lesson-marks-banner"><small>Marks received</small><strong>{myEntry.mark_out_of_ten} / 10</strong><span>{myEntry.mark_passed ? 'Passed' : 'Keep practising'} · Level {levels.findIndex(item => item.id === level.id) + 1} · {level.title}</span></div>}
+              {myEntry?.mark_out_of_ten != null && <div className="lesson-marks-banner"><small>Marks received</small><strong>{myEntry.mark_out_of_ten} / 10</strong><span>{myEntry.mark_passed ? 'Passed' : 'Keep practicing'} · Level {levels.findIndex(item => item.id === level.id) + 1} · {level.title}</span></div>}
               <div className="level-heading">
                 <div>
                   <p className="eyebrow">Level {levels.findIndex(l => l.id === level.id) + 1}</p>
@@ -1438,10 +1184,10 @@ export function CourseEnvironment() {
                     </section>
 
                     <section className="lesson-step-card">
-                      <header><span>3</span><h2>Practise the worksheet</h2><small>Use art paper</small></header>
+                      <header><span>3</span><h2>Practice the worksheet</h2><small>Use art paper</small></header>
                       <div className="lesson-step-body lesson-worksheet-body">
                         {Object.values(level.sheet_files ?? {}).some(Boolean) ? <SheetPreview file={Object.values(level.sheet_files ?? {}).find(Boolean)!} /> : <div className="lesson-worksheet-preview"><i /><i /><i /><i /><i /><i /></div>}
-                        <div className="lesson-worksheet-copy"><p>Print the worksheet and practise each letter on <strong>art paper</strong> until the shapes match the reference.</p><div><SheetDownloadMenu files={level.sheet_files} label="View worksheet" /><SheetDownloadMenu files={level.sheet_files} label="Download worksheet" /></div><small>For more assistance, contact Funun al-Quran.</small></div>
+                        <div className="lesson-worksheet-copy"><p>Print the worksheet and practice each letter on <strong>art paper</strong> until the shapes match the reference.</p><div><SheetDownloadMenu files={level.sheet_files} label="View worksheet" /><SheetDownloadMenu files={level.sheet_files} label="Download worksheet" /></div><small>For more assistance, contact Funun al-Quran.</small></div>
                       </div>
                     </section>
 
@@ -1450,7 +1196,7 @@ export function CourseEnvironment() {
                       <div className="lesson-step-body">
                         <div className="lesson-upload-checklist"><small>What to upload for this level</small><p><i /> Upload 1 · Photo of your practice sheet</p><span>Send your upload here. Clear photo in daylight, whole page in frame.</span></div>
                         <div className="practice-form lesson-practice-form">
-                          <label className="field-label">Minutes practised<input className="field" type="number" value={minutes} onChange={event => setMinutes(event.target.value)} placeholder="e.g. 25" /></label>
+                          <label className="field-label">Minutes practiced<input className="field" type="number" value={minutes} onChange={event => setMinutes(event.target.value)} placeholder="e.g. 25" /></label>
                           <UploadBox label={pickedFile?.name || 'Choose a photo of your practice'} sublabel={pickedFile ? 'Ready to send' : 'PNG or JPG · up to 10 MB'} onChange={setPickedFile} />
                         </div>
                         {error && <p className="error-text" role="alert">{error}</p>}
@@ -1589,161 +1335,10 @@ type ApiSelfProfile = {
   photo_storage_key?: string | null;
 };
 
-type ApiEarnedCertificate = {
-  id: string;
-  title: string;
-  file_storage_key: string;
-  issued_at: string;
-  khat_type_id: string;
-  status?: string;
-  previewUrl?: string | null;
-};
-type ApiEarnedBadge = {
-  id: string;
-  khat_type_id: string;
-  tier: string;
-  awarded_at: string;
-  khat_type_code: string;
-  khat_type_name: string;
-};
-type ApiBadgeArtworkItem = { key: string; filename: string; mediaType: 'image' | 'pdf'; url: string | null };
-type ApiCompetitionAchievement = {
-  rank: number;
-  awarded_at: string;
-  competition_id: string;
-  competition_title: string;
-  khat_type_id: string | null;
-  khat_type_name: string | null;
-  image_storage_key: string | null;
-  imageUrl?: string;
-};
 
+// v3 note 4.3: certificates and badges, each with a Download button (src/v2/content).
 export function Achievements() {
-  const [certificates, setCertificates] = useState<ApiEarnedCertificate[]>([]);
-  const [badges, setBadges] = useState<ApiEarnedBadge[]>([]);
-  const [badgeArtwork, setBadgeArtwork] = useState<ApiBadgeArtworkItem[]>([]);
-  const [competitionAwards, setCompetitionAwards] = useState<ApiCompetitionAchievement[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    let cancelled = false;
-    async function loadAchievements() {
-      setLoading(true);
-      setError(null);
-      const [certificateResult, badgeResult, artworkResult, competitionResult] = await Promise.allSettled([
-        apiFetch<ApiEarnedCertificate[]>('/certificates/mine'),
-        apiFetch<ApiEarnedBadge[]>('/badges'),
-        apiFetch<ApiBadgeArtworkItem[]>('/badges/assets'),
-        apiFetch<ApiCompetitionAchievement[]>('/competitions/mine/achievements'),
-      ]);
-      if (cancelled) return;
-      if (certificateResult.status === 'fulfilled') {
-        const resolvedCertificates = await Promise.all(certificateResult.value.map(async certificate => {
-          try { return { ...certificate, previewUrl: await getViewUrl(certificate.file_storage_key) }; }
-          catch { return { ...certificate, previewUrl: null }; }
-        }));
-        if (!cancelled) setCertificates(resolvedCertificates);
-      }
-      if (badgeResult.status === 'fulfilled') setBadges(badgeResult.value);
-      if (artworkResult.status === 'fulfilled') setBadgeArtwork(artworkResult.value);
-      if (competitionResult.status === 'fulfilled') {
-        const resolvedAwards = await Promise.all(competitionResult.value.map(async award => {
-          if (!award.image_storage_key) return award;
-          try { return { ...award, imageUrl: await getViewUrl(award.image_storage_key) }; }
-          catch { return award; }
-        }));
-        if (!cancelled) setCompetitionAwards(resolvedAwards);
-      }
-      if ([certificateResult, badgeResult, competitionResult].every(result => result.status === 'rejected')) {
-        setError('Could not load your achievements. Please try again.');
-      }
-      if (!cancelled) setLoading(false);
-    }
-    void loadAchievements();
-    return () => { cancelled = true; };
-  }, []);
-
-  const viewCertificate = async (certificate: ApiEarnedCertificate) => {
-    try {
-      const url = await getViewUrl(certificate.file_storage_key);
-      window.open(url, '_blank', 'noopener,noreferrer');
-    } catch {
-      setError(`Could not open “${certificate.title}”.`);
-    }
-  };
-
-  const downloadCertificate = async (certificate: ApiEarnedCertificate) => {
-    try {
-      const extension = certificate.file_storage_key.match(/\.(pdf|png|jpe?g|webp)$/i)?.[0] ?? '';
-      const filename = `${certificate.title}${extension}`;
-      const url = await getDownloadUrl(certificate.file_storage_key, filename);
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = `${certificate.title.replace(/[\\/:*?"<>|]/g, '_')}${extension}`;
-      link.target = '_blank';
-      link.rel = 'noreferrer';
-      link.click();
-    } catch {
-      setError(`Could not download “${certificate.title}”.`);
-    }
-  };
-
-  const earnedCount = certificates.length + badges.length + competitionAwards.length;
-
-  return (
-    <main className="page portal-page achievements-page">
-      <SectionHeading eyebrow="Your calligraphy journey" title="Achievements" text="A personal archive of certificates, script badges, and published competition awards." />
-      <div className="achievement-summary-strip">
-        <div><Award size={19} /><strong>{earnedCount}</strong><span>honors earned</span></div>
-        <div><FileText size={18} /><strong>{certificates.length}</strong><span>certificates</span></div>
-        <div><Trophy size={18} /><strong>{badges.length + competitionAwards.length}</strong><span>badges & awards</span></div>
-      </div>
-      {error && <p className="error-text" role="alert">{error}</p>}
-      {loading ? <PenLoader label="Gathering your achievements…" /> : (
-        <>
-          <section className="achievement-section">
-            <SectionHeading eyebrow="Course milestones" title="Certificates" text="Approved certificates earned from your course milestones." />
-            {certificates.length ? <div className="achievement-certificate-grid">{certificates.map(certificate => {
-              const khatName = certificate.khat_type_id ? badges.find(badge => badge.khat_type_id === certificate.khat_type_id)?.khat_type_name : null;
-              const isPdf = /\.pdf$/i.test(certificate.file_storage_key);
-              return <article className="achievement-certificate-card" key={certificate.id}>
-                <div className={`achievement-certificate-preview${isPdf ? ' is-pdf' : ''}`}>
-                  {certificate.previewUrl ? (isPdf
-                    ? <iframe src={`${certificate.previewUrl}#toolbar=0&navpanes=0&view=FitH`} title={`${certificate.title} certificate preview`} loading="lazy" />
-                    : <img src={certificate.previewUrl} alt={`${certificate.title} certificate`} loading="lazy" />)
-                    : <div><Award size={27} /><span>Certificate preview unavailable</span></div>}
-                </div>
-                <div className="achievement-card-icon"><Award size={21} /></div>
-                <div className="achievement-card-copy"><small>{khatName ?? 'Calligraphy certification'}</small><h3>{certificate.title}</h3><span>Earned {new Date(certificate.issued_at).toLocaleDateString()}</span></div>
-                <div className="achievement-card-actions"><Button onClick={() => void viewCertificate(certificate)}>View certificate <ExternalLink size={14} /></Button><Button outline onClick={() => void downloadCertificate(certificate)}><Download size={14} /> Download</Button></div>
-              </article>;
-            })}</div> : <div className="achievement-empty"><FileText size={20} /><div><strong>No certificates earned yet</strong><p>Approved course certificates will be collected here when you reach their milestones.</p></div></div>}
-          </section>
-
-          <section className="achievement-section">
-            <SectionHeading eyebrow="Script milestones" title="Badges" text="Badges recognize progress in each hand and remain part of your permanent record." />
-            {badges.length ? <div className="achievement-badge-grid">{badges.map(badge => {
-              const script = scriptFromCode(badge.khat_type_code) ?? 'Naskh';
-              const artwork = badgeArtwork.find(item => item.key === `${badge.khat_type_id}:${badge.tier}`);
-              return <article className="achievement-badge-card" key={badge.id} style={{ '--script': khatTypes[script].color } as React.CSSProperties}>
-                <div className="achievement-badge-art">{artwork?.url && artwork.mediaType === 'image' ? <img src={artwork.url} alt={`${badge.khat_type_name} ${badge.tier} badge`} /> : <><Award size={24} /><strong>{khatTypes[script].arabic}</strong></>}</div>
-                <div><small>{badge.khat_type_name}</small><h3>{badge.tier} badge</h3><span>Awarded {new Date(badge.awarded_at).toLocaleDateString()}</span></div>
-                {artwork?.url && artwork.mediaType === 'pdf' && <a className="text-link" href={artwork.url} target="_blank" rel="noreferrer"><FileText size={14} /> View badge artwork <ExternalLink size={13} /></a>}
-              </article>;
-            })}</div> : <div className="achievement-empty"><Award size={20} /><div><strong>No badges earned yet</strong><p>Badges appear here as you pass course checkpoints and reach award tiers.</p></div></div>}
-          </section>
-
-          <section className="achievement-section">
-            <SectionHeading eyebrow="Guild honors" title="Competition awards" text="Awards from competitions with published results." />
-            {competitionAwards.length ? <div className="achievement-competition-list">{competitionAwards.map(award => <article className="achievement-competition-card" key={`${award.competition_id}-${award.rank}`}>
-              <span className="achievement-medal"><Trophy size={19} /></span><div className="achievement-card-copy"><small>{award.khat_type_name ?? 'Guild competition'}</small><h3>{award.competition_title}</h3><span>Placed #{award.rank} · {new Date(award.awarded_at).toLocaleDateString()}</span></div><StatusChip tone={award.rank === 1 ? 'gold' : 'blue'}>{award.rank === 1 ? 'Winner' : `Rank ${award.rank}`}</StatusChip>{award.imageUrl && <a className="achievement-winning-piece" href={award.imageUrl} target="_blank" rel="noreferrer"><img src={award.imageUrl} alt={`${award.competition_title} award entry`} /><span>View entry</span></a>}
-            </article>)}</div> : <div className="achievement-empty"><Trophy size={20} /><div><strong>No competition awards yet</strong><p>Published competition placements will be added to your archive.</p></div></div>}
-          </section>
-        </>
-      )}
-    </main>
-  );
+  return <V3AchievementsPage />;
 }
 
 export function Profile() {
@@ -1923,74 +1518,10 @@ export function Profile() {
   );
 }
 
-type ApiShowcasePost = { id: string; caption: string | null; status: string; created_at: string; image_storage_key?: string | null; imageStorageKey?: string | null };
 
+// v3 notes 4.7 / E: reflection question + time taken (src/v2/content).
 export function ShowcaseSubmission() {
-  const [posts, setPosts] = useState<ApiShowcasePost[]>([]);
-  const [postImageUrls, setPostImageUrls] = useState<Record<string, string>>({});
-  const [postsLoading, setPostsLoading] = useState(true);
-  const [caption, setCaption] = useState('');
-  const [file, setFile] = useState<File | null>(null);
-  const [editingFile, setEditingFile] = useState<File | null>(null);
-  const [submitting, setSubmitting] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  const load = async () => {
-    try {
-      const nextPosts = await apiFetch<ApiShowcasePost[]>('/showcase/mine');
-      setPosts(nextPosts);
-      const imageEntries = await Promise.all(nextPosts.map(async post => {
-        const storageKey = post.image_storage_key ?? post.imageStorageKey;
-        if (!storageKey) return null;
-        try { return [post.id, await getViewUrl(storageKey)] as const; } catch { return null; }
-      }));
-      setPostImageUrls(Object.fromEntries(imageEntries.filter((entry): entry is readonly [string, string] => Boolean(entry))));
-    } catch {
-      setPosts([]);
-    } finally {
-      setPostsLoading(false);
-    }
-  };
-  useEffect(() => { void load(); }, []);
-
-  const submit = async () => {
-    if (!file) return;
-    setSubmitting(true);
-    setError(null);
-    try {
-      const { storageKey } = await uploadFile('showcase', file);
-      await apiFetch('/showcase', { method: 'POST', body: { imageStorageKey: storageKey, caption } });
-      setCaption(''); setFile(null);
-      await load();
-    } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'Failed to submit.');
-    } finally {
-      setSubmitting(false);
-    }
-  };
-
-  return (
-    <main className="page portal-page showcase-page">
-      <SectionHeading eyebrow="Share with the guild" title="Showcase submission" text="Share a finished exercise or a moment from your practice desk." />
-      {error && <p className="error-text">{error}</p>}
-      <div className="showcase-form">
-        <label className="field-label">Caption<textarea className="field textarea" value={caption} onChange={e => setCaption(e.target.value)} placeholder="What did you notice while making this piece?" /></label>
-        <UploadBox tall label={file?.name ?? 'Add a photo of your work'} sublabel={file ? 'Photo ready — tap to replace or edit' : "Enters moderation — admin approves before it's public"} icon={FileImage} onChange={setEditingFile} />
-        <Button onClick={submit}>{submitting ? <PenLoader label="Submitting showcase post" compact tiny /> : 'Send to moderation'} {!submitting && <ArrowRight size={15} />}</Button>
-      </div>
-      <SectionHeading title="My showcase submissions" />
-      <div className="submission-list">
-        {postsLoading ? <PenLoader label="Loading your submissions…" compact /> : posts.length === 0 && <p className="muted">Nothing submitted yet.</p>}
-        {posts.map(post => (
-          <article className="submission-card" key={post.id}>
-            <div className="submission-card-image">{postImageUrls[post.id] ? <img src={postImageUrls[post.id]} alt={post.caption ?? 'Showcase submission'} /> : <FileImage size={25} />}</div>
-            <div className="submission-card-content"><div><strong>{post.caption ?? 'Untitled piece'}</strong><small>{new Date(post.created_at).toLocaleDateString()}</small></div><StatusChip tone={post.status === 'approved' ? 'green' : post.status === 'rejected' ? 'red' : 'amber'}>{post.status}</StatusChip></div>
-          </article>
-        ))}
-      </div>
-      {editingFile && <ShowcaseImageEditor file={editingFile} onCancel={() => setEditingFile(null)} onSave={editedFile => { setFile(editedFile); setEditingFile(null); }} />}
-    </main>
-  );
+  return <V3MyShowcasePage mode="student" />;
 }
 
 type ApiCompetition = { id: string; title: string; description: string | null; khat_type_id: string | null; start_date: string; end_date: string; status: string; results_published_at: string | null };
@@ -2005,248 +1536,26 @@ function isCompetitionAcceptingEntries(competition: ApiCompetition): boolean {
   return startDate <= endDate && endDate >= today;
 }
 
+// v3 audit: students use "Competitions & calls" (#v2-competitions), where results are published.
+// The old guild-wide competitions page is gone; anything still pointing at #competitions lands there.
 export function Competitions() {
-  const [active, setActive] = useState<ApiCompetition[]>([]);
-  const [past, setPast] = useState<(ApiCompetition & { winners: ApiWinner[] })[]>([]);
-  const [files, setFiles] = useState<Record<string, File>>({});
-  const [submitted, setSubmitted] = useState<Record<string, boolean>>({});
-  const [error, setError] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
-  const winnerImageUrls = useRef<Record<string, string>>({});
-
-  useEffect(() => {
-    let cancelled = false;
-    let inFlight = false;
-
-    const load = async () => {
-      if (inFlight) return;
-      inFlight = true;
-      try {
-        const list = await apiFetch<ApiCompetition[]>('/competitions');
-        const completed = list.filter(c => c.status === 'completed' && c.results_published_at);
-        const withWinners = await Promise.all(completed.map(async c => {
-          const winners = await apiFetch<ApiWinner[]>(`/competitions/${c.id}/winners`).catch(() => []);
-          const resolvedWinners = await Promise.all(winners.map(async winner => {
-            const key = winner.image_storage_key;
-            if (!key) return winner;
-            if (winnerImageUrls.current[key]) return { ...winner, imageUrl: winnerImageUrls.current[key] };
-            try {
-              const imageUrl = await getViewUrl(key);
-              winnerImageUrls.current[key] = imageUrl;
-              return { ...winner, imageUrl };
-            } catch {
-              return winner;
-            }
-          }));
-          return { ...c, winners: resolvedWinners };
-        }));
-        if (!cancelled) {
-          setActive(list.filter(isCompetitionAcceptingEntries));
-          setPast(withWinners);
-          setError(null);
-        }
-      } catch (err) {
-        if (!cancelled) setError(err instanceof ApiError ? err.message : 'Could not load competitions.');
-      } finally {
-        inFlight = false;
-        if (!cancelled) setLoading(false);
-      }
-    };
-
-    const refreshWhenVisible = () => {
-      if (document.visibilityState === 'visible') void load();
-    };
-    void load();
-    const interval = window.setInterval(() => void load(), 15_000);
-    window.addEventListener('focus', refreshWhenVisible);
-    document.addEventListener('visibilitychange', refreshWhenVisible);
-    return () => {
-      cancelled = true;
-      window.clearInterval(interval);
-      window.removeEventListener('focus', refreshWhenVisible);
-      document.removeEventListener('visibilitychange', refreshWhenVisible);
-    };
-  }, []);
-
-  const submitEntry = async (competitionId: string) => {
-    const file = files[competitionId];
-    if (!file) return;
-    setError(null);
-    try {
-      const { storageKey } = await uploadFile('competition-entries', file);
-      await apiFetch(`/competitions/${competitionId}/entries`, { method: 'POST', body: { imageStorageKey: storageKey } });
-      setSubmitted(prev => ({ ...prev, [competitionId]: true }));
-    } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'Failed to submit entry.');
-    }
-  };
-
-  return (
-    <main className="page portal-page competitions-page">
-      <SectionHeading eyebrow="Guild-wide" title="Competitions" text="Open to every branch. Your entries are never shown on your profile — only to the assigned judge and admin, until results are posted." />
-      {error && <p className="error-text">{error}</p>}
-      <div className="competition-grid">
-        {loading && <p className="muted">Loading competitions…</p>}
-        {!loading && !error && active.length === 0 && (
-          <div className="competition-empty-state">
-            <span className="competition-empty-icon"><Trophy size={17} /></span>
-            <div><strong>No open competitions</strong><p>New challenges will appear here when they’re announced.</p></div>
-          </div>
-        )}
-        {active.map(comp => (
-          <div className="competition-card" key={comp.id}>
-            <div className="competition-card-topline">
-              <span className="competition-card-kicker"><Trophy size={14} /> Guild challenge</span>
-              <span className="competition-open-label"><i /> Entries open</span>
-            </div>
-            <div className="competition-card-copy">
-              <h3>{comp.title}</h3>
-              {comp.description && <p>{comp.description}</p>}
-              <div className="competition-deadline"><CalendarDays size={15} /><span>Submit by <strong>{new Date(comp.end_date).toLocaleDateString()}</strong></span></div>
-            </div>
-            {submitted[comp.id] ? (
-              <StatusChip tone="green">Submitted · awaiting judging</StatusChip>
-            ) : (
-              <>
-                <UploadBox label={files[comp.id]?.name ?? 'Upload your entry'} sublabel="Not shown on your profile — visible only to the judge and admin" onChange={file => setFiles(prev => ({ ...prev, [comp.id]: file }))} />
-                <Button onClick={() => submitEntry(comp.id)}>Submit entry <ArrowRight size={14} /></Button>
-              </>
-            )}
-          </div>
-        ))}
-      </div>
-      <SectionHeading title="Past competitions" text="Winners, once posted by admin." />
-      <div className="winners-list">
-        {past.length === 0 && (
-          <div className="competition-empty-state competition-empty-past">
-            <span className="competition-empty-icon"><Award size={17} /></span>
-            <div><strong>No results published yet</strong><p>When results are ready, the winning entries will be gathered here.</p></div>
-          </div>
-        )}
-        {past.flatMap(comp => comp.winners.map(w => (
-          <div className="winner-row" key={`${comp.id}-${w.rank}`}>
-            <span className="winner-medal"><Trophy size={19} /></span>
-            <div className="winner-copy"><strong>{comp.title}</strong><small><span>{w.student_name}</span><i>·</i> Rank {w.rank}</small></div>
-            {w.imageUrl ? (
-              <a className="winner-piece" href={w.imageUrl} target="_blank" rel="noreferrer" aria-label={`View ${w.student_name}'s winning entry`}>
-                <img src={w.imageUrl} alt={`${w.student_name}'s winning calligraphy entry`} loading="lazy" />
-                <span>View winning piece <ExternalLink size={13} /></span>
-              </a>
-            ) : (
-              <div className="winner-piece winner-piece-unavailable"><FileImage size={20} /><span>Winning entry preview unavailable</span></div>
-            )}
-            <StatusChip tone="gold"><Award size={13} /> Winner</StatusChip>
-          </div>
-        )))}
-      </div>
-    </main>
-  );
+  useEffect(() => { window.location.replace('#v2-competitions'); }, []);
+  return <PenLoader label="Opening competitions…" />;
 }
 
 export function StudentEvents() {
-  const [events, setEvents] = useState<ApiEvent[]>([]);
-  const [error, setError] = useState<string | null>(null);
-  const [player, setPlayer] = useState<{ title: string; videoUrl?: string; room?: LiveKitRoomAccess } | null>(null);
-
-  useEffect(() => {
-    let mounted = true;
-    const refresh = () => {
-      void apiFetch<ApiEvent[]>('/events')
-        .then(data => { if (mounted) setEvents(data); })
-        .catch(err => { if (mounted) setError(err instanceof ApiError ? err.message : 'Could not refresh live events.'); });
-    };
-    refresh();
-    const timer = window.setInterval(refresh, 10_000);
-    return () => { mounted = false; window.clearInterval(timer); };
-  }, []);
-
-  const upcoming = events.filter(e => e.status === 'scheduled' || e.status === 'live');
-  const past = events.filter(e => e.status === 'ended');
-
-  const join = async (ev: ApiEvent) => {
-    try {
-      const room = await apiFetch<LiveKitRoomAccess>(`/events/${ev.id}/join`, { method: 'POST' });
-      setPlayer({ title: ev.title, room });
-    } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'Could not join.');
-    }
-  };
-
-  const watchRecording = async (ev: ApiEvent) => {
-    await apiFetch(`/events/${ev.id}/watched-recording`, { method: 'POST' }).catch(() => {});
-    if (ev.recording_storage_key) {
-      try {
-        setPlayer({ title: ev.title, videoUrl: await getViewUrl(ev.recording_storage_key) });
-      } catch (err) {
-        setError(err instanceof ApiError ? err.message : 'Could not load the recording.');
-      }
-    }
-  };
-
-  return (
-    <main className="page portal-page events-page">
-      <SectionHeading eyebrow="Gather around the page" title="Live events" text="Join a study circle, watch a demonstration, or revisit a recording." />
-      {error && <p className="error-text">{error}</p>}
-      <div className="event-list">
-        {upcoming.length === 0 && <div className="events-empty-state"><span className="events-empty-icon"><CalendarDays size={18} /></span><div><strong>No upcoming events</strong><p>New study circles and demonstrations will appear here when they are scheduled.</p></div></div>}
-        {upcoming.map(ev => (
-          <div className="event-row" key={ev.id}>
-            <div className="event-date"><span>{new Date(ev.scheduled_at).getDate()}</span><small>{new Date(ev.scheduled_at).toLocaleString('en', { month: 'short' }).toUpperCase()}</small></div>
-            <div><strong>{ev.title}</strong><span>{ev.host_name} · {ev.branch_name}</span></div>
-            <StatusChip tone={ev.status === 'live' ? 'green' : 'gold'}>{ev.status === 'live' ? 'Live now' : 'Upcoming'}</StatusChip>
-            {ev.status === 'live' ? (
-              <Button outline onClick={() => join(ev)}>Join now</Button>
-            ) : (
-              <small className="muted">Not live yet</small>
-            )}
-          </div>
-        ))}
-      </div>
-      <SectionHeading title="Past recordings" />
-      <div className="recordings">
-        {past.length === 0 && <div className="events-empty-state"><span className="events-empty-icon"><Play size={18} /></span><div><strong>No recordings yet</strong><p>Completed events with available recordings will be collected here.</p></div></div>}
-        {past.map(ev => (
-          <article className="recording-card" key={ev.id}>
-            <div className="recording-art"><Play size={20} /></div>
-            <div className="recording-copy"><strong>{ev.title}</strong><small>{ev.branch_name} · {new Date(ev.scheduled_at).toLocaleDateString()}</small></div>
-            {ev.recording_status === 'processing' ? (
-              <small className="muted">Preparing the recording…</small>
-            ) : ev.recording_storage_key ? (
-              <button className="text-link" onClick={() => watchRecording(ev)}>Watch recording <ArrowRight size={14} /></button>
-            ) : (
-              <small className="muted">No recording uploaded yet</small>
-            )}
-          </article>
-        ))}
-      </div>
-      {player && (
-        <Modal onClose={() => setPlayer(null)}>
-          <p className="eyebrow">{player.room ? 'Live event · in-site' : 'Event recording'}</p>
-          <h2>{player.title}</h2>
-          {player.room ? (
-            <Suspense fallback={<div className="live-video-waiting">Joining the live room…</div>}>
-              <LiveKitEventRoom
-                access={player.room}
-                publishMedia={false}
-                onDisconnected={() => setPlayer(null)}
-                onError={err => setError(err.message || 'Could not connect to the live event.')}
-              />
-            </Suspense>
-          ) : (
-            <div className="live-video-frame">
-              <video src={player.videoUrl} controls autoPlay style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
-            </div>
-          )}
-        </Modal>
-      )}
-    </main>
-  );
+  return <V3EventsPage />;
 }
 
-type ApiBook = { id: string; title: string; khat_type_id: string | null; file_storage_key: string; original_filename?: string | null };
+type ApiBook = { id: string; title: string; khat_type_id: string | null; file_storage_key: string; original_filename?: string | null; author?: string | null; language?: string | null; description?: string | null };
+type V3LibraryBook = { id: string; title: string; author: string | null; language: string | null; description: string | null; khatTypeId: string | null; fileStorageKey: string; originalFilename: string | null };
 
 export function Resources() {
   const [filter, setFilter] = useState<Script | 'All'>('All');
+  const [language, setLanguage] = useState('');
+  const [searchDraft, setSearchDraft] = useState('');
+  const [search, setSearch] = useState('');
+  const [booksLoading, setBooksLoading] = useState(true);
   const [khatTypesList, setKhatTypesList] = useState<ApiKhatType[]>([]);
   const [booksList, setBooksList] = useState<ApiBook[]>([]);
   const [viewerBook, setViewerBook] = useState<ApiBook | null>(null);
@@ -2255,25 +1564,39 @@ export function Resources() {
   const [viewerError, setViewerError] = useState<string | null>(null);
 
   useEffect(() => { apiFetch<ApiKhatType[]>('/khat-types').then(setKhatTypesList).catch(() => {}); }, []);
+  useEffect(() => { const timer = window.setTimeout(() => setSearch(searchDraft.trim()), 250); return () => window.clearTimeout(timer); }, [searchDraft]);
 
+  // v3 note 4.6: books with a filter (script, language, search by title or author).
   useEffect(() => {
     const params = new URLSearchParams();
     if (filter !== 'All') { const kt = khatTypesList.find(k => k.code === scriptCode(filter)); if (kt) params.set('khatTypeId', kt.id); }
-    apiFetch<ApiBook[]>(`/books?${params.toString()}`).then(setBooksList).catch(() => {});
-  }, [filter, khatTypesList]);
+    if (language) params.set('language', language);
+    if (search) params.set('q', search);
+    setBooksLoading(true);
+    apiFetch<V3LibraryBook[]>(`/v2/books?${params.toString()}`, { silent: true })
+      .then(list => setBooksList(list.map(b => ({ id: b.id, title: b.title, khat_type_id: b.khatTypeId, file_storage_key: b.fileStorageKey, original_filename: b.originalFilename, author: b.author, language: b.language, description: b.description }))))
+      .catch(() => apiFetch<ApiBook[]>(`/books?${params.toString()}`).then(setBooksList).catch(() => {}))
+      .finally(() => setBooksLoading(false));
+  }, [filter, khatTypesList, language, search]);
 
   useEffect(() => () => {
     if (viewerUrl?.startsWith('blob:')) URL.revokeObjectURL(viewerUrl);
   }, [viewerUrl]);
 
+  // audit 20: a missing book file never fails silently — the student gets a friendly message instead
+  const BOOK_MISSING = 'This book isn’t available yet — please ask your teacher.';
   const download = async (book: ApiBook) => {
-    const url = await getDownloadUrl(book.file_storage_key, book.original_filename ?? `${book.title}.pdf`);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = book.title.replace(/[\\/:*?"<>|]/g, '_') + '.pdf';
-    link.target = '_blank';
-    link.rel = 'noreferrer';
-    link.click();
+    if (!book.file_storage_key) { setViewerBook(book); setViewerUrl(null); setViewerError(BOOK_MISSING); return; }
+    try {
+      const objectUrl = await getFileObjectUrl(book.file_storage_key); // fails when the file is not there
+      const link = document.createElement('a');
+      link.href = objectUrl;
+      link.download = (book.original_filename || book.title.replace(/[\\/:*?"<>|]/g, '_') + '.pdf');
+      link.click();
+      window.setTimeout(() => URL.revokeObjectURL(objectUrl), 30_000);
+    } catch {
+      setViewerBook(book); setViewerUrl(null); setViewerLoading(false); setViewerError(BOOK_MISSING);
+    }
   };
 
   const viewBook = async (book: ApiBook) => {
@@ -2282,9 +1605,10 @@ export function Resources() {
     setViewerError(null);
     setViewerLoading(true);
     try {
+      if (!book.file_storage_key) throw new ApiError(404, BOOK_MISSING);
       setViewerUrl(await getFileObjectUrl(book.file_storage_key));
     } catch (err) {
-      setViewerError(err instanceof ApiError ? err.message : 'Could not load this resource.');
+      setViewerError(err instanceof ApiError && err.status !== 404 && err.status < 500 && !/not found|no such|missing/i.test(err.message) ? err.message : BOOK_MISSING);
     } finally {
       setViewerLoading(false);
     }
@@ -2298,13 +1622,21 @@ export function Resources() {
 
   return (
     <main className="page portal-page resources-page">
-      <SectionHeading eyebrow="The library" title="Resource library" text="Books, references, and quiet companions for your desk." />
-      <div className="tabs small">
-        <button className={filter === 'All' ? 'active' : ''} onClick={() => setFilter('All')}>All</button>
-        {scriptList.map(s => <button key={s} className={filter === s ? 'active' : ''} onClick={() => setFilter(s)}>{khatTypes[s].name}</button>)}
+      <SectionHeading eyebrow="The library" title="Books" text="Books on calligraphy to read on the site or download." />
+      <div className="v3c-toolbar v3c-books-toolbar">
+        <label className="v3c-search"><Search size={16} /><input value={searchDraft} onChange={event => setSearchDraft(event.target.value)} placeholder="Search title or author" aria-label="Search books" /></label>
+        <select className="v3c-select" value={filter} onChange={event => setFilter(event.target.value as Script | 'All')} aria-label="Filter by script">
+          <option value="All">All scripts</option>
+          {scriptList.map(s => <option key={s} value={s}>{khatTypes[s].name}</option>)}
+        </select>
+        <select className="v3c-select" value={language} onChange={event => setLanguage(event.target.value)} aria-label="Filter by language">
+          <option value="">All languages</option>
+          {['Arabic', 'Lisan ud-Dawat', 'Urdu', 'English', 'Farsi'].map(l => <option key={l} value={l}>{l}</option>)}
+        </select>
       </div>
+      <p className="v3c-branch-note">{booksLoading ? 'Looking for books…' : `${booksList.length} ${booksList.length === 1 ? 'book' : 'books'}${filter !== 'All' || language || search ? ' match your filter' : ''}`}</p>
       <div className="resource-grid">
-        {booksList.length === 0 && <div className="resources-empty-state"><span className="resources-empty-icon"><BookOpen size={20} /></span><div><span className="eyebrow">A quiet shelf</span><h3>No resources yet</h3><p>Books, practice sheets, and references for this library will appear here as they are added.</p></div><span className="resources-empty-flourish" aria-hidden="true">✦</span></div>}
+        {!booksLoading && booksList.length === 0 && <div className="resources-empty-state"><span className="resources-empty-icon"><BookOpen size={20} /></span><div><span className="eyebrow">{filter !== 'All' || language || search ? 'No match' : 'A quiet shelf'}</span><h3>{filter !== 'All' || language || search ? 'No books match this filter' : 'No books yet'}</h3><p>{filter !== 'All' || language || search ? 'Try another script, language or word.' : 'Books will appear here as they are added.'}</p></div><span className="resources-empty-flourish" aria-hidden="true">✦</span></div>}
         {booksList.map(book => {
           const kt = khatTypesList.find(k => k.id === book.khat_type_id);
           const script = kt ? scriptFromCode(kt.code) : null;
@@ -2312,13 +1644,15 @@ export function Resources() {
             <div className="resource-card" key={book.id}>
               <div className="resource-book-cover-frame"><Suspense fallback={<div className="book-cover resource-book-cover"><span className="resource-cover-placeholder"><BookOpen size={25} /><span>{book.title}</span></span></div>}><ResourceBookCover book={book} /></Suspense>{script && <span className="resource-book-script-tag">{khatTypes[script].name}</span>}</div>
               <strong>{book.title}</strong>
-              <div className="resource-card-actions"><button className="resource-view-button" onClick={() => void viewBook(book)}><BookOpen size={14} /> View</button><button className="text-link" onClick={() => void download(book)}>Download <ArrowRight size={14} /></button></div>
+              {(book.author || book.language) && <small className="v3c-book-meta">{[book.author, book.language].filter(Boolean).join(' · ')}</small>}
+              {book.description && <small className="v3c-book-desc">{book.description}</small>}
+              <div className="resource-card-actions"><button className="resource-view-button" onClick={() => void viewBook(book)}><BookOpen size={14} /> Read</button><button className="text-link" onClick={() => void download(book)}><Download size={14} /> Download</button></div>
             </div>
           );
         })}
       </div>
       {viewerBook && <div className="resource-reader-layer" onMouseDown={event => { if (event.target === event.currentTarget) closeViewer(); }}>
-        {viewerLoading ? <div className="resource-reader-message resource-reader-loading-page"><span className="resource-reader-spinner" /><strong>Opening resource</strong><small>Preparing your reader…</small></div> : viewerError ? <div className="resource-reader-error-panel"><button type="button" onClick={closeViewer} aria-label="Close viewer"><X size={18} /></button><FileText size={28} /><strong>Could not open resource</strong><p>{viewerError}</p></div> : viewerUrl && <Suspense fallback={<div className="resource-reader-message resource-reader-loading-page"><span className="resource-reader-spinner" /><strong>Preparing reader</strong><small>Loading the page viewer…</small></div>}><ResourcePdfViewer book={viewerBook} url={viewerUrl} onClose={closeViewer} /></Suspense>}
+        {viewerLoading ? <div className="resource-reader-message resource-reader-loading-page"><span className="resource-reader-spinner" /><strong>Opening resource</strong><small>Preparing your reader…</small></div> : viewerError ? <div className="resource-reader-error-panel"><button type="button" onClick={closeViewer} aria-label="Close viewer"><X size={18} /></button><FileText size={28} /><strong>{viewerError === BOOK_MISSING ? 'Not available yet' : 'Could not open resource'}</strong><p>{viewerError}</p></div> : viewerUrl && <Suspense fallback={<div className="resource-reader-message resource-reader-loading-page"><span className="resource-reader-spinner" /><strong>Preparing reader</strong><small>Loading the page viewer…</small></div>}><ResourcePdfViewer book={viewerBook} url={viewerUrl} onClose={closeViewer} /></Suspense>}
       </div>}
     </main>
   );

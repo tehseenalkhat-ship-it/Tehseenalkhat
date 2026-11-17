@@ -15,7 +15,9 @@
     "migrate:test-student-chatroom": "tsx scripts/apply-test-student-chatroom-migration.ts",
     "create-admin": "tsx scripts/create-admin.ts",
     "seed-demo": "tsx scripts/seed-demo-data.ts",
-    "bundle": "esbuild src/server.ts --bundle --platform=node --target=node18 --format=cjs --outfile=dist/server.cjs --log-level=warning"
+    "bundle": "esbuild src/server.ts --bundle --platform=node --target=node18 --format=cjs --outfile=dist/server.cjs --log-level=warning",
+    "migrate:v2": "tsx scripts/apply-v2-migration.ts",
+    "migrate:v3": "tsx scripts/apply-v2-migration.ts 2026-11-14-v3-shared.sql && tsx scripts/apply-v2-migration.ts 2026-11-14-v3-builder.sql && tsx scripts/apply-v2-migration.ts 2026-11-14-v3-teacher.sql && tsx scripts/apply-v2-migration.ts 2026-11-14-v3-chat.sql && tsx scripts/apply-v2-migration.ts 2026-11-14-v3-admin-comms.sql && tsx scripts/apply-v2-migration.ts 2026-11-14-v3-content.sql && tsx scripts/apply-v2-migration.ts 2026-11-14-v3-student-task.sql && tsx scripts/apply-v2-migration.ts 2026-11-15-v3-fixer-b.sql"
   },
   "dependencies": {
     "@fastify/cors": "^9.0.1",
@@ -26,11 +28,14 @@
     "fastify": "^4.28.1",
     "fastify-plugin": "^4.5.1",
     "livekit-server-sdk": "^2.19.1",
-    "mysql2": "^3.24.5"
+    "mysql2": "^3.24.5",
+    "pdf-lib": "^1.17.1",
+    "qrcode": "^1.5.4"
   },
   "devDependencies": {
     "@types/bcryptjs": "^2.4.6",
     "@types/node": "^20.19.43",
+    "@types/qrcode": "^1.5.6",
     "esbuild": "^0.28.2",
     "tsx": "^4.16.2",
     "typescript": "^5.5.4"

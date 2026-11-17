@@ -30,6 +30,28 @@ import { badgeRoutes } from './routes/badges.routes.js';
 import { assistantRoutes } from './routes/assistant.routes.js';
 import { journeyRoutes } from './routes/journeys.routes.js';
 import { chatRoutes } from './routes/chat.routes.js';
+import { policiesV2Routes } from './v2/routes/policies.routes.js';
+import { catalogV2Routes } from './v2/routes/catalog.routes.js';
+import { coursesV2Routes } from './v2/routes/courses.routes.js';
+import { ingestV2Routes } from './v2/routes/ingest.routes.js';
+import { studentV2Routes } from './v2/routes/student.routes.js';
+import { threadsV2Routes } from './v2/routes/threads.routes.js';
+import { reviewV2Routes } from './v2/routes/review.routes.js';
+import { meritV2Routes } from './v2/routes/merit.routes.js';
+import { aiV2Routes } from './v2/routes/ai.routes.js';
+import { downloadsV2Routes } from './v2/routes/downloads.routes.js';
+import { printV2Routes } from './v2/routes/print.routes.js';
+import { competitionsV2Routes } from './v2/routes/competitions.routes.js';
+import { insightsV2Routes } from './v2/routes/insights.routes.js';
+import { groupsV2Routes } from './v2/routes/groups.routes.js';
+import { adminHomeV2Routes } from './v2/routes/adminHome.routes.js';
+import { analysisV2Routes } from './v2/routes/analysis.routes.js';
+import { deptChatV2Routes } from './v2/routes/deptChat.routes.js';
+import { announcementsV2Routes } from './v2/routes/announcements.routes.js';
+import { peopleV2Routes } from './v2/routes/people.routes.js';
+import { badgesV2Routes } from './v2/routes/badges.routes.js';
+import { contentV2Routes } from './v2/routes/content.routes.js';
+import { runSlaSweep, runMeritReminderSweep, runStaffDigestSweep, runNudgeSweep } from './v2/services/sweeps.js';
 
 const app = Fastify({ logger: true });
 
@@ -66,6 +88,27 @@ async function main() {
   await app.register(bookRoutes, { prefix: '/books' });
   await app.register(notificationRoutes, { prefix: '/notifications' });
   await app.register(referenceDataRoutes); // no prefix — /branches, /khat-types
+  await app.register(policiesV2Routes, { prefix: '/v2' });
+  await app.register(catalogV2Routes, { prefix: '/v2' });
+  await app.register(coursesV2Routes, { prefix: '/v2' });
+  await app.register(ingestV2Routes, { prefix: '/v2' });
+  await app.register(studentV2Routes, { prefix: '/v2' });
+  await app.register(threadsV2Routes, { prefix: '/v2' });
+  await app.register(reviewV2Routes, { prefix: '/v2' });
+  await app.register(meritV2Routes, { prefix: '/v2' });
+  await app.register(aiV2Routes, { prefix: '/v2' });
+  await app.register(downloadsV2Routes, { prefix: '/v2' });
+  await app.register(printV2Routes, { prefix: '/v2' });
+  await app.register(competitionsV2Routes, { prefix: '/v2' });
+  await app.register(insightsV2Routes, { prefix: '/v2' });
+  await app.register(groupsV2Routes, { prefix: '/v2' });
+  await app.register(adminHomeV2Routes, { prefix: '/v2' });
+  await app.register(analysisV2Routes, { prefix: '/v2' });
+  await app.register(deptChatV2Routes, { prefix: '/v2' });
+  await app.register(announcementsV2Routes, { prefix: '/v2' });
+  await app.register(peopleV2Routes, { prefix: '/v2' });
+  await app.register(badgesV2Routes, { prefix: '/v2' });
+  await app.register(contentV2Routes, { prefix: '/v2' });
 
   // Serve the built frontend from ./public (copied there by the deploy build) so one Node app hosts
   // both the site and the API. Registered last so every API route above takes precedence.
@@ -93,6 +136,20 @@ async function main() {
           }
         })
         .catch((err) => app.log.error(err, 'Diversion sweep failed'));
+    }, ONE_HOUR_MS);
+
+    // v2 background jobs. SLA runs every 15 minutes; the others hourly (each job decides
+    // itself whether it is due, e.g. the digest only sends once a day).
+    const FIFTEEN_MIN_MS = 15 * 60 * 1000;
+    setInterval(() => {
+      runSlaSweep()
+        .then(r => { if (r.diverted || r.forwarded || r.autoMarked) app.log.info(r, 'v2 SLA sweep'); })
+        .catch(err => app.log.error(err, 'v2 SLA sweep failed'));
+    }, FIFTEEN_MIN_MS);
+    setInterval(() => {
+      for (const [name, job] of [['merit reminders', runMeritReminderSweep], ['staff digest', runStaffDigestSweep], ['nudges', runNudgeSweep]] as const) {
+        job().then(r => app.log.info(r, `v2 ${name} sweep`)).catch(err => app.log.error(err, `v2 ${name} sweep failed`));
+      }
     }, ONE_HOUR_MS);
   } catch (err) {
     app.log.error(err);

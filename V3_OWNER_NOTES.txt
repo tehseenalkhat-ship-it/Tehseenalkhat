@@ -1,0 +1,247 @@
+Tehseen al-Khat preview — my review notes
+
+1.1 Student dashboard — CHANGE: how it works-make take a tour, it will be a guide for the website, 
+
+no need for lv02,s01, make it clear, level, step, no need for code, it is an interanl thing, make it small, add mashq, crash,certification, so he know what hthis courses is
+multiple courrses also to  appear here right?
+
+1.2 Student dashboard — CHANGE: add, that comments will be recvd and sent in chats
+1.3 Student dashboard — Looks good
+1.4 Student dashboard — CHANGE: make the english text transliterated,
+mention Number of levels, badge after each level, in small
+no need for mistar details here
+no need for you will practice,
+make the practice with C every where,
+the alignemnt and setting of this box is not good, make it well designed aligned
+1.5 Student dashboard — CHANGE: also the rounded rectangles are not good, make it sharp edged, i am talking abt the blue highlight, the al usloob al awwal box,
+
+1.7 Student dashboard — Looks good
+1.8 Student dashboard — CHANGE: make sure all details are duly integrated
+1.9 Student dashboard — CHANGE: gallery is for reference images of calligrapger, to be uploaded by admin or faculty, this is not for studetns 
+. Look closely — what makes it beautiful? - remove
+1.10 Student dashboard — CHANGE: Selected for decoration- remove
+
+1.11 Student dashboard — CHANGE: notifications will only be for marks or comments rcvd,
+and new course added, nothing else,
+i want a system , marks, chats and new course or website development this is emailed to the students,
+new course addidtions as well,
+so design the email template in admin as well,
+also make a system to send announcement, and surveys, when initiated it will be emailed,
+so we have to create a database of all the branch students,they will recve the notifications even if they are not registered on the website, this data has to be fetched from jhs
+1.12 Student — my progress & badges — CHANGE: no need for, Salaam zainab, just look how far...is enough i think,
+2 pieves sent so far is confusin, 2 uploads sent for assessment is better
+
+also add somewhere if he has showcsed anything it wil be visibile to him as his perosnal achievement
+
+1.13 Student — my progress & badges — Looks good: Continue with S01 · Two-letter joins in LV02
+TKH-N101 is 63% done.
+change the language no need for abbreviations
+1.14 Student — my progress & badges — CHANGE: why العربية is there, remove it,
+1.16 Student — my progress & badges — Looks good
+1.17 Student — my progress & badges — CHANGE: no needto write given on jamea portal, the merit points is an internal thing, visible to teacher and admin only
+1.18 Student — my progress & badges — CHANGE: badges design i will add in admin, it will be refelcted here,
+this must be a printable thing, or uplaodable thing, so you can write, you can upload this badge in jhs,
+
+2.1 Course window — Looks good
+2.2 Course window — CHANGE: the card is not orgsnized, non aligned, make it organized, 
+1) Number of Steps in this level:
+start, continue.
+if done make it properly visible if completed,
+not need for this in the card display:1, print the worksheet, 2,write....
+it can be visible when he starts the course.
+in this just make the card look professional.
+
+we can add a rule that progress bars will turn green to show progress,
+no need for badge earned mubarak, 
+Badge earned. if he clicks, it opens and it is also downlaodable,
+no need to mention istinsakh upload in the card
+2.3 Course window — CHANGE: you can add started since how mnay days? 
+2.4 Course window — CHANGE: you are here, instead of that add continue, or start
+2.6 Course window — CHANGE: what is the logic of red color?
+how have we set the color code?
+i feel make normal pen Pastel green. and cut pen a light shade of blue .
+make all the start and continue, solid base white text, 
+the rest have to not be solid, this will make the focus where it is required, think about it more smartly
+2.7 Course window — CHANGE: if there is a video : watch reference video
+2: download the worksheet
+ and practice multiple times
+
+if the step is for review add: upload you one page of istinsakh.
+if the step is for assessment add: upload all your practices in a single pdf,
+download assesmeent sheet, fill it and upload for remarks
+
+what i want you is instead of dsiplaying what to do in this level, write what to do in this task:
+
+1: watch video (if there is, we dont write this if there is none
+2, see reference image
+3; download practice sheet
+4)upload for comments/marking
+
+level to level task to task make itsmart
+2.8 Course window — CHANGE: make correct transliteration
+the 
+١
+الأسلوب الأول
+Style 1
+the placemeent is not correct, it should be om a top, i think
+2.9 Course window — CHANGE: Prepared in Nairobi on the basis of the book العرس المئوي.
+
+Urs Crash Course this is mashq worksheet. not a crash course righr?
+check thorghly
+in mashq worksheets,
+i want all the downloadable resources stacked one by one as thumbnail,
+on top select mistar size, and then just a download button below the image.
+that will be self explanatory,
+and then below you make a long card which is very evident and clear that, after practisincing all the worksheets, upload your signle pdf format all sheets for assessment and remarks, once done it will be marked completed or something like that,
+in every assesment step make sure to have the whatsapp chat, where if he presses send for assesment, the page moves down beautlifully towards; the wharsapp chat area, and he uploads over there,
+and he recives comment, i dont want a discnnect, 
+make sure the whatsapp environment is 1000% as same as a normal whatsapp environtment in which
+voice note button
+if i click on the image i can annotate and send 
+a button give marks out of 10 over there.
+request to meet in funun button, it will be a customized message: request to come meet in funun office regarding further discussions/comments on your kitabat,
+
+i want the whatsapp type green vibe and feel so they knw the environmetn, make sure to have it everywhere working,
+no need for this in anycourse, where it was prepared is 
+3.1 Task page — CHANGE: write the course name, not the codes , formal clarity, 
+3.3 Task page — CHANGE: write details of the step, as instructions will change step to step
+
+1. look at the reference make the fonts at some logic, some are big in this page and some are small
+3.4 Task page — CHANGE: when i press the reference iamge it opens, but give an option if i want to zoom i can, make a download button as well,
+but most importantly where is the mistar selection button,
+3.5 Task page — CHANGE: where the download your worksheet button is, give option to select the size mistar as per need
+3.6 Task page — Looks good
+3.7 Task page — CHANGE: i want the reviewers name to be written when he answers,
+course name should be properly done,
+fonts adjustment in the chat option should be given,for the teacher, add an ai assistant in chat if he needs, like the button of meta in in whatsapp.
+
+3.8 Task page — CHANGE: there must be a proper way to give marks, i feel in whatsapp environment lets make buttons of marks, and that will reflect in the chat, in a bit highlighted form, and also reflceted elsewere
+3.9 Task page — CHANGE: voice notes must work exactly as whatsapp..also add emoji options 
+3.10 Task page — Looks good: this is good, no need to make changes form amrks intimation, chats reply and marks reply must be reflected in the email of both faculty and student
+4.1 Student — other pages — CHANGE: lets not add a chat option to teachers, i want a feature to just chat with Funun al-Quran Department.
+this will reflect in admin portal also in email
+4.2 Student — other pages — CHANGE: Practice shared across every branch.
+
+this is branch specific only
+4.3 Student — other pages — CHANGE: Approved certificates  no need for approved,
+with every certificate and badge add a download button
+
+4.4 Student — other pages — Looks good
+4.5 Student — other pages — CHANGE: make a system that recordings are uploaded from you tube, and links are also there, so when i press to see the video, it will be in a youtube type window over there only
+4.6 Student — other pages — CHANGE: just add boooks, and then add a filter
+4.7 Student — other pages — CHANGE: the question in caption needs to be calligraphy centric or thought process centric, do add, how much time did it take you to complete this artwork?
+it will be reflected as his effort
+4.8 Student — other pages — Looks good: he will recive emails as well.
+also make a template for emails, for announcements, surveys, competitions and other things going on in the webiste
+4.9 Student — other pages — CHANGE: this page failed to load
+5.1 Teacher — review — CHANGE: i want to seee how the queue  works, make it clear, a simple review button, and download uploaded doc button,
+and can we make a bulk dowload button, so it is downlaoded with student details and markded physically it is much easier, and then with the help of ai bot, if uploaded the file there, according to the print bar code it will upload it to the student's chat perfectly, that way it will be much easier,
+also in all the uploads and downloads can we add student details, to avoid piracy and make it student specific, it super imposes in the header and footer
+5.2 Teacher — review — CHANGE: my workload window, sned my work to has to be simplified a bit simply a sequence and order swap, and make fonts sizes perfect,
+review inbox button has to be on dashboard as well,
+send reivew button not working,
+there is a button to save marks, but no where to add
+scan return how will it work?
+make an icon drop your checked pdf's here, the ai chat bot will segregate each item and then upload and send as per the command given, but i want the command prompt to be asked by ai, do you want to seggregate and upload and send to student, any other msg along with the upload?
+
+what i am missing is a student stats, branch, give deep analysis of the students, where is the bottle neck who need pushing, what are the average marks,, other analytical things meedded for a teacher and admin to grow arabic calligrahphy in the campus, think abotu it smartly and as a pro anaylist using ai and smart analysis and working on studnet psychology with experience of 100 years
+5.3 Teacher — review — CHANGE: we add a system, transfer my work to the next in queue afte 72 hours,
+after 96 hours the student will be given average marks and an encouraging humainzed message on behalf of the teacher, so he does not get discouraged,
+also in admin i want accountibility for teachers and stats, so iknow if someone is not responding,
+my workload button also should be at the dashboard on top along with Upload Marked Items
+5.4 Teacher — review — CHANGE: when marks are pressed, the message also comesm that what does this mean
+5.5 Teacher — review — CHANGE: is the annotation ipad supported?
+
+remmebr i want you to make a website which smart and supported in phone
+we also have to make it compatible for ipad and iphone and make this into an app only for teachers to do markings and communicate , so basically a techer portal
+and yes for the student's as well, as ease of work has to be our top prioroty
+5.6 Teacher — review — CHANGE: no unnecessary notifications, check this is a fault, i am constantly seeing notificatoons
+5.8 Teacher — review — CHANGE: i have commented perviously
+5.9 Teacher — review — CHANGE: ai bot will handle the after upload process, also download smartly to be uploaded by the bot 
+5.10 Teacher — insights — CHANGE: make some charts and bars if needed
+5.11 Teacher — insights — CHANGE: the student also could be categorized by needs a push encouragement..etc..also if i press the button to doing well, those students have to appear down and the page moves down, 
+5.12 Teacher — insights — Looks good
+5.13 Teacher — other pages — CHANGE: segregate the review queue every where as per certifcation, mashq, crash
+practuce ,online assessment is not familiar, dont introduce new terms, stick to those established filters
+5.14 Teacher — other pages — Looks good
+5.16 Teacher — other pages — Looks good
+5.17 Teacher — other pages — Looks good
+5.18 Teacher — other pages — Looks good: any teacher can initiate the live event
+6.1 Admin — CHANGE: this master admin will also have other branch views and analysis across branches, the master admin
+6.2 Admin — CHANGE: create course button not working
+
+6.3 Admin — CHANGE: merits will be given by branch admins, not the main admin, so all branch will have branch admins, 
+6.4 Admin — CHANGE: make an hr page to assigne an admin , a teacher page as well, simple toggle will work for him, rest teacher, one branch admin
+6.6 Admin — course builder — CHANGE: can we make a cascading view so iknow that in this course this maney levels, and all editable for me?
+in badge add a drop down, so we awrd that type of badge
+i want to have clarity which course, how many levels, how many steps, what is in each step, even thought it is autmoatically fetched from drive or from zip folders, 
+
+6.7 Admin — course builder — CHANGE: dont make a lot of changes, it is good, give me a guide on how to build a course ,
+also give ootion to add video link
+youtube style
+refence image
+worksheet image
+also i need to see how student details are superimposded
+give each sheet an id so the bot can track
+his name,
+hir trnum
+and class
+and branch
+6.10 Admin — course builder — CHANGE: i should have a button to go again to admin view after i switch to teacher view,
+
+all teachers must have an overall course page, so they know what is happening , also they get update
+6.11 Admin — course builder — CHANGE: fetch proper data from my master file
+6.12 Admin — course builder — CHANGE: to add a step, make it a drop down to selct specific areas, or else it will become a mess.
+and is this proper and perfect? is it fool proof method? is it thiseasy to make a policy?,
+add a policy page as well in which sub admin can do ,
+but i should know if any changes done by them
+6.13 Admin — policies & people — CHANGE: not tadreeb fanni
+Funun al-Quran
+policy page is too scattered fonts haywire, organize everything pls, it is amess
+6.15 Admin — policies & people — CHANGE: give me an option with each policy, static policy, or option 2 give branches autonomy
+6.17 Admin — CHANGE: make merit point doanloadable as an excel file and pdf as well
+6.19 Admin — CHANGE: if i press a card, names have to appear and page hovers
+6.20 Admin — CHANGE: add a tab to make announcements or surveys, give option, appears when someone opens site, 
+and if to email`
+or both
+if to email, registered users or all the branch students, and teachers also get intimation, on email and website what is happening in the branch, what is initiated
+7.2 Branch admin — CHANGE: why same as nairobi, if we give them autonomu they can decide, those policy greyed are static, no need to mentipn what policy is in the other branch
+7.3 Branch admin — CHANGE: download message has to be customized, i need the message to say, print on art paper, contact funun al-quran for furhter details, dont practice on normal a4 sheet. art paper only
+
+Not reviewed yet: 1.6, 1.15, 2.5, 3.2, 3.11, 5.7, 5.15, 6.5, 6.8, 6.9, 6.14, 6.16, 6.18, 6.21, 7.1
+
+Earlier notes (first review list):
+1.1 — CHANGE: the signing with one click is not ok, make it as normal signin windows are, usse the same appearance which was in the website previously, i remember there was a photo on the left and an eleegrant interface, smart one, and then a page followed full color on the left, a quote etc, 
+
+how it works button has to work,
+it will be a website guide, change the name of the button to Guide Me, things highlight one by one for them,
+when someone presses, got it-lets begin, this how it works part vanishes,
+that card is perfect no changes required.
+
+just the button on the top needs a rename
+
+the course name has to be translitterally translated
+
+no point of you will practice thing,
+it has to mention, 
+1) how many levels, (badge on completing each level)
+if it only has worksheets, write 20 Worksheets in this course,
+-assessment:  once every level, or if it has only final submission in the end write that, do write small, completion of the course willbe a badge award
+
+in the certification of course, write also, 1 certificate in the end, refine
+
+make sure the my progress bar is interlinked all datasynced,amrks etc
+
+Look closely — what makes it beautiful? (remove)
+gallery is supposed to be reference content,content will be unique added by the admin
+
+SHowcase is for teacher and students
+right now boith seem same
+
+
+
+i habe by mistake given a lot of accumulated comments, do keep in note,
+1.2 — CHANGE: i think, write level one clearly, not lv02, also step 01,
+also i feel, tkh n101 is it for us the admin side, not needed for the student, it should appear in a way it make it clear for him, you can add whether it is  a crash course of certifiacete, if he has started multiple things all will populate here
+1.3 — CHANGE: chech why the message nudges are coming? any errors? dont use notifiacations if not needed
+1.4 — CHANGE

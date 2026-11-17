@@ -1,0 +1,12 @@
+/*
+ * ONE text-size scale for every student page (dashboard, course, task, progress, badges, chat) — audit 13.
+ * Six steps only. Arabic script (Amiri) keeps its own display sizes.
+ */
+:root{
+  --v3-fs-xs:12px;   /* small labels, dates, meta */
+  --v3-fs-sm:14px;   /* secondary text, buttons in lists */
+  --v3-fs-md:16px;   /* body text */
+  --v3-fs-lg:19px;   /* card and step titles */
+  --v3-fs-xl:24px;   /* section headings */
+  --v3-fs-2xl:clamp(26px,4vw,32px); /* page titles */
+}

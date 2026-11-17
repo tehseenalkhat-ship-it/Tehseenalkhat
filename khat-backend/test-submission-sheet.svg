@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="1600" viewBox="0 0 1200 1600">
+  <rect width="1200" height="1600" fill="#fffdf8" />
+  <rect x="44" y="44" width="1112" height="1512" rx="8" fill="none" stroke="#cbbd9f" stroke-width="4" />
+  <text x="600" y="250" text-anchor="middle" font-family="sans-serif" font-size="52" fill="#473c2d">TEST SUBMISSION</text>
+  <text x="600" y="335" text-anchor="middle" font-family="sans-serif" font-size="34" fill="#736553">Synthetic workflow-check sheet — not student calligraphy</text>
+  <path d="M180 700 C360 510 450 930 630 700 S900 510 1020 700" fill="none" stroke="#171717" stroke-width="22" stroke-linecap="round" />
+  <path d="M180 950 H1020 M180 1035 H1020 M180 1120 H1020" fill="none" stroke="#dfd5c4" stroke-width="3" />
+</svg>

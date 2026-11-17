@@ -7,3 +7,10 @@ dist-ssr/
 *.local
 *.log
 .DS_Store
+.venv/
+.venv-1/
+/*.sql
+khat-frontend/*.sql
+khat-frontend/tests-v3/*/shots/
+khat-backend/tests/v2/out/
+.DS_Store

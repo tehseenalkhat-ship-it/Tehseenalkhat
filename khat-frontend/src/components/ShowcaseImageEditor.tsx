@@ -65,7 +65,7 @@ export function ShowcaseImageEditor({ file, onCancel, onSave }: { file: File; on
   return (
     <div className="showcase-editor-backdrop" onPointerDown={event => { if (event.target === event.currentTarget && !saving) onCancel(); }}>
       <section className="showcase-editor" role="dialog" aria-modal="true" aria-labelledby="showcase-editor-title">
-        <header className="showcase-editor-header"><div><span className="eyebrow">Prepare your piece</span><h2 id="showcase-editor-title">Edit your photo</h2><p>Choose a frame, adjust the image, and make the piece ready for the guild.</p></div><button type="button" className="showcase-editor-close" onClick={onCancel} disabled={saving} aria-label="Close image editor"><X size={18} /></button></header>
+        <header className="showcase-editor-header"><div><span className="eyebrow">Prepare your piece</span><h2 id="showcase-editor-title">Edit your photo</h2><p>Choose a frame, adjust the image, and make the piece ready to share.</p></div><button type="button" className="showcase-editor-close" onClick={onCancel} disabled={saving} aria-label="Close image editor"><X size={18} /></button></header>
         <div className="showcase-editor-layout">
           <div className="showcase-editor-stage" style={{ aspectRatio: ratio.value }}>
             {imageUrl && <img src={imageUrl} alt="Preview of showcase submission" onLoad={handleImageLoad} style={{ filter: `brightness(${brightness}%) contrast(${contrast}%)`, transform: `scale(${zoom}) rotate(${rotation}deg)` }} />}

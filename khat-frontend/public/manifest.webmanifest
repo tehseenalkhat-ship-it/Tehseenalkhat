@@ -1,0 +1,21 @@
+{
+  "name": "Tehseen al-Khat — Funun al-Quran",
+  "short_name": "Tehseen al-Khat",
+  "description": "Learn Arabic calligraphy with the teachers of Funun al-Quran, Al-Jamea-tus-Saifiyah.",
+  "id": "/",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "display_override": ["standalone", "minimal-ui"],
+  "orientation": "any",
+  "background_color": "#003049",
+  "theme_color": "#003049",
+  "lang": "en",
+  "categories": ["education"],
+  "icons": [
+    { "src": "/icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "/icons/icon-maskable-192.png", "sizes": "192x192", "type": "image/png", "purpose": "maskable" },
+    { "src": "/icons/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

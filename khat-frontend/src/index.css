@@ -669,13 +669,15 @@ html[data-theme] .theme-popover .theme-swatch{min-height:56px}
 .global-side-rail.expanded .global-rail-toggle svg{transform:rotate(180deg)}
 .global-rail-hover-label{position:fixed;left:calc(var(--global-rail-width) + 10px);z-index:500;transform:translateY(-50%);padding:7px 10px;border:1px solid color-mix(in srgb,var(--text-on-deep) 16%,transparent);border-radius:6px;background:var(--card);color:var(--ink);font-size:11px;font-weight:600;line-height:1.2;white-space:nowrap;box-shadow:0 8px 24px rgba(0,0,0,.18);pointer-events:none;animation:rail-label-in .12s ease-out}
 @keyframes rail-label-in{from{opacity:0;transform:translate(-3px,-50%)}to{opacity:1;transform:translate(0,-50%)}}
-.global-notification-toasts{position:fixed;top:calc(var(--global-header-height) + 12px);right:18px;z-index:4800;width:min(360px,calc(100vw - 24px));display:grid;gap:9px;pointer-events:none}
-.global-notification-toast{display:flex;align-items:stretch;overflow:hidden;border:1px solid color-mix(in srgb,var(--gold) 28%,var(--line));border-radius:11px;background:var(--card);color:var(--ink);box-shadow:0 14px 36px color-mix(in srgb,var(--theme-deep) 20%,transparent);animation:notification-toast-in .22s cubic-bezier(.2,.7,.25,1);pointer-events:auto}
+/* v3: pop-ups sit bottom-right on tablet/desktop so they never cover the header buttons; on phones they drop in just under the header (max 2) */
+.global-notification-toasts{position:fixed;top:auto;bottom:max(20px,env(safe-area-inset-bottom));right:20px;z-index:4800;width:min(360px,calc(100vw - 24px));display:grid;gap:9px;pointer-events:none}
+@media(max-width:740px){.global-notification-toasts{top:calc(var(--global-header-height) + 8px);bottom:auto;right:12px;width:calc(100vw - 24px)}}
+.global-notification-toast{display:flex;align-items:stretch;overflow:hidden;border:1px solid color-mix(in srgb,var(--gold) 28%,var(--line));border-radius:4px;background:var(--card);color:var(--ink);box-shadow:0 14px 36px color-mix(in srgb,var(--theme-deep) 20%,transparent);animation:notification-toast-in .22s cubic-bezier(.2,.7,.25,1);pointer-events:auto}
 .global-notification-toast-body{display:flex;flex:1;min-width:0;align-items:center;gap:11px;padding:12px;text-align:left}
 .global-notification-toast-icon{width:34px;height:34px;flex:none;display:grid;place-items:center;border-radius:9px;background:var(--surface-tint);color:var(--gold)}
 .global-notification-toast-body>span:last-child{display:grid;gap:3px;min-width:0}
-.global-notification-toast-body strong{color:var(--ink);font-size:11px;line-height:1.35}
-.global-notification-toast-body small{color:var(--muted);font-size:9px;line-height:1.4}
+.global-notification-toast-body strong{color:var(--ink);font-size:14px;line-height:1.35}
+.global-notification-toast-body small{color:var(--muted);font-size:13px;line-height:1.4;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
 .global-notification-toast-close{width:34px;flex:none;display:grid;place-items:center;color:var(--muted)}
 .global-notification-toast-close:hover{background:var(--surface-tint-2);color:var(--ink)}
 @keyframes notification-toast-in{from{opacity:0;transform:translateX(12px) translateY(-4px)}to{opacity:1;transform:translateX(0) translateY(0)}}
@@ -1744,7 +1746,7 @@ html[data-theme] .showcase-carousel-dots button.active{background:var(--gold)}
 .alerts-unread-dot{width:7px;height:7px;flex:none;border-radius:50%;background:var(--gold);box-shadow:0 0 0 3px color-mix(in srgb,var(--gold) 14%,transparent)}
 .alerts-notification-arrow{flex:none;color:var(--muted)}
 .alerts-empty{padding:30px 20px;text-align:center;font-size:11px}
-@media(max-width:600px){.global-notification-toasts{top:calc(var(--global-header-height) + 8px);right:12px;width:calc(100vw - 24px)}.alerts-page>.section-heading .heading-row{align-items:stretch}.alerts-page>.section-heading .btn{align-self:flex-start}.alerts-notification{gap:9px;padding:12px}.alerts-notification-copy>span{font-size:9px}}
+@media(max-width:600px){.alerts-page>.section-heading .heading-row{align-items:stretch}.alerts-page>.section-heading .btn{align-self:flex-start}.alerts-notification{gap:9px;padding:12px}.alerts-notification-copy>span{font-size:9px}}
 @media(prefers-reduced-motion:reduce){.global-notification-toast{animation:none!important}}
 
 /* Keep the warm brown navigation exclusive to the Gold theme. */
@@ -2878,3 +2880,5 @@ html[data-theme] .auth-page .auth-art p:not(.eyebrow),html[data-theme] .auth-pag
 @media(max-width:520px){.reference-landing .landing-panel-brand .logo-symbol,.auth-art .logo-symbol{width:min(100px,40vw)}.reference-landing .landing-panel-brand .logo strong{font-size:17px}.reference-landing .landing-panel-brand .logo small{font-size:9px;letter-spacing:.13em}.global-topbar .logo-symbol{width:30px;height:28px}}
 html[data-theme] .reference-landing .landing-panel .reference-role-card{background:transparent!important;border-color:rgba(255,255,255,.25)!important}
 html[data-theme] .reference-landing .landing-panel .reference-role-card:hover{background:rgba(255,255,255,.1)!important;border-color:rgba(255,255,255,.48)!important}
+/* v3 (audit 12): sharp corners on the cards students see — notifications, profile and settings */
+.alerts-list,.notification-list,.settings-card,.settings-photo-panel,.settings-theme-section,.settings-theme-option,.profile-script,.profile-hero .stat-card,.profile-stats .stat-card{border-radius:4px!important}

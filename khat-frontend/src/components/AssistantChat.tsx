@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type FormEvent, type KeyboardEvent } from 'react';
 import { ArrowDown, ArrowRight, BookOpen, Check, GraduationCap, HelpCircle, LoaderCircle, MessageCircle, RotateCcw, Send, Sparkles, X } from 'lucide-react';
 import { apiFetch, ApiError, type SessionUser } from '@/api';
+import { useHash } from '@/components/ui';
 import './AssistantChat.css';
 
 type ChatMessage = { role: 'user' | 'assistant'; content: string };
@@ -18,7 +19,10 @@ const WELCOME: ChatMessage = {
   content: 'Hello! I can help you find your way around the Calligraphy Studio, understand your learning path, or answer questions about reviews and events. What can I help with?',
 };
 
+const HIDDEN_ON = new Set(['v2-course']);
+
 export function AssistantChat({ user }: { user: SessionUser }) {
+  const page = useHash();
   const [open, setOpen] = useState(false);
   const [messages, setMessages] = useState<ChatMessage[]>([WELCOME]);
   const [draft, setDraft] = useState('');
@@ -86,6 +90,8 @@ export function AssistantChat({ user }: { user: SessionUser }) {
       { label: 'Where can I see my assignments?', icon: BookOpen },
     ];
 
+  // v3 audit 16: on course step lists the floating button covered the "To do" arrows — not shown there.
+  if (HIDDEN_ON.has(page.split('?')[0]) && !open) return null;
   return (
     <div className="assistant-chat-root">
       {open && (
@@ -93,7 +99,7 @@ export function AssistantChat({ user }: { user: SessionUser }) {
           <header className="assistant-chat-header">
             <span className="assistant-chat-avatar"><Sparkles size={17} /></span>
             <div className="assistant-chat-title-copy">
-              <strong id="assistant-chat-title">Guild Guide</strong>
+              <strong id="assistant-chat-title">Calligraphy Guide</strong>
               <span>Here to help, {displayName}</span>
             </div>
             <button type="button" className="assistant-chat-icon-button" onClick={reset} aria-label="Start a new conversation" title="New conversation"><RotateCcw size={16} /></button>
@@ -129,7 +135,7 @@ export function AssistantChat({ user }: { user: SessionUser }) {
               placeholder={isStudent ? 'Ask about courses, lessons, checkpoints…' : 'Ask about your teaching workspace…'}
               rows={1}
               maxLength={2000}
-              aria-label="Message Guild Guide"
+              aria-label="Message the Calligraphy Guide"
               disabled={sending}
             />
             <button type="submit" disabled={sending || !draft.trim()} aria-label="Send message"><Send size={17} /></button>
@@ -142,9 +148,9 @@ export function AssistantChat({ user }: { user: SessionUser }) {
         className={`assistant-chat-launcher${open ? ' is-open' : ''}`}
         onClick={() => setOpen(value => !value)}
         aria-expanded={open}
-        aria-label={open ? 'Close Guild Guide' : 'Open Guild Guide assistant'}
+        aria-label={open ? 'Close the Calligraphy Guide' : 'Open the Calligraphy Guide'}
       >
-        {open ? <ArrowDown size={19} /> : <><MessageCircle size={19} /><span>Ask Guild Guide</span></>}
+        {open ? <ArrowDown size={19} /> : <><MessageCircle size={19} /><span>Ask the Guide</span></>}
       </button>
     </div>
   );

@@ -32,7 +32,7 @@ function isAcknowledgment(text: string): boolean {
 }
 
 function isGreeting(text: string): boolean {
-  return /^(hi|hello|hey|hiya|howdy|good morning|good afternoon|good evening|salaam|salam|assalamu alaikum|as salaam alaikum)(?:[,\s]+(?:there|guild guide|how are you|how are you doing))?[!.,?\s👋🙂😊]*$/i.test(text.trim());
+  return /^(hi|hello|hey|hiya|howdy|good morning|good afternoon|good evening|salaam|salam|assalamu alaikum|as salaam alaikum)(?:[,\s]+(?:there|guild guide|calligraphy guide|guide|how are you|how are you doing))?[!.,?\s👋🙂😊]*$/i.test(text.trim());
 }
 
 function localFallbackReply(messages: ChatMessage[], courses: CourseSummary[], learner: Record<string, unknown> | null, name = 'there'): string {
@@ -51,11 +51,11 @@ function localFallbackReply(messages: ChatMessage[], courses: CourseSummary[], l
   }
 
   if (isGreeting(lastUserRaw)) {
-    return `Hello${name && name !== 'there' ? `, ${name.split(' ')[0]}` : ''}! I’m Guild Guide. I can help you navigate the Studio, understand your course and checkpoints, or explore Arabic calligraphy. What would you like to know?`;
+    return `Hello${name && name !== 'there' ? `, ${name.split(' ')[0]}` : ''}! I’m the Calligraphy Guide. I can help you navigate the Studio, understand your course and checkpoints, or explore Arabic calligraphy. What would you like to know?`;
   }
 
   if (/^(who are you|what are you|what is your name|whats your name|what can you do|how can you help|help|help me|what do you know)$/.test(normalized)) {
-    return 'I’m Guild Guide, the built-in helper for the Calligraphy Guild Learning Platform. I can explain how to use Courses, practice uploads, checkpoints, reviews, certificates, events, and other site features; help you think through a course choice; and share general Arabic-calligraphy concepts and practice ideas. I can’t see your artwork unless it is uploaded into a feature that gives it to me, and I can’t change account records or replace your teacher’s guidance.';
+    return 'I’m the Calligraphy Guide, the built-in helper for Tehseen al-Khat, the calligraphy learning site of Funun al-Quran. I can explain how to use Courses, practice uploads, checkpoints, reviews, certificates, events, and other site features; help you think through a course choice; and share general Arabic-calligraphy concepts and practice ideas. I can’t see your artwork unless it is uploaded into a feature that gives it to me, and I can’t change account records or replace your teacher’s guidance.';
   }
 
   if (/^(how are you|how are you doing|how is it going|hows it going)$/.test(normalized)) {
@@ -71,7 +71,7 @@ function localFallbackReply(messages: ChatMessage[], courses: CourseSummary[], l
   }
 
   if (contains(normalized, ['what is this site', 'what is this website', 'about this site', 'about this website', 'what is the studio', 'what is calligraphy guild'])) {
-    return 'This is the Calligraphy Guild Learning Platform, a learning space for Arabic calligraphy. Students can study separate certification paths, work through practice levels, submit teacher-reviewed checkpoints, explore optional secondary courses, find shared resources, join events, and keep track of progress and achievements. Teachers review checkpoint work and support students; administrators manage the curriculum and platform. The course catalog is the source of truth for which paths and lessons are currently available.';
+    return 'This is Tehseen al-Khat, Funun al-Quran’s learning space for Arabic calligraphy. Students can study separate certification paths, work through practice levels, submit teacher-reviewed checkpoints, explore optional secondary courses, find shared resources, join events, and keep track of progress and achievements. Teachers review checkpoint work and support students; administrators manage the curriculum and platform. The course catalog is the source of truth for which paths and lessons are currently available.';
   }
 
   if (contains(normalized, ['motivate me', 'motivation', 'encourage me', 'i feel discouraged', 'i feel stuck', 'i want to quit', 'i am frustrated', 'im frustrated', 'i am bad at', 'im bad at'])) {
@@ -87,7 +87,7 @@ function localFallbackReply(messages: ChatMessage[], courses: CourseSummary[], l
   }
 
   if (contains(normalized, ['signup', 'sign up', 'create account', 'register', 'tr number', 'registration number', 'edu email'])) {
-    return 'Student signup requires an available TR number that has been added by an administrator and a Jamea Saifiyah email ending in **@jameasaifiyah.edu**. Enter the TR number, your details, and your branch on the signup page. If your TR number is not recognized, has already been used, or is assigned to another branch, contact your administrator; Guild Guide cannot add or activate TR numbers.';
+    return 'Student signup requires an available TR number that has been added by an administrator and a Jamea Saifiyah email ending in **@jameasaifiyah.edu**. Enter the TR number, your details, and your branch on the signup page. If your TR number is not recognized, has already been used, or is assigned to another branch, contact your administrator; the Guide cannot add or activate TR numbers.';
   }
 
   if (contains(normalized, ['certificate', 'certificates', 'achievement', 'achievements', 'badge', 'badges', 'award'])) {
@@ -95,7 +95,7 @@ function localFallbackReply(messages: ChatMessage[], courses: CourseSummary[], l
   }
 
   if (contains(normalized, ['normal pen', 'ordinary pen', 'ballpoint', 'biro', 'cut pen', 'qalam pen', 'reed pen course', 'which pen'])) {
-    return 'The platform has a separate **Naskh (Normal Pen)** certification path for an ordinary pen, distinct from **Naskh** practised with a cut qalam. The other certification paths are **Sulus (Thuluth)** and **Nastaaleeq**, taught with the cut-pen approach. Choose the tool you actually want to practise with; nib angle, stroke contrast, and course materials differ, so do not assume cut-qalam instructions transfer unchanged to an ordinary pen.';
+    return 'The platform has a separate **Naskh (Normal Pen)** certification path for an ordinary pen, distinct from **Naskh** practiced with a cut qalam. The other certification paths are **Sulus (Thuluth)** and **Nastaaleeq**, taught with the cut-pen approach. Choose the tool you actually want to practice with; nib angle, stroke contrast, and course materials differ, so do not assume cut-qalam instructions transfer unchanged to an ordinary pen.';
   }
 
   if (contains(normalized, ['what is arabic calligraphy', 'what is khat', 'meaning of khat', 'what is calligraphy'])) {
@@ -158,7 +158,7 @@ function localFallbackReply(messages: ChatMessage[], courses: CourseSummary[], l
   }
 
   if (contains(normalized, ['notification', 'notifications', 'email me', 'email notification'])) {
-    return 'In-site alerts are available from **Notifications**. The account email is collected for specialized communications, but Guild Guide cannot change notification preferences or promise that a particular email will be sent. Check your notification settings and the information provided by the platform administrators.';
+    return 'In-site alerts are available from **Notifications**. The account email is collected for specialized communications, but the Guide cannot change notification preferences or promise that a particular email will be sent. Check your notification settings and the information provided by the platform administrators.';
   }
 
   if (contains(normalized, ['profile', 'my profile'])) {
@@ -178,7 +178,7 @@ function localFallbackReply(messages: ChatMessage[], courses: CourseSummary[], l
   }
 
   if (contains(normalized, ['thumb pain', 'wrist pain', 'hand pain', 'hand tired', 'cramp', 'ergonomic'])) {
-    return 'Pause if your hand, wrist, or shoulder becomes painful or numb. Keep the page and grip comfortable, relax unnecessary tension, and take short breaks. Do not force through pain; if discomfort persists, stop practising and seek appropriate health advice.';
+    return 'Pause if your hand, wrist, or shoulder becomes painful or numb. Keep the page and grip comfortable, relax unnecessary tension, and take short breaks. Do not force through pain; if discomfort persists, stop practicing and seek appropriate health advice.';
   }
 
   if (contains(normalized, ['letter proportions', 'how to improve letters', 'my letters look', 'uneven letters', 'inconsistent letters'])) {
@@ -186,7 +186,7 @@ function localFallbackReply(messages: ChatMessage[], courses: CourseSummary[], l
   }
 
   if (contains(normalized, ['what should i practice', 'practice exercise', 'give me an exercise', 'warm up'])) {
-    return 'Try this short warm-up: make a row of slow vertical strokes, a row of horizontal strokes, then a row of gentle curves. Keep their size and spacing as consistent as you can. Next, practise one letter from your current lesson and compare it with the reference. If you tell me your script and level, I can suggest a more focused exercise.';
+    return 'Try this short warm-up: make a row of slow vertical strokes, a row of horizontal strokes, then a row of gentle curves. Keep their size and spacing as consistent as you can. Next, practice one letter from your current lesson and compare it with the reference. If you tell me your script and level, I can suggest a more focused exercise.';
   }
 
   if (contains(normalized, ['hold the pen', 'hold a qalam', 'grip the pen', 'pen grip', 'pen angle', 'how to hold'])) {
@@ -206,11 +206,11 @@ function localFallbackReply(messages: ChatMessage[], courses: CourseSummary[], l
   }
 
   if (contains(normalized, ['which script should i choose', 'which course should i choose', 'help choose a course', 'help me choose'])) {
-    return 'I can help you choose without grading your ability. First, have you practised Arabic calligraphy before? If so, which script and for how long? I’ll ask about your comfort with proportions and joining next, then whether you prefer an ordinary pen or cut qalam and what you hope to learn.';
+    return 'I can help you choose without grading your ability. First, have you practiced Arabic calligraphy before? If so, which script and for how long? I’ll ask about your comfort with proportions and joining next, then whether you prefer an ordinary pen or cut qalam and what you hope to learn.';
   }
 
   if (contains(normalized, ['forgot password', 'reset password', 'change password', 'cant log in', 'cannot log in', 'login issue', 'sign in issue'])) {
-    return 'Use **Forgot your password?** on the sign-in page to request a reset link for your account email. If you are already signed in, use your account settings to change your password. For account or TR-number access problems, contact an administrator; Guild Guide cannot reset credentials or unlock accounts directly.';
+    return 'Use **Forgot your password?** on the sign-in page to request a reset link for your account email. If you are already signed in, use your account settings to change your password. For account or TR-number access problems, contact an administrator; the Guide cannot reset credentials or unlock accounts directly.';
   }
 
   if (contains(normalized, ['what scripts are there', 'which scripts', 'scripts available', 'courses available', 'what courses'])) {
@@ -241,7 +241,7 @@ function localFallbackReply(messages: ChatMessage[], courses: CourseSummary[], l
     const currentCourse = learner.currentCourse as string | undefined;
     return currentCourse && !prefersNormalPen
       ? `Based on your answers, continue with **${currentCourse}** rather than restarting. Your next step is the next unlocked lesson on your dashboard. If you want, tell me the lesson name and I can explain how to approach it.`
-      : `Based on your answers, I recommend starting with **${certification.title}** (${certification.script}), the guild's structured certification path. It has ${certification.levelCount} ordered lessons/checkpoints. Open **Courses**, choose ${certification.script}, and begin at the first unlocked lesson—it's designed to build from fundamentals. Try the lessons in order and ask your teacher for feedback at checkpoints.`;
+      : `Based on your answers, I recommend starting with **${certification.title}** (${certification.script}), the structured certification path. It has ${certification.levelCount} ordered lessons/checkpoints. Open **Courses**, choose ${certification.script}, and begin at the first unlocked lesson—it's designed to build from fundamentals. Try the lessons in order and ask your teacher for feedback at checkpoints.`;
   }
 
   if (contains(normalized, ['event', 'live session', 'live event', 'meeting'])) {
@@ -254,10 +254,10 @@ function localFallbackReply(messages: ChatMessage[], courses: CourseSummary[], l
     return 'Teachers can open **Review queue** to see assigned student submissions, **My reviews** for completed decisions, and **Host events** to schedule a live session. Your profile shows assigned scripts and review activity.';
   }
   if (contains(normalized, ['qalam', 'reed pen', 'pen cut', 'pen angle'])) {
-    return 'The qalam is the reed pen used to make calligraphic strokes. Its cut width and the angle at which you hold it determine the characteristic thick and thin strokes. For a beginner, use a consistent cut and hold the nib steadily; practise slow vertical, horizontal, and curved strokes before combining them into letters. Your course’s materials may specify a particular nib width and angle, so follow those when provided.';
+    return 'The qalam is the reed pen used to make calligraphic strokes. Its cut width and the angle at which you hold it determine the characteristic thick and thin strokes. For a beginner, use a consistent cut and hold the nib steadily; practice slow vertical, horizontal, and curved strokes before combining them into letters. Your course’s materials may specify a particular nib width and angle, so follow those when provided.';
   }
   if (contains(normalized, ['dot', 'proportion', 'measure', 'scale'])) {
-    return 'In many Arabic calligraphy teaching traditions, the rhombic dot made by the qalam is used as a repeatable unit for measuring letters and spacing. The exact proportions depend on the script and the course method. Practise making dots with a consistent nib angle, then compare letter height, width, and spacing against the proportions taught in your current lesson rather than mixing rules from different scripts.';
+    return 'In many Arabic calligraphy teaching traditions, the rhombic dot made by the qalam is used as a repeatable unit for measuring letters and spacing. The exact proportions depend on the script and the course method. Practice making dots with a consistent nib angle, then compare letter height, width, and spacing against the proportions taught in your current lesson rather than mixing rules from different scripts.';
   }
   if (contains(normalized, ['baseline', 'line', 'satr', 'under the line', 'above the line'])) {
     return 'The baseline (often discussed as the writing line) organizes where letters sit, rise, and descend. The relationship changes by letter, connection, and script; it is not simply a rule that every letter rests on one flat line. In practice, mark a light guide line, compare where each letter joins and descends, and follow the examples in your current script lesson.';
@@ -352,7 +352,7 @@ async function loadContext(user: AuthUser): Promise<{ name: string; courses: Cou
 async function askConfiguredModel(messages: ChatMessage[], context: Awaited<ReturnType<typeof loadContext>>): Promise<string | null> {
   if (!config.assistant.baseUrl || !config.assistant.model) return null;
   const siteGuidance = [
-    'You are Guild Guide, a warm, capable AI assistant for the Calligraphy Guild Learning Platform. Help with site navigation and workflows AND answer general Arabic-calligraphy questions: scripts and their visual characteristics, qalam/reed preparation, proportions, letter construction, joining, practice habits, composition, terminology, and critique principles. Explain concepts clearly with examples and adapt depth to the learner. Do not claim to see a submitted artwork unless an image is explicitly supplied.',
+    'You are the Calligraphy Guide, a warm, capable AI assistant for Tehseen al-Khat, the Arabic calligraphy learning site of Funun al-Quran (Al-Jamea-tus-Saifiyah). Never call the site or the department a “guild”. Help with site navigation and workflows AND answer general Arabic-calligraphy questions: scripts and their visual characteristics, qalam/reed preparation, proportions, letter construction, joining, practice habits, composition, terminology, and critique principles. Explain concepts clearly with examples and adapt depth to the learner. Do not claim to see a submitted artwork unless an image is explicitly supplied.',
     'Use your general calligraphy knowledge for broad educational questions. Be nuanced: practices and proportions differ by script, teacher, and tradition; avoid presenting one school\'s rules as universal. Give practical exercises when useful, and invite a follow-up rather than turning every reply into a course-placement interview.',
     'Be conversational and responsive to the exact message. Reply warmly to greetings, “how are you?”, thanks, requests for motivation, and questions about who you are; do not force every message into a site FAQ. For motivation, be kind and practical without judging talent. For practice-time questions, suggest a modest, adjustable routine (for example, 15–30 focused minutes) and advise breaks if there is discomfort.',
     'You may explain general Arabic-calligraphy topics such as writing direction, letter shapes and connections, non-joining letters, dots and proportions, baseline, harakat, qalam structure and angle, ordinary-pen versus cut-qalam practice, ink and paper, spacing, rhythm, composition, terminology, and broad script histories. Keep historical statements qualified and do not invent exact course prescriptions or religious quotations.',

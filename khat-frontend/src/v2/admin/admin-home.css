@@ -1,0 +1,124 @@
+/* Tehseen al-Khat v2 — admin "Today" home. Mobile first; colours only through the site's CSS variables.
+   owner: admin-home */
+
+.v2-home{--v2-home-gap:14px;--v2-home-urgent:var(--danger);--v2-home-ok:var(--positive)}
+
+/* ---------- head ---------- */
+.v2-home-head{display:flex;justify-content:space-between;align-items:flex-end;gap:14px;flex-wrap:wrap;margin-bottom:22px}
+.v2-home-hello .eyebrow{margin-bottom:6px}
+.v2-home-hello h1{font-size:clamp(30px,4vw,42px);letter-spacing:-.03em}
+.v2-home-calm{display:flex;align-items:center;gap:9px;margin-top:8px;font-size:14px;color:var(--ink)}
+.v2-home-pulse{width:9px;height:9px;border-radius:50%;background:var(--v2-home-ok);box-shadow:0 0 0 4px color-mix(in srgb,var(--v2-home-ok) 16%,transparent);flex:none}
+.v2-home-pulse.is-urgent{background:var(--v2-home-urgent);box-shadow:0 0 0 4px color-mix(in srgb,var(--v2-home-urgent) 18%,transparent)}
+.v2-home-tools-bar{display:flex;align-items:center;gap:8px;width:100%}
+.v2-home-switch{flex:1;min-width:0}
+.v2-home-switch .field{min-height:44px;font-weight:600;cursor:pointer}
+.v2-home-scope{flex:1;display:inline-flex;align-items:center;min-height:40px;padding:0 14px;border:1px solid var(--line);border-radius:999px;background:var(--v2-soft);font-weight:700;font-size:13px;color:var(--ink);width:max-content;flex-grow:0;white-space:nowrap}
+.v2-home-refresh{border:1px solid var(--line);width:44px;height:44px;background:var(--card)}
+.v2-home-tools-bar:has(.v2-home-scope){justify-content:space-between}
+
+/* ---------- number cards ---------- */
+.v2-home-cards{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin-bottom:30px}
+.v2-home-card{display:flex;flex-direction:column;gap:4px;padding:14px;border:1px solid var(--line);border-radius:var(--v2-radius);background:var(--card);box-shadow:var(--v2-shadow);min-width:0;position:relative;overflow:hidden}
+.v2-home-card::before{content:'';position:absolute;inset:0 0 auto 0;height:3px;background:var(--line)}
+.v2-home-card.is-urgent::before{background:var(--v2-home-urgent)}
+.v2-home-card.is-ok::before{background:color-mix(in srgb,var(--v2-home-ok) 55%,var(--line))}
+.v2-home-card-top{display:flex;align-items:center;gap:8px;min-height:30px}
+.v2-home-card-icon{width:30px;height:30px;border-radius:9px;display:grid;place-items:center;background:var(--v2-soft);color:var(--gold);flex:none}
+.v2-home-card-label{font-size:12px;font-weight:700;line-height:1.3;color:var(--ink)}
+.v2-home-card-value{font:400 34px/1.1 'Libre Baskerville',serif;color:var(--ink);margin-top:6px;letter-spacing:-.02em}
+.v2-home-card-note{display:flex;align-items:center;gap:4px;font-size:12px;color:var(--muted);min-height:18px;line-height:1.35}
+.v2-home-card.is-urgent .v2-home-card-note{color:var(--v2-home-urgent);font-weight:700}
+.v2-home-card.is-ok .v2-home-card-note svg{color:var(--v2-home-ok)}
+.v2-home .btn.v2-home-card-btn{margin-top:auto;padding:9px 10px;min-height:40px;font-size:12px;gap:6px;width:100%}
+.v2-home-card-note+.v2-home-card-btn{margin-top:12px}
+
+/* ---------- sections ---------- */
+.v2-home-section{margin-bottom:34px}
+.v2-home-section-head{display:flex;align-items:baseline;justify-content:space-between;gap:6px 14px;flex-wrap:wrap;margin-bottom:12px}
+.v2-home-section-head h2{font-size:21px;letter-spacing:-.02em}
+.v2-home-section-head .muted{font-size:12px}
+
+/* ---------- do next ---------- */
+.v2-home-todo{list-style:none;margin:0;padding:0;border:1px solid var(--line);border-radius:var(--v2-radius);background:var(--card);overflow:hidden;box-shadow:var(--v2-shadow)}
+.v2-home-todo-item{display:grid;grid-template-columns:1fr;gap:6px;padding:14px 16px 14px 18px;border-bottom:1px solid var(--line);position:relative}
+.v2-home-todo-item:last-child{border-bottom:0}
+.v2-home-todo-item::before{content:'';position:absolute;left:0;top:12px;bottom:12px;width:3px;border-radius:0 3px 3px 0;background:var(--line)}
+.v2-home-todo-item.is-urgent::before{background:var(--v2-home-urgent)}
+.v2-home-todo-item.is-soon::before{background:var(--gold)}
+.v2-home-todo-when{font-size:10px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+.v2-home-todo-item.is-urgent .v2-home-todo-when{color:var(--v2-home-urgent)}
+.v2-home-todo-item.is-soon .v2-home-todo-when{color:var(--gold)}
+.v2-home-todo-text{font-size:14.5px;line-height:1.5;color:var(--ink)}
+.v2-home .btn.v2-home-todo-btn{justify-self:start;min-height:40px;padding:8px 14px;font-size:12px;gap:6px;white-space:nowrap}
+.v2-home-allclear{display:flex;align-items:center;gap:14px;padding:18px;border:1px solid var(--line);border-radius:var(--v2-radius);background:var(--v2-soft)}
+.v2-home-allclear>span{width:40px;height:40px;border-radius:50%;display:grid;place-items:center;background:var(--card);color:var(--v2-home-ok);flex:none}
+.v2-home-allclear strong,.v2-home-allclear small{display:block}
+.v2-home-allclear strong{font-family:'Libre Baskerville',serif;font-size:15px}
+.v2-home-allclear small{font-size:12px;color:var(--muted);margin-top:2px}
+
+/* ---------- branches (cards on phone, table from tablet) ---------- */
+.v2-home-table-wrap{display:none}
+.v2-home-branch-cards{display:grid;gap:10px}
+.v2-home-branch-card{display:grid;gap:10px;text-align:left;width:100%;padding:14px 16px;border:1px solid var(--line);border-radius:var(--v2-radius);background:var(--card);color:var(--ink)}
+.v2-home-branch-card:not(:disabled):hover{border-color:color-mix(in srgb,var(--gold) 45%,var(--line))}
+.v2-home-branch-card:disabled{cursor:default;opacity:1}
+.v2-home-branch-name{display:flex;align-items:center;gap:8px}
+.v2-home-branch-name strong{font-family:'Libre Baskerville',serif;font-size:15px;flex:1;min-width:0}
+.v2-home-branch-name svg{color:var(--muted)}
+.v2-home-flag{font-size:11px;font-weight:800;color:var(--v2-home-urgent);background:color-mix(in srgb,var(--v2-home-urgent) 10%,var(--card));padding:3px 8px;border-radius:999px;white-space:nowrap}
+.v2-home-branch-stats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px}
+.v2-home-branch-stats span{display:grid;font-size:11px;color:var(--muted)}
+.v2-home-branch-stats b{font-size:16px;color:var(--ink);font-weight:700}
+.v2-home-branch-foot{font-size:12px}
+.v2-home-glance{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.v2-home-glance>div{display:grid;gap:2px;padding:14px;border:1px solid var(--line);border-radius:var(--v2-radius);background:var(--card)}
+.v2-home-glance b{font:400 22px/1.2 'Libre Baskerville',serif;color:var(--ink)}
+.v2-home-glance span{font-size:12px;color:var(--muted)}
+
+/* ---------- all tools ---------- */
+.v2-home-groups{display:grid;gap:20px}
+.v2-home-group h3{font-family:'DM Sans',sans-serif;font-size:11px;font-weight:800;letter-spacing:.11em;text-transform:uppercase;color:var(--muted);margin-bottom:8px}
+.v2-home-tiles{display:grid;grid-template-columns:1fr;border:1px solid var(--line);border-radius:var(--v2-radius);background:var(--card);overflow:hidden}
+.v2-home-tile{display:flex;align-items:center;gap:12px;width:100%;text-align:left;min-height:56px;padding:10px 14px;border-bottom:1px solid var(--line);color:var(--ink);transition:background .15s}
+.v2-home-tile:last-child{border-bottom:0}
+.v2-home-tile:hover{background:var(--v2-soft)}
+.v2-home-tile-icon{width:34px;height:34px;border-radius:10px;display:grid;place-items:center;background:var(--v2-soft);color:var(--gold);flex:none}
+.v2-home-tile-copy{display:grid;flex:1;min-width:0}
+.v2-home-tile-copy strong{font-size:13.5px;font-weight:700;line-height:1.3}
+.v2-home-tile-copy small{font-size:11.5px;color:var(--muted);line-height:1.35;margin-top:1px}
+.v2-home-tile-go{color:var(--muted);flex:none}
+.v2-home-updated{text-align:center;margin-top:-6px}
+
+/* ---------- tablet ---------- */
+@media (min-width:720px){
+  .v2-home-head{margin-bottom:28px}
+  .v2-home-tools-bar{width:auto}
+  .v2-home-switch{flex:none;min-width:220px}
+  .v2-home-cards{grid-template-columns:repeat(4,minmax(0,1fr));gap:14px;margin-bottom:38px}
+  .v2-home-card{padding:18px}
+  .v2-home-card-value{font-size:40px}
+  .v2-home-todo-item{grid-template-columns:110px 1fr auto;align-items:center;gap:14px;padding:14px 18px 14px 22px}
+  .v2-home .btn.v2-home-todo-btn{justify-self:end}
+  .v2-home-glance{grid-template-columns:repeat(4,minmax(0,1fr))}
+  .v2-home-groups{grid-template-columns:repeat(2,minmax(0,1fr));gap:22px 18px}
+  .v2-home-table-wrap{display:block;border:1px solid var(--line);border-radius:var(--v2-radius);background:var(--card);overflow-x:auto;box-shadow:var(--v2-shadow)}
+  .v2-home-branch-cards{display:none}
+}
+@media (min-width:1100px){
+  .v2-home-groups{grid-template-columns:repeat(3,minmax(0,1fr))}
+}
+
+/* ---------- table ---------- */
+.v2-home-table{width:100%;border-collapse:collapse;font-size:13px;font-variant-numeric:tabular-nums}
+.v2-home-table th,.v2-home-table td{padding:12px 14px;text-align:right;border-bottom:1px solid var(--line);white-space:nowrap}
+.v2-home-table thead th{font-size:10.5px;font-weight:800;letter-spacing:.07em;text-transform:uppercase;color:var(--muted);background:var(--v2-soft);vertical-align:bottom;line-height:1.3}
+.v2-home-table thead th small{display:block;font-size:10px;font-weight:600;letter-spacing:0;text-transform:none}
+.v2-home-table th:first-child,.v2-home-table td:first-child{text-align:left}
+.v2-home-table tbody tr:last-child>*{border-bottom:0}
+.v2-home-table tbody th{font-weight:700}
+.v2-home-table tr.is-clickable{cursor:pointer}
+.v2-home-table tr.is-clickable:hover{background:var(--v2-soft)}
+.v2-home-branch-link{font-family:'Libre Baskerville',serif;font-size:14px;color:var(--ink);padding:4px 0;min-height:32px}
+.v2-home-branch-link:hover{color:var(--gold);text-decoration:underline}
+.v2-home-bad{color:var(--v2-home-urgent);font-weight:800}
