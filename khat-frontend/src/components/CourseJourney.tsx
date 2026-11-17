@@ -99,6 +99,10 @@ function EntryChat({ studentId, courseId, items, threadKey = 'course' }: { stude
   const [sending, setSending] = useState(false);
   const [recording, setRecording] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Mashq worksheet courses have no chat (the server answers 403): show marks only, no message box.
+  const [noChat, setNoChat] = useState(false);
+  const noChatRef = useRef(false);
+  noChatRef.current = noChat;
   const recorderRef = useRef<MediaRecorder | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const chunksRef = useRef<Blob[]>([]);
@@ -113,6 +117,7 @@ function EntryChat({ studentId, courseId, items, threadKey = 'course' }: { stude
       setMessages(result.messages ?? []);
       setError(null);
     } catch (err) {
+      if (err instanceof ApiError && err.status === 403) { setNoChat(true); return; }
       setError(err instanceof ApiError ? err.message : 'Could not load this conversation.');
     } finally {
       setLoading(false);
@@ -122,7 +127,7 @@ function EntryChat({ studentId, courseId, items, threadKey = 'course' }: { stude
   useEffect(() => {
     void loadMessages(true);
     const interval = window.setInterval(() => {
-      if (document.visibilityState === 'visible') void loadMessages();
+      if (document.visibilityState === 'visible' && !noChatRef.current) void loadMessages();
     }, 7000);
     const refresh = () => { if (document.visibilityState === 'visible') void loadMessages(); };
     window.addEventListener('focus', refresh);
@@ -209,7 +214,7 @@ function EntryChat({ studentId, courseId, items, threadKey = 'course' }: { stude
   return <section className="course-chat" aria-label="Student and teacher chat">
     <div className="course-chat-feed" ref={feedRef} aria-live="polite">
       {loading && <p className="course-chat-state">Loading messages…</p>}
-      {!loading && transcript.length === 0 && <div className="course-chat-empty"><MessageCircle size={20} /><span>Start the conversation. Your submissions, teacher feedback, and voice notes will appear here.</span></div>}
+      {!loading && !noChat && transcript.length === 0 && <div className="course-chat-empty"><MessageCircle size={20} /><span>Start the conversation. Your submissions, teacher feedback, and voice notes will appear here.</span></div>}
       {transcript.map(item => {
         if (item.activity) return <div key={item.id} className="course-chat-transcript-activity"><CourseActivityMessages item={item.activity} userRole={user?.role ?? 'student'} /></div>;
         const message = item.message;
@@ -225,11 +230,11 @@ function EntryChat({ studentId, courseId, items, threadKey = 'course' }: { stude
       <div className="course-chat-bottom" />
     </div>
     {error && <p className="course-chat-error" role="alert">{error}</p>}
-    <form className="course-chat-composer" onSubmit={event => void sendText(event)}>
+    {!noChat && <form className="course-chat-composer" onSubmit={event => void sendText(event)}>
       <textarea ref={draftRef} value={draft} onChange={event => setDraft(event.currentTarget.value)} onKeyDown={event => { if (event.key === 'Enter' && !event.shiftKey) { event.preventDefault(); void sendText(); } }} rows={1} maxLength={4000} placeholder="Type a message" aria-label="Type a chat message" disabled={sending || recording} />
       <button type="button" className={`course-chat-mic${recording ? ' is-recording' : ''}`} onClick={() => void toggleVoiceRecording()} disabled={sending} aria-label={recording ? 'Stop and send voice note' : 'Record voice note'} title={recording ? 'Stop and send voice note' : 'Record voice note'}>{recording ? <Square size={17} fill="currentColor" /> : <Mic size={19} />}</button>
       <button type="submit" className="course-chat-send" disabled={sending || !draft.trim() || recording} aria-label="Send message" title="Send message"><Send size={17} /></button>
-    </form>
+    </form>}
     {recording && <small className="course-chat-recording-hint">Recording… select stop to send</small>}
   </section>;
 }

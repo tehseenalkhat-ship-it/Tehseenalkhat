@@ -3,6 +3,7 @@ import { ArrowRight, BookOpen, RotateCcw } from 'lucide-react';
 import { apiFetch, ApiError } from '@/api';
 import { Button, PenLoader, navigate } from '@/components/ui';
 import { openCourseLevel } from '@/courseSession';
+import { displayCourseTitle } from '@/data/mock';
 import type { OlderCourse } from './contentTypes';
 import './content-v3.css';
 
@@ -54,7 +55,7 @@ export function V3OlderCoursesSection() {
           {courses.map(c => (
             <article className="v3c-older-card" key={c.id}>
               <span className="v3c-tag">{c.kind}</span>
-              <strong>{c.title}</strong>
+              <strong>{displayCourseTitle(c.title)}</strong>
               <small>{[c.scriptName, `${c.levelCount} ${c.levelCount === 1 ? 'level' : 'levels'}`].filter(Boolean).join(' · ')}</small>
               {c.enrolled && <div className="v3c-progress" aria-label={`${c.percentComplete}% done`}><i style={{ width: `${c.percentComplete}%` }} /></div>}
               {c.enrolled

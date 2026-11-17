@@ -106,6 +106,8 @@ export function V2StudentHomePage(_props: Props) {
 
       {entries && (
         <>
+          {/* No Course-builder courses yet: skip the empty "what to do now" and pen sections; the older courses list below is the course list. */}
+          {entries.length > 0 && (<>
           {/* ---------- what to do now ---------- */}
           <section className="v3-sd-now" data-guide="now" aria-labelledby="v3-sd-now-title">
             <p className="v3-sd-eyebrow" id="v3-sd-now-title">What to do now</p>
@@ -147,6 +149,7 @@ export function V2StudentHomePage(_props: Props) {
               ))}
             </div>
           </section>
+          </>)}
 
           {/* Courses made before the Course builder (all live courses until they are rebuilt there). */}
           <V3OlderCoursesSection />
