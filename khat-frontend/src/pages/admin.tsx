@@ -473,7 +473,7 @@ function AdminOverview() {
 
   return (
     <>
-      <SectionHeading eyebrow={`${greeting}, ${user?.name?.split(' ')[0] ?? 'administrator'}`} title="Guild overview" text="A clear view of learning, teaching, and the work between." />
+      <SectionHeading eyebrow={`${greeting}, ${user?.name?.split(' ')[0] ?? 'administrator'}`} title="Funun al-Quran overview" text="A clear view of learning, teaching, and the work between." />
       <FixedReportsCard />
       {loading && <p className="muted">Loading overview…</p>}
       {error && <div className="admin-error-banner" role="alert"><span>{error}</span><Button outline onClick={() => window.location.reload()}>Reload</Button></div>}
@@ -505,7 +505,7 @@ function AdminOverview() {
         </div>
       </div>
       <section className="admin-people-showcase">
-        <div className="admin-people-heading"><div><p className="eyebrow">Our community</p><h2>Students & teachers</h2><p>People building the guild across every branch.</p></div><button className="text-link" onClick={() => navigate('admin-governance')}>Manage records <ArrowRight size={15} /></button></div>
+        <div className="admin-people-heading"><div><p className="eyebrow">Our community</p><h2>Students & teachers</h2><p>People learning and teaching calligraphy in every branch.</p></div><button className="text-link" onClick={() => navigate('admin-governance')}>Manage records <ArrowRight size={15} /></button></div>
         <div className="admin-people-columns">
           <div><h3>Students <span>{studentCount}</span></h3>
             {studentPreview.length ? studentPreview.map(student => <div className="admin-person-row" key={student.id}><GovernanceAvatar name={student.name} storageKey={student.photo_storage_key ?? student.photoStorageKey} className="admin-person-avatar" /><strong>{student.name}</strong><small>{branchNameById[student.branch_id] ?? 'Branch'}</small></div>) : <p className="muted">{loading ? 'Loading students…' : 'No students to show yet.'}</p>}
@@ -1535,7 +1535,7 @@ function CompetitionsManager() {
 
   return (
     <div className="competitions-manager-page">
-      <SectionHeading eyebrow="Guild challenges" title="Competitions Manager" text="Create, assign judges, and post results." />
+      <SectionHeading eyebrow="Competitions" title="Competitions Manager" text="Create, assign judges, and post results." />
       {error && <p className="error-text">{error}</p>}
       <div className="admin-form-card competition-create-card">
         <h3>Create competition</h3>
@@ -1631,7 +1631,7 @@ function EventsManager() {
 
   return (
     <>
-      <SectionHeading eyebrow="Across the guild" title="Live Events Manager" text="See every circle, clinic, and recording across the branches." />
+      <SectionHeading eyebrow="Across the branches" title="Live Events Manager" text="See every circle, clinic, and recording across the branches." />
       {error && <p className="error-text">{error}</p>}
       <div className="stats-grid">
         <StatCard icon={CalendarDays} value={String(events.length)} label="Total events" />
@@ -1794,7 +1794,7 @@ function StatisticsDashboard() {
 
   return (
     <div className="admin-statistics-page">
-      <SectionHeading eyebrow="Org-wide analytics" title="Statistics Dashboard" text="A live view of account activity, learning, reviews, and participation across the guild." action={<Button outline onClick={load} disabled={loading}>{loading ? 'Refreshing…' : 'Refresh data'}</Button>} />
+      <SectionHeading eyebrow="Org-wide analytics" title="Statistics Dashboard" text="A live view of account activity, learning, reviews, and participation across Funun al-Quran." action={<Button outline onClick={load} disabled={loading}>{loading ? 'Refreshing…' : 'Refresh data'}</Button>} />
       {error && <div className="admin-error-banner" role="alert"><span>{error}</span><Button outline onClick={load}>Try again</Button></div>}
       {loading && !data && <p className="muted">Loading site statistics…</p>}
       {summary && (
@@ -1866,7 +1866,7 @@ function StatisticsDashboard() {
 
           <div className="admin-dashboard-grid">
             <section className="chart-card admin-chart-card">
-              <SectionHeading eyebrow="Guild challenges" title="Competition participation" text={`${summary.competition_entries} entries across all competitions`} />
+              <SectionHeading eyebrow="Competitions" title="Competition participation" text={`${summary.competition_entries} entries across all competitions`} />
               <div className="admin-horizontal-bars">
                 {data.competitionParticipation.map(comp => <div className="admin-horizontal-bar" key={comp.id}><span>{comp.title}</span><div><i style={{ width: `${comp.entries ? Math.max(2, comp.entries / competitionMax * 100) : 0}%` }} /></div><strong>{comp.entries}</strong></div>)}
                 {data.competitionParticipation.length === 0 && <div className="admin-chart-empty"><span><Trophy size={15} /></span><div><strong>No competitions yet</strong><p>Participation will appear here once a competition has entries.</p></div></div>}

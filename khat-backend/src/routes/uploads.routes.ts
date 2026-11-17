@@ -32,9 +32,19 @@ const PREFIX_ROLES: Record<string, Role[]> = {
   'level-submissions': ['student'],
   'competition-entries': ['student'],
   assets: ['teacher', 'admin'],
-  corrections: ['teacher'],
+  corrections: ['teacher', 'admin'],
   'chat-audio': ['student', 'teacher'],
   'profile-photos': ['student', 'teacher', 'admin'],
+  // v2
+  'course-files': ['admin'],
+  settings: ['admin'],
+  'thread-files': ['student', 'teacher', 'admin'],
+  voice: ['student', 'teacher', 'admin'],
+  annotations: ['teacher', 'admin'],
+  'scan-returns': ['teacher', 'admin'],
+  groups: ['student', 'teacher', 'admin'],
+  threads: ['student', 'teacher', 'admin'],
+  competitions: ['teacher', 'admin'],
 };
 
 export async function uploadRoutes(app: FastifyInstance) {

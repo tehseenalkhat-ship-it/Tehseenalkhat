@@ -2,6 +2,14 @@ import type { FastifyInstance } from 'fastify';
 import { pool } from '../db.js';
 import type { AuthUser } from '../plugins/auth.js';
 import { notify, notifyAllAdmins } from '../services/notify.js';
+import { getActor } from '../v2/lib/access.js';
+
+// v3 (owner note 4.2): the showcase is branch-specific. Everyone sees the posts of their own
+// branch; only master admins see every branch.
+async function viewerBranchFilter(request: Parameters<typeof getActor>[0]): Promise<string | null> {
+  const actor = await getActor(request);
+  return actor.isMaster ? null : (actor.branchId ?? '');
+}
 
 type CreatePostBody = { imageStorageKey: string; caption?: string; originalFilename?: string };
 type ModerateBody = { decision: 'approve' | 'reject' };
@@ -24,9 +32,9 @@ export async function showcaseRoutes(app: FastifyInstance) {
       const status = showcaseRole === 'teacher' ? 'approved' : 'pending';
 
       const { rows } = await pool.query(
-        `INSERT INTO showcase_posts (user_id, user_role, image_storage_key, caption, status)
-         VALUES ($1, $2, $3, $4, $5) RETURNING *`,
-        [user.id, showcaseRole, imageStorageKey, caption ?? null, status]
+        `INSERT INTO showcase_posts (user_id, user_role, image_storage_key, caption, status, branch_id)
+         VALUES ($1, $2, $3, $4, $5, $6) RETURNING *`,
+        [user.id, showcaseRole, imageStorageKey, caption ?? null, status, user.branchId ?? null]
       );
       if (status === 'pending') {
         await notifyAllAdmins('showcase_pending', { postId: rows[0].id, authorId: user.id });
@@ -45,6 +53,8 @@ export async function showcaseRoutes(app: FastifyInstance) {
       const params: unknown[] = [user.id];
       let roleFilter = '';
       if (role) { params.push(role); roleFilter = `AND p.user_role = $${params.length}`; }
+      const branch = await viewerBranchFilter(request);
+      if (branch !== null) { params.push(branch); roleFilter += ` AND COALESCE(p.branch_id, u.branch_id) = $${params.length}`; }
   
       let statusClause = `p.status = 'approved'`;
       if (user.role === 'admin' && status) {
@@ -84,6 +94,11 @@ export async function showcaseRoutes(app: FastifyInstance) {
       if (role === 'student' || role === 'teacher') {
         params.push(role);
         conditions.push(`p.user_role = $${params.length}`);
+      }
+      const feedBranch = await viewerBranchFilter(request);
+      if (feedBranch !== null) {
+        params.push(feedBranch);
+        conditions.push(`COALESCE(p.branch_id, u.branch_id) = $${params.length}`);
       }
       const query = q?.trim().slice(0, 100);
       if (query) {

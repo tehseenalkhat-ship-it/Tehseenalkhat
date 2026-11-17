@@ -1,11 +1,6 @@
 import { useLanguage } from '@/language';
 import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react';
-import {
-  ArrowRight, Award, BarChart3, BookOpen, CalendarDays, Check, ChevronRight, ClipboardList,
-  FileImage, FileSpreadsheet, Flame, FolderOpen, GraduationCap, Heart, Home, Images, LayoutDashboard, Library, Lock,
-  LogOut, MapPin, MoreHorizontal, Menu, Palette, PenTool, Play, Search, Settings, ShieldCheck, Trophy,
-  Upload, UserRound, Users, Video, X, Bell, MessageCircle, Eye, EyeOff,
-} from 'lucide-react';
+import { ArrowRight, Award, BarChart3, BookOpen, CalendarDays, Check, ChevronRight, ClipboardList, FileImage, FileSpreadsheet, Flame, FolderOpen, GraduationCap, Heart, Home, Images, LayoutDashboard, Library, Lock, LogOut, MapPin, MoreHorizontal, Menu, Palette, PenTool, Play, Search, Settings, ShieldCheck, Trophy, Upload, UserRound, Users, Video, X, Bell, MessageCircle, Inbox, ScanLine, Sparkles, Settings2, UsersRound, Gauge, Megaphone, TrendingUp, Eye, EyeOff } from 'lucide-react';
 import type { Script, Role } from '@/data/types';
 import { khatTypes, scriptList, branches, type GalleryWork } from '@/data/mock';
 import {
@@ -14,6 +9,9 @@ import {
   type UserNotification,
 } from '@/api';
 import { THEME_OPTIONS, type ThemeName } from '@/theme';
+// v2 details travel in the address (#v2-task?courseId=…&stepId=…). nav.ts imports navigate from here;
+// the cycle is safe because both are only called at click time.
+import { openV2, readV2Param } from '@/v2/nav';
 import penLoaderImage from '../public/pen-loader.png';
 
 export function navigate(page: string) { window.location.hash = page; }
@@ -89,83 +87,136 @@ export function Logo({ admin = false }: { admin?: boolean }) {
 
 const roleNavigation: Record<Role, [string, string, typeof LayoutDashboard][]> = {
   student: [
-    ['dashboard', 'Dashboard', Home], ['catalog', 'Courses', GraduationCap], ['chats', 'Chats', MessageCircle], ['achievements', 'Achievements', Award], ['gallery', 'Gallery', Images],
-    ['competitions', 'Competitions', Trophy], ['events', 'Events', CalendarDays], ['resources', 'Resources', Library],
+    ['v2-home', 'Dashboard', Home], ['catalog', 'Courses', GraduationCap], ['v2-my-progress', 'My progress', TrendingUp], ['v2-dept-chat', 'Chat with Funun al-Quran', MessageCircle], ['achievements', 'Achievements', Award], ['gallery', 'Gallery', Images],
+    ['v2-competitions', 'Competitions', Trophy], ['events', 'Events', CalendarDays], ['resources', 'Resources', Library],
     ['showcase', 'My showcase', PenTool], ['notifications', 'Notifications', Bell],
   ],
+  // v3 audit: the old "Review queue" / "My reviews" pages are gone from the menu — the Review inbox is the one place.
+  // "Judging" is added only for a teacher who is actually assigned as a judge (see JUDGING_ITEM below).
   teacher: [
-    ['teacher-dashboard', 'Dashboard', Home], ['queue', 'Review queue', ClipboardList], ['reviews', 'My reviews', Check], ['teacher-chats', 'Student messages', MessageCircle],
-    ['showcase', 'Showcase', PenTool], ['assets', 'Asset library', FolderOpen], ['judging', 'Judging', Trophy],
+    ['teacher-dashboard', 'Dashboard', Home], ['v2-inbox', 'Review inbox', Inbox], ['v2-scan-return', 'Upload marked items', ScanLine], ['v2-dept-chat', 'Student messages', MessageCircle],
+    ['v2-teacher-courses', 'All courses', BookOpen], ['v2-insights', 'Student insights', Sparkles], ['v2-team', 'Team report', Gauge],
+    ['v2-competitions', 'Competitions & calls', Trophy], ['showcase', 'Showcase', PenTool], ['assets', 'Asset library', FolderOpen],
     ['events-host', 'Host events', Video], ['notifications', 'Notifications', Bell],
   ],
   coordinator: [
-    ['coordinator-dashboard', 'Dashboard', Home], ['queue', 'Review queue', ClipboardList], ['reviews', 'My reviews', Check],
-    ['branch-stats', 'Branch statistics', BarChart3], ['branch-teachers', 'Branch teachers', Users],
-    ['branch-students', 'Branch students', GraduationCap], ['showcase', 'Showcase', PenTool],
-    ['assets', 'Asset library', FolderOpen], ['judging', 'Judging', Trophy], ['events-host', 'Host events', Video],
-    ['notifications', 'Notifications', Bell],
+    ['coordinator-dashboard', 'Dashboard', Home], ['v2-inbox', 'Review inbox', Inbox], ['v2-scan-return', 'Upload marked items', ScanLine], ['v2-dept-chat', 'Student messages', MessageCircle],
+    ['v2-teacher-courses', 'All courses', BookOpen], ['v2-insights', 'Student insights', Sparkles], ['v2-team', 'Team report', Gauge],
+    ['branch-stats', 'Branch statistics', BarChart3], ['branch-teachers', 'Branch teachers', Users], ['branch-students', 'Branch students', GraduationCap],
+    ['v2-competitions', 'Competitions & calls', Trophy], ['showcase', 'Showcase', PenTool], ['assets', 'Asset library', FolderOpen],
+    ['events-host', 'Host events', Video], ['notifications', 'Notifications', Bell],
   ],
   admin: [
-    ['admin', 'Overview', Home], ['admin-courses', 'Course builder', BookOpen], ['admin-tr-numbers', 'TR number uploads', FileSpreadsheet], ['admin-users', 'Teacher & load', Users],
-    ['admin-logs', 'Entry logs', ClipboardList], ['admin-showcase', 'Showcase moderation', Images],
-    ['admin-competitions', 'Competitions', Trophy], ['admin-events', 'Live events', CalendarDays],
-    ['admin-resources', 'Resources', Library], ['admin-stats', 'Statistics', BarChart3],
-    ['admin-certificates', 'Certificates & badges', Award], ['admin-governance', 'Data governance', ShieldCheck], ['teacher-dashboard', 'Teacher desk', Home],
-    ['queue', 'Review queue', ClipboardList], ['reviews', 'My reviews', Check], ['showcase', 'My showcase', PenTool],
-    ['assets', 'Asset library', FolderOpen], ['judging', 'Judging', Award], ['events-host', 'Host events', Video],
-    ['notifications', 'Notifications', Bell],
+    ['v2-admin-home', 'Home', Home], ['v2-inbox', 'Review inbox', Inbox], ['v2-builder', 'Course builder', BookOpen],
+    ['v2-insights', 'Student insights', Sparkles], ['v2-merit', 'Merit points', Award], ['v2-policies', 'Branch policies', ShieldCheck],
+    ['v2-team', 'Team report', Gauge], ['v2-people', 'People & roles', UsersRound], ['v2-announcements', 'Announcements & surveys', Megaphone],
+    ['v2-dept-chat', 'Student messages', MessageCircle], ['v2-badges', 'Badge designs', Trophy], ['notifications', 'Notifications', Bell],
   ],
 };
 
+/** Shown in the teacher / coordinator menu only while this teacher is assigned to judge a competition. */
+const JUDGING_ITEM: [string, string, typeof LayoutDashboard] = ['judging', 'Judging', Trophy];
+
+/** True when the signed-in teacher is the assigned judge of a competition that is being judged now. */
+function useIsAssignedJudge(role: Role, userId: string | undefined): boolean {
+  const [assigned, setAssigned] = useState(false);
+  useEffect(() => {
+    if (!userId || (role !== 'teacher' && role !== 'coordinator')) { setAssigned(false); return; }
+    let cancelled = false;
+    apiFetch<{ judge_teacher_id?: string | null }[]>('/competitions?status=judging', { silent: true })
+      .then(rows => { if (!cancelled) setAssigned(Array.isArray(rows) && rows.some(row => row.judge_teacher_id === userId)); })
+      .catch(() => { if (!cancelled) setAssigned(false); });
+    return () => { cancelled = true; };
+  }, [role, userId]);
+  return assigned;
+}
+
 type NotificationPresentation = { title: string; body: string };
 
-export function notificationPresentation(notification: UserNotification): NotificationPresentation {
-  const payload = typeof notification.payload === 'string'
+function notificationPayload(notification: UserNotification): Record<string, unknown> {
+  return typeof notification.payload === 'string'
     ? (() => { try { return JSON.parse(notification.payload) as Record<string, unknown>; } catch { return {}; } })()
-    : notification.payload ?? {};
-  const competition = typeof payload.title === 'string' ? ` “${payload.title}”` : '';
+    : (notification.payload as Record<string, unknown> | null) ?? {};
+}
+
+/** Never show internal codes ("FNK-C101 LV01 S05") to anyone reading a pop-up. */
+const CODE_PATTERN = /\b[A-Z]{2,5}-[A-Z]?\d{2,4}\b|\bLV\s?\d{1,2}\b|\bS\d{1,2}\b/g;
+function withoutCodes(text: string): string {
+  return text.replace(CODE_PATTERN, '').replace(/\s{2,}/g, ' ').replace(/^[\s,·—]+/, '').trim();
+}
+function text(value: unknown): string | null {
+  return typeof value === 'string' && value.trim() ? withoutCodes(value.trim()) : null;
+}
+
+export function notificationPresentation(notification: UserNotification): NotificationPresentation {
+  const payload = notificationPayload(notification);
+  const named = text(payload.title);
+  const quoted = named ? ` “${named}”` : '';
+  const where = text(payload.stepLabel);
+  const mark = typeof payload.mark === 'number' ? payload.mark : null;
+  const message = text(payload.message);
   const map: Record<string, NotificationPresentation> = {
-    test_result: { title: 'Checkpoint result', body: payload.decision === 'pass' ? 'Your checkpoint test passed and your next level is unlocked.' : 'Your checkpoint needs another attempt. Check the review for feedback.' },
+    // ---- the in-app allow-list (khat-backend/src/services/notify.ts) ----
+    work_marked: payload.provisional === true
+      ? { title: mark != null ? `Marked ${mark}/10 · your teacher will confirm` : 'Your work has a mark', body: message ?? `${where ? `${where}. ` : ''}Your teacher will look at it soon and confirm the mark. Read the message in the chat.` }
+      : { title: mark != null ? `Your work was marked ${mark}/10` : 'Your work has been marked', body: message ?? `${where ? `${where}. ` : ''}Open it to read your teacher’s comments.` },
+    work_reviewed: { title: 'Your teacher replied to your work', body: message ?? (where ? `${where}. Open it to read the comments.` : 'Open your task to read the comments.') },
+    teacher_replied: { title: 'New message from your teacher', body: where ? `About ${where}. Tap to open the chat.` : (message ?? 'Tap to open the chat.') },
+    dept_reply: { title: 'The Funun al-Quran Department replied', body: (message ?? '').replace(/^Funun al-Quran Department:\s*/, '') || 'Tap to read the reply.' },
+    new_course: { title: 'A new course is ready for you', body: named ? `${named} has just been added. Take a look!` : 'A new course has just been added. Take a look!' },
+    course_created: { title: 'A new course is ready for you', body: named ? `${named} has just been added. Take a look!` : 'A new course has just been added. Take a look!' },
+    announcement: { title: named ?? 'A message from Funun al-Quran', body: message ?? 'Tap to read it.' },
     entry_marked: payload.entryKind === 'mashq_marking'
-      ? { title: payload.passed === true ? 'Mashq worksheet marked' : 'Mashq worksheet needs another attempt', body: typeof payload.markOutOfTen === 'number' ? `Your Mashq worksheet was marked ${payload.markOutOfTen}/10. Open the matching worksheet category to view teacher feedback.` : 'Your Mashq worksheet was marked. Open its worksheet category to see the result and feedback.' }
-      : { title: payload.passed === true ? 'Practice passed' : 'Practice needs another attempt', body: typeof payload.markOutOfTen === 'number' ? `The course review team marked your work ${payload.markOutOfTen}/10. Open your course journey for feedback.` : 'Your course practice was marked. Open your course journey for the result and feedback.' },
-    new_entry_to_check: { title: 'New entry to review', body: 'A student submission has been added to your review queue.' },
-    entry_queued_unassigned: { title: 'Entry needs assignment', body: 'A submission is waiting for an administrator to assign a reviewer.' },
-    entry_auto_diverted: { title: 'Entry reassigned', body: 'A submission was automatically moved to another reviewer.' },
-    entry_idle_flagged: { title: 'Review needs attention', body: 'An entry has been idle past its review window.' },
-    competition_results: { title: 'Competition results published', body: `Results are now available${competition}.` },
-    competition_created: { title: 'New competition', body: `A new guild competition is open${competition}.` },
-    competition_entry_received: { title: 'Competition entry received', body: `A new submission was received${competition}.` },
-    competition_judging_assigned: { title: 'Judging assignment', body: `You have been assigned to judge${competition}.` },
-    competition_results_ready: { title: 'Results ready to publish', body: `A judge submitted results for${competition}.` },
-    showcase_pending: { title: 'Showcase post needs moderation', body: 'A student shared a new piece for review.' },
-    showcase_moderated: { title: payload.decision === 'approve' ? 'Showcase post approved' : 'Showcase post not approved', body: payload.decision === 'approve' ? 'Your work is now visible in the showcase.' : 'Your work was reviewed and is not visible in the showcase.' },
-    showcase_removed: { title: 'Showcase post removed', body: 'Your showcase post was removed by an administrator.' },
-    event_scheduled: { title: 'New live event scheduled', body: `A new event has been scheduled${competition}.` },
-    event_updated: { title: 'Live event updated', body: `Event details have changed${competition}.` },
-    event_live: { title: 'Event is live', body: `${competition || 'A guild event'} is broadcasting now.` },
-    event_ended: { title: 'Event ended', body: `${competition || 'A guild event'} has ended.` },
-    event_cancelled: { title: 'Event cancelled', body: `${competition || 'A guild event'} has been cancelled.` },
-    certificate_pending_review: { title: 'Certificate awaiting approval', body: 'A certificate has been earned and is waiting for admin approval.' },
-    certificate_approved: { title: 'Certificate approved', body: 'Your certificate is ready to view.' },
-    certificate_rejected: { title: 'Certificate not approved', body: 'Your certificate request was reviewed.' },
-    theme_changed: { title: 'Appearance updated', body: `Your theme is now ${String(payload.theme ?? 'updated')}.` },
-    password_changed: { title: 'Password changed', body: 'Your account password was updated successfully.' },
-    password_reset: { title: 'Password reset', body: 'Your account password was reset successfully.' },
-    profile_updated: { title: 'Profile updated', body: 'An administrator updated your profile details.' },
-    asset_added: { title: 'New reference available', body: `A new calligraphy reference was added${competition}.` },
-    course_created: { title: 'New course available', body: `A new course was added${competition}.` },
-    course_updated: { title: 'Course updated', body: `Course content or lessons were updated${competition}.` },
-    course_removed: { title: 'Course removed', body: `A course was removed${competition}.` },
-    resource_added: { title: 'New resource available', body: `A new reference resource was added${competition}.` },
-    resource_removed: { title: 'Resource removed', body: `A reference resource was removed${competition}.` },
-    staff_assignment_updated: { title: 'Teaching assignment updated', body: 'Your branch, role settings, or teaching assignments were updated.' },
-    account_deactivated: { title: 'Account deactivated', body: 'Your staff account has been deactivated.' },
+      ? { title: typeof payload.markOutOfTen === 'number' ? `Your Mashq worksheet was marked ${payload.markOutOfTen}/10` : 'Your Mashq worksheet was marked', body: payload.passed === true ? 'Well done! Open it to read your teacher’s comments.' : 'Read your teacher’s comments, practice once more and send it again.' }
+      : { title: typeof payload.markOutOfTen === 'number' ? `Your practice was marked ${payload.markOutOfTen}/10` : 'Your practice was marked', body: payload.passed === true ? 'Well done! Open your course to read the comments.' : 'Read your teacher’s comments, practice once more and send it again.' },
+    test_result: payload.decision === 'pass'
+      ? { title: 'You passed your checkpoint!', body: 'Well done — your next level is now open.' }
+      : { title: 'Your checkpoint needs one more try', body: 'Read your teacher’s comments and try again when you are ready.' },
+    competition_results: { title: 'Competition results are out', body: named ? `See how you did in${quoted}.` : 'See how you did.' },
+    // ---- older types (no longer created, but may still sit in the bell) ----
+    badge_earned: { title: 'You earned a new badge!', body: message ?? 'Open My badges to see it.' },
+    competition_created: { title: 'A new competition is open', body: named ? `Take part in${quoted}.` : 'Take a look and take part.' },
+    certificate_approved: { title: 'Your certificate is ready', body: 'Open Achievements to download it.' },
+    event_scheduled: { title: 'A new live class is coming', body: named ? `${named} has been scheduled.` : 'Open Events to see when.' },
+    event_live: { title: 'A live class has started', body: named ? `${named} is live now.` : 'Open Events to join.' },
+    showcase_moderated: { title: payload.decision === 'approve' ? 'Your work is in the showcase' : 'About your showcase post', body: payload.decision === 'approve' ? 'Everyone in your branch can now see it.' : 'It was looked at and is not shown this time.' },
   };
   return map[notification.type] ?? {
-    title: notification.type.replace(/_/g, ' ').replace(/\b\w/g, character => character.toUpperCase()),
-    body: typeof payload.message === 'string' ? payload.message : 'There is a new update in your workspace.',
+    title: 'New update',
+    body: message ?? 'There is something new for you.',
   };
+}
+
+/** Where tapping a pop-up takes you (and the parameters the v2 pages read). */
+function notificationTarget(notification: UserNotification): { page: string; params: Record<string, string> } {
+  const payload = notificationPayload(notification);
+  const courseId = typeof payload.courseId === 'string' ? payload.courseId : null;
+  const stepId = typeof payload.stepId === 'string' ? payload.stepId : null;
+  if (['work_marked', 'work_reviewed', 'teacher_replied'].includes(notification.type) && courseId && stepId) return { page: 'v2-task', params: { courseId, stepId } };
+  if (notification.type === 'dept_reply') return { page: 'v2-dept-chat', params: {} };
+  return { page: 'notifications', params: {} };
+}
+
+/** Pop-ups about the same chat (same step, or the department chat) share one key. */
+function toastGroupKey(notification: UserNotification): string {
+  const stepId = notificationPayload(notification).stepId;
+  if (notification.type === 'teacher_replied' && typeof stepId === 'string') return `chat:${stepId}`;
+  if (notification.type === 'dept_reply') return 'chat:dept';
+  return `id:${notification.id}`;
+}
+
+/** True when the chat this notification is about is already open on screen (then no pop-up). */
+function isChatOpenFor(notification: UserNotification): boolean {
+  const page = window.location.hash.slice(1).split('?')[0];
+  if (notification.type === 'dept_reply') return page === 'v2-dept-chat';
+  if (['work_marked', 'work_reviewed', 'teacher_replied'].includes(notification.type)) {
+    const stepId = notificationPayload(notification).stepId;
+    if (typeof stepId !== 'string') return false;
+    if (page === 'v2-task') return readV2Param('stepId') === stepId;
+    // an open step chat elsewhere (course window) marks itself with data-thread-step
+    return Boolean(document.querySelector(`[data-thread-step="${CSS.escape(stepId)}"]`));
+  }
+  return false;
 }
 
 export function AlertsPage() {
@@ -238,7 +289,7 @@ export function AlertsPage() {
         {items.map(notification => {
           const presentation = notificationPresentation(notification);
           return (
-            <button className={`notification alerts-notification${notification.read ? '' : ' unread'}`} key={notification.id} onClick={() => void markRead(notification)} aria-label={`${presentation.title}${notification.read ? '' : ', unread'}`}>
+            <button className={`notification alerts-notification${notification.read ? '' : ' unread'}`} key={notification.id} onClick={() => { void markRead(notification); const target = notificationTarget(notification); if (target.page !== 'notifications') openV2(target.page, target.params); }} aria-label={`${presentation.title}${notification.read ? '' : ', unread'}`}>
               <span className="notification-icon"><Bell size={17} /></span>
               <span className="alerts-notification-copy"><strong>{presentation.title}</strong><span>{presentation.body}</span><small>{new Date(notification.created_at).toLocaleString()}</small></span>
               {!notification.read && <span className="alerts-unread-dot" aria-label="Unread" />}
@@ -297,6 +348,7 @@ export function Header({
   const notificationsLoaded = useRef(false);
   const pendingNotificationToasts = useRef<UserNotification[]>([]);
   const activeNotificationToastIds = useRef<Set<string>>(new Set());
+  const activeToastKeys = useRef<Set<string>>(new Set());
   const notificationToastTimers = useRef<Map<string, number>>(new Map());
   const page = useHash();
   const { language, setLanguage, t } = useLanguage();
@@ -306,7 +358,8 @@ export function Header({
   const themeRef = useRef<HTMLDivElement>(null);
   const searchRef = useRef<HTMLDivElement>(null);
   const avatarRevision = useRef(0);
-  const nav = roleNavigation[role];
+  const isJudge = useIsAssignedJudge(role, user?.id);
+  const nav = isJudge ? [...roleNavigation[role].slice(0, -2), JUDGING_ITEM, ...roleNavigation[role].slice(-2)] : roleNavigation[role];
   const initials = user ? user.name.split(' ').map(part => part[0]).slice(0, 2).join('').toUpperCase() : '?';
 
   useEffect(() => {
@@ -402,6 +455,7 @@ export function Header({
     notificationsLoaded.current = false;
     pendingNotificationToasts.current = [];
     activeNotificationToastIds.current = new Set();
+    activeToastKeys.current = new Set();
     notificationToastTimers.current.forEach(timer => window.clearTimeout(timer));
     notificationToastTimers.current.clear();
     setUnreadNotifications(0);
@@ -413,17 +467,18 @@ export function Header({
     const flushToastQueue = () => {
       if (stopped) return;
       const next: UserNotification[] = [];
-      while (activeNotificationToastIds.current.size + next.length < 4 && pendingNotificationToasts.current.length) {
+      while (activeNotificationToastIds.current.size + next.length < 2 && pendingNotificationToasts.current.length) {
         const candidate = pendingNotificationToasts.current.shift()!;
         if (!activeNotificationToastIds.current.has(candidate.id)) next.push(candidate);
       }
       if (!next.length) return;
-      next.forEach(notification => activeNotificationToastIds.current.add(notification.id));
-      setNotificationToasts(current => [...current, ...next].slice(-4));
+      next.forEach(notification => { activeNotificationToastIds.current.add(notification.id); activeToastKeys.current.add(toastGroupKey(notification)); });
+      setNotificationToasts(current => [...current, ...next].slice(-2));
       next.forEach(notification => {
         const timer = window.setTimeout(() => {
           notificationToastTimers.current.delete(notification.id);
           activeNotificationToastIds.current.delete(notification.id);
+          activeToastKeys.current.delete(toastGroupKey(notification));
           setNotificationToasts(current => current.filter(item => item.id !== notification.id));
           flushToastQueue();
         }, 9000);
@@ -432,8 +487,14 @@ export function Header({
     };
     const enqueueToasts = (notifications: UserNotification[]) => {
       const queuedIds = new Set(pendingNotificationToasts.current.map(item => item.id));
+      // several messages in the same chat → one pop-up (the newest words are in the chat anyway)
+      const queuedKeys = new Set(pendingNotificationToasts.current.map(toastGroupKey));
       notifications.forEach(notification => {
         if (activeNotificationToastIds.current.has(notification.id) || queuedIds.has(notification.id)) return;
+        if (isChatOpenFor(notification)) return; // the message is already on screen
+        const key = toastGroupKey(notification);
+        if (queuedKeys.has(key) || activeToastKeys.current.has(key)) return;
+        queuedKeys.add(key);
         pendingNotificationToasts.current.push(notification);
         queuedIds.add(notification.id);
       });
@@ -454,7 +515,18 @@ export function Header({
         // The first successful sync happens immediately after login. Surface
         // unread alerts accumulated while the user was away instead of
         // treating that initial response as a silent baseline.
-        const toastsToShow = notificationsLoaded.current ? fresh : notifications.filter(notification => !notification.read);
+        // On the first sync after opening the site, only pop up alerts from the
+        // last 10 minutes (max 3) that were never shown before; older unread ones
+        // wait quietly in the bell. Shown ids are remembered across reloads.
+        const seenKey = `khat_toasted_${user?.id ?? ''}`;
+        let seen: string[] = [];
+        try { seen = JSON.parse(localStorage.getItem(seenKey) || '[]'); } catch { seen = []; }
+        const recent = (n: UserNotification) => Date.now() - new Date(n.created_at).getTime() < 10 * 60 * 1000;
+        const toastsToShow = (notificationsLoaded.current ? fresh : notifications.filter(n => !n.read && recent(n)).slice(0, 3))
+          .filter(n => !seen.includes(n.id));
+        if (toastsToShow.length) {
+          try { localStorage.setItem(seenKey, JSON.stringify([...seen, ...toastsToShow.map(n => n.id)].slice(-200))); } catch { /* storage unavailable */ }
+        }
         if (toastsToShow.length) {
           enqueueToasts(toastsToShow);
           broadcastNotificationsChanged();
@@ -513,6 +585,8 @@ export function Header({
     if (timer !== undefined) window.clearTimeout(timer);
     notificationToastTimers.current.delete(id);
     activeNotificationToastIds.current.delete(id);
+    const dismissed = notificationToasts.find(item => item.id === id);
+    if (dismissed) activeToastKeys.current.delete(toastGroupKey(dismissed));
     setNotificationToasts(current => current.filter(item => item.id !== id));
     // The active header effect drains queued login notifications after any
     // displayed toast is dismissed; trigger its normal poll to keep everything
@@ -549,7 +623,7 @@ export function Header({
           {searchResults.length > 0 && <div className="global-search-results">{searchResults.map(([href, label, Icon]) => <button key={href} onClick={() => handleNav(href)}><Icon size={15} />{label}<ArrowRight size={13} /></button>)}</div>}
         </div>
         <div className="global-topbar-actions">
-          <button type="button" className="global-language-toggle" onClick={() => setLanguage(language === 'en' ? 'ar' : 'en')} aria-label={language === 'en' ? 'Switch to Arabic' : 'Switch to English'}>{language === 'en' ? 'العربية' : 'English'}</button>
+          {language !== 'en' && <button type="button" className="global-language-toggle" onClick={() => setLanguage('en')} aria-label="Switch to English">English</button>}
           <div className="global-popover-anchor" ref={themeRef}>
             <button className={`global-header-action${themeOpen ? ' active' : ''}`} onClick={() => { setThemeOpen(value => !value); setProfileOpen(false); }} aria-label="Choose theme" aria-expanded={themeOpen} title="Choose theme">
               <Palette size={18} />
@@ -585,7 +659,7 @@ export function Header({
         {notificationToasts.map(notification => {
           const presentation = notificationPresentation(notification);
           return <div className="global-notification-toast" key={notification.id}>
-            <button className="global-notification-toast-body" onClick={() => handleNav('notifications')}>
+            <button className="global-notification-toast-body" onClick={() => { const target = notificationTarget(notification); dismissNotificationToast(notification.id); setSearch(''); openV2(target.page, target.params); }}>
               <span className="global-notification-toast-icon"><Bell size={16} /></span>
               <span><strong>{presentation.title}</strong><small>{presentation.body}</small></span>
             </button>
@@ -638,7 +712,7 @@ export function SectionHeading({ eyebrow, title, text, action, className = '' }:
   );
 }
 
-export function ShowcaseHeading({ eyebrow = 'The guild', title, text, action }: { eyebrow?: string; title: string; text?: string; action?: ReactNode }) {
+export function ShowcaseHeading({ eyebrow = 'Funun al-Quran', title, text, action }: { eyebrow?: string; title: string; text?: string; action?: ReactNode }) {
   return (
     <header className="showcase-page-heading">
       <p className="showcase-heading-eyebrow"><span aria-hidden="true" />{eyebrow}</p>
@@ -850,7 +924,7 @@ export function ShowcaseSections({ works }: { works: GalleryWork[] }) {
   return (
     <>
       <section className="page section showcase-section-block">
-        <SectionHeading title="Teacher Showcase" text="Work shared by teachers across every branch." className="showcase-subheading" />
+        <SectionHeading title="Teacher Showcase" text="Work shared by the teachers of your branch." className="showcase-subheading" />
         <div className="gallery-grid">
           {teacherWorks.map(work => (
             <GalleryCard work={work} key={work.word + work.name} />
@@ -858,7 +932,7 @@ export function ShowcaseSections({ works }: { works: GalleryWork[] }) {
         </div>
       </section>
       <section className="page section showcase-section-block">
-        <SectionHeading title="Student Showcase" text="Practice shared by students across every branch — feedback, not just likes." className="showcase-subheading" />
+        <SectionHeading title="Student Showcase" text="Finished pieces by students of your branch." className="showcase-subheading" />
         <div className="gallery-grid">
           {studentWorks.map(work => (
             <GalleryCard work={work} key={work.word + work.name} />
@@ -876,14 +950,14 @@ export function ShowcaseFeedSections({ posts, onLike }: { posts: ShowcaseFeedPos
   return (
     <div className="showcase-feed-sections">
       <section className="showcase-feed-section showcase-section-block">
-        <SectionHeading title="Teacher Showcase" text="Work shared by teachers across every branch." className="showcase-subheading" />
+        <SectionHeading title="Teacher Showcase" text="Work shared by the teachers of your branch." className="showcase-subheading" />
         <div className="gallery-grid">
           {teacherPosts.map(post => <ShowcasePostCard key={post.id} post={post} onLike={onLike} />)}
           {teacherPosts.length === 0 && <p className="muted showcase-feed-empty">No teacher posts to show yet.</p>}
         </div>
       </section>
       <section className="showcase-feed-section showcase-section-block">
-        <SectionHeading title="Student Showcase" text="Practice shared across branches — feedback, not just likes." className="showcase-subheading" />
+        <SectionHeading title="Student Showcase" text="Finished pieces by students of your branch." className="showcase-subheading" />
         <div className="gallery-grid">
           {studentPosts.map(post => <ShowcasePostCard key={post.id} post={post} onLike={onLike} />)}
           {studentPosts.length === 0 && <p className="muted showcase-feed-empty">No student posts to show yet.</p>}
@@ -903,8 +977,8 @@ export function DashboardShowcaseCarousels({ posts, onLike }: { posts: ShowcaseF
 
   return (
     <div className="dashboard-showcase-carousels">
-      {carousel('Teacher Showcase', 'Work shared by teachers across every branch.', teacherPosts)}
-      {carousel('Student Showcase', 'Practice shared across branches — feedback, not just likes.', studentPosts)}
+      {carousel('Teacher Showcase', 'Work shared by the teachers of your branch.', teacherPosts)}
+      {carousel('Student Showcase', 'Finished pieces by students of your branch.', studentPosts)}
     </div>
   );
 }

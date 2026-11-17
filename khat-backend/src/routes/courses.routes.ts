@@ -38,8 +38,18 @@ export async function courseRoutes(app: FastifyInstance) {
       const { khatTypeId, category } = request.query;
       const conditions: string[] = [];
       const params: unknown[] = [];
-      if ((request.user as AuthUser).role === 'student') {
+      const viewer = request.user as AuthUser;
+      if (viewer.role === 'student') {
         conditions.push(`khat_type_id NOT IN (SELECT id FROM khat_types WHERE code = 'tehseen_al_khat_normal_pen')`);
+        // v3 curriculum audit: students only see OLD-system courses here that are published,
+        // open to their branch (no branch rows = every branch) and actually have levels.
+        // New-system courses (structure_version 2) are listed once, in the v2 course section.
+        conditions.push(`COALESCE(structure_version, 1) = 1`);
+        conditions.push(`COALESCE(status, 'published') = 'published'`);
+        conditions.push(`EXISTS (SELECT 1 FROM levels lv WHERE lv.course_id = courses.id)`);
+        params.push(viewer.branchId ?? '');
+        conditions.push(`(NOT EXISTS (SELECT 1 FROM course_branches cb WHERE cb.course_id = courses.id)
+          OR EXISTS (SELECT 1 FROM course_branches cb2 WHERE cb2.course_id = courses.id AND cb2.branch_id = $${params.length}))`);
       }
       if (khatTypeId) {
         params.push(khatTypeId);

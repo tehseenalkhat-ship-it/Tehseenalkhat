@@ -5,7 +5,7 @@ export type Branch = (typeof branches)[number];
 
 export const khatTypes: Record<Script, KhatType> = {
   Naskh: { name: 'Naskh', arabic: 'نسخ', color: '#a9791f', soft: '#f1e6ca', desc: 'Clear, disciplined, built to be read — the script of the Qur’an and the page.', tagline: 'clarity you can read at a glance.' },
-  'Naskh (Normal Pen)': { name: 'Naskh · Normal pen', arabic: 'نسخ', color: '#607a69', soft: '#dce8df', desc: 'Naskh forms and proportions practised with an ordinary pen.', tagline: 'Naskh, practised with the everyday pen.' },
+  'Naskh (Normal Pen)': { name: 'Naskh · Normal pen', arabic: 'نسخ', color: '#607a69', soft: '#dce8df', desc: 'Naskh forms and proportions practiced with an ordinary pen.', tagline: 'Naskh, practiced with the everyday pen.' },
   Sulus: { name: 'Sulus (Thuluth)', arabic: 'ثلث', color: '#8d3327', soft: '#f0dbd2', desc: 'Monumental and dramatic — the script of titles, domes, and inscriptions.', tagline: 'the script built to be seen.' },
   Nastaaleeq: { name: 'Nastaaleeq', arabic: 'نستعلیق', color: '#496052', soft: '#dce4da', desc: 'Flowing and suspended — the script of Persian and Urdu poetry.', tagline: 'the hand that carries poetry.' },
   Istinsaakh: { name: 'Istinsaakh', arabic: 'استنساخ', color: '#7a4d23', soft: '#f5eadd', desc: 'A disciplined, measured script form designed for careful proportion and clean rhythm.', tagline: 'precision through repetition.' },
@@ -203,7 +203,7 @@ export type Notification = { title: string; body: string; type: string; time: st
 export const studentNotifications: Notification[] = [
   { title: 'Your Naskh checkpoint result is ready', body: 'Foundation checkpoint passed. Your next level is unlocked.', type: 'Test result', time: 'Today' },
   { title: 'A new course is open', body: 'Qalam care & cutting has been added to the library.', type: 'New course', time: 'Yesterday' },
-  { title: 'Guild challenge closes soon', body: 'Three days left to submit your work.', type: 'Competition', time: '2 days ago' },
+  { title: 'Competition closes soon', body: 'Three days left to submit your work.', type: 'Competition', time: '2 days ago' },
   { title: 'Monthly practice reminder', body: 'Your hand has been quiet for 4 days. Five minutes is enough.', type: 'Reminder', time: '4 days ago' },
   { title: 'Live event starting soon', body: 'Naskh clinic begins in 1 hour.', type: 'Live event', time: '5 days ago' },
 ];

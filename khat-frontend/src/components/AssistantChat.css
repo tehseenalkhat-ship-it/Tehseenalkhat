@@ -44,3 +44,9 @@
 .assistant-chat-composer small{position:absolute;right:13px;bottom:8px;color:var(--muted);font-size:8px}
 @media(max-width:600px){.assistant-chat-root{right:12px;bottom:12px}.assistant-chat-panel{position:fixed;right:10px;bottom:68px;width:calc(100vw - 20px);height:min(650px,calc(100dvh - 92px));border-radius:16px}.assistant-chat-launcher{width:45px;min-height:45px;padding:0;font-size:11px}.assistant-chat-launcher:hover,.assistant-chat-launcher:focus-visible{width:160px;padding:0 14px}.assistant-chat-launcher.is-open,.assistant-chat-launcher.is-open:hover,.assistant-chat-launcher.is-open:focus-visible{width:44px;min-height:44px;padding:0}}
 @media(prefers-reduced-motion:reduce){.assistant-chat-panel{animation:none}.assistant-chat-launcher,.assistant-chat-icon-button,.assistant-chat-suggestions button,.assistant-chat-composer>button{transition:none}.assistant-spin{animation-duration:1.8s}}
+/* v3 audit 16: smaller and tucked lower on phones so it never covers list arrows */
+@media (max-width:740px){
+  .assistant-chat-root{right:10px;bottom:10px}
+  .assistant-chat-launcher{width:40px;min-height:40px;opacity:.92}
+  .assistant-chat-launcher>svg{width:17px;height:17px}
+}

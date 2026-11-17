@@ -30,7 +30,7 @@ const ARABIC: Record<string, string> = {
   'Enroll in a course to start building your overall progress.': 'سجل في دورة لبدء متابعة تقدمك الإجمالي.',
   'Mashq worksheets': 'أوراق تدريب المشق', 'All khat types': 'جميع أنواع الخط', 'View sheets': 'عرض الأوراق',
   'Loading courses…': 'جارٍ تحميل الدورات…', 'Loading worksheets…': 'جارٍ تحميل أوراق التدريب…',
-  'Choose your place in the guild to continue.': 'اختر موقعك في المجموعة للمتابعة.', 'Student': 'طالب', 'Faculty': 'الهيئة التعليمية',
+  'Choose how you take part in Funun al-Quran to continue.': 'اختر موقعك في المجموعة للمتابعة.', 'Student': 'طالب', 'Faculty': 'الهيئة التعليمية',
   'Coordinator': 'منسق', 'Admin': 'مسؤول', 'Sign in': 'تسجيل الدخول', 'Email': 'البريد الإلكتروني', 'Password': 'كلمة المرور',
   'Student sign in': 'دخول الطالب', 'Welcome back': 'مرحباً بعودتك', 'Profile': 'الملف الشخصي', 'Overview': 'نظرة عامة',
 };

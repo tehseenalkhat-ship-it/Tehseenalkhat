@@ -1,3 +1,7 @@
+import { V3MyShowcasePage } from '@/v2/content/MyShowcasePage';
+import { V3RecordingsManager } from '@/v2/content/EventsPage';
+import { TeacherActionStrip } from '@/v2/teacher/TeacherActionStrip';
+import { V2DashboardHighlights } from '@/v2/competitions/DashboardHighlights';
 import { lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react';
 import {
   Activity, ArrowRight, Award, CalendarDays, Check, ChevronRight, ClipboardList, Clock,
@@ -17,7 +21,6 @@ import { FixedReportsCard } from '@/components/ReportProblem';
 import { openEntry, useActiveEntryId } from '@/entrySession';
 import { viewStudentProfile, useActiveStudentId } from '@/studentViewSession';
 import { viewTeacherProfile, useViewedTeacherId, clearViewedTeacher } from '@/teacherViewSession';
-import { ShowcaseImageEditor } from '@/components/ShowcaseImageEditor';
 import { SubmissionAnnotator } from '@/components/SubmissionAnnotator';
 import { CourseJourney } from '@/components/CourseJourney';
 import type { LiveKitRoomAccess } from '@/components/LiveKitEventRoom';
@@ -131,7 +134,6 @@ function makeWavFile(chunks: Float32Array[], sampleRate: number): { file: File; 
 // const currentTeacher = teachers[0];
 
 export function TeacherDashboard({ coordinator = false }: { coordinator?: boolean }) {
-  const [queue, setQueue] = useState<ApiQueueRow[]>([]);
   const [assignedScripts, setAssignedScripts] = useState<ApiAssignedScript[]>([]);
   const [stats, setStats] = useState<{ totalReviewed: number; avgResponseHours: number | null } | null>(null);
   const user = getSessionUser();
@@ -139,7 +141,6 @@ export function TeacherDashboard({ coordinator = false }: { coordinator?: boolea
   const userBranchId = user?.branchId;
   const [activity, setActivity] = useState<ApiActivity[]>([]);
   const [activityLoading, setActivityLoading] = useState(true);
-  const [queueLoading, setQueueLoading] = useState(true);
   const [dashboardError, setDashboardError] = useState<string | null>(null);
   const [coordinatorData, setCoordinatorData] = useState<{
     branchName: string;
@@ -155,11 +156,6 @@ export function TeacherDashboard({ coordinator = false }: { coordinator?: boolea
 
   useEffect(() => {
     if (!userId) return;
-  
-    apiFetch<ApiQueueRow[]>('/entries/queue')
-      .then(items => setQueue(Array.isArray(items) ? items : []))
-      .catch(err => setDashboardError(err instanceof ApiError ? err.message : 'Could not load your review queue.'))
-      .finally(() => setQueueLoading(false));
   
     apiFetch<{
       assignedScripts?: ApiAssignedScript[];
@@ -264,20 +260,17 @@ export function TeacherDashboard({ coordinator = false }: { coordinator?: boolea
   return (
     <main className="page portal-page">
       <FixedReportsCard />
+      <TeacherActionStrip />
+      <V2DashboardHighlights />
       <div className="portal-welcome">
         <div>
           <p className="eyebrow">{coordinator ? `Branch coordinator${coordinatorData?.branchName ? ` · ${coordinatorData.branchName}` : ''}` : 'Faculty workspace'}</p>
           <h1>Good morning, {user?.name.split(' ')[0] ?? 'there'}.</h1>
-          <p>{coordinator ? 'Your teaching desk and branch overview are ready. Review student work and support your local guild.' : 'Your teaching desk is ready. Review work, follow your students, and keep the hand moving.'}</p>
+          <p>{coordinator ? 'Your teaching desk and branch overview are ready. Review student work and support the calligraphy students of your branch.' : 'Your teaching desk is ready. Review work, follow your students, and keep the hand moving.'}</p>
           {coordinator && coordinatorData?.branchName && <span className="coordinator-branch-badge"><MapPin size={14} /> Appointed branch <strong>{coordinatorData.branchName}</strong></span>}
         </div>
-        <div className="queue-count"><strong>{queueLoading ? '—' : queue.length}</strong><span>entries to review</span></div>
       </div>
       {dashboardError && <p className="error-text" role="alert">{dashboardError}</p>}
-      <div className="stats-grid">
-        <StatCard icon={ClipboardList} value={String(stats?.totalReviewed ?? '—')} label="Total reviewed" />
-        <StatCard icon={Zap} value={stats?.avgResponseHours != null ? `${Math.round(stats.avgResponseHours)} hrs` : '—'} label="Average response" />
-      </div>
       {coordinator && (
         <section className="coordinator-overview">
           <div className="coordinator-overview-heading">
@@ -310,22 +303,9 @@ export function TeacherDashboard({ coordinator = false }: { coordinator?: boolea
       {assignedScripts.length > 0 && (
         <div className="info-banner"><Check size={16} /><span>You are assigned to review: {assignedScripts.map(s => s.display_name).join(', ')}. You will only see entries matching these scripts in your queue.</span></div>
       )}
+      {/* v3 audit: the old "Today's queue" box and "Total reviewed" counter read only the old queue and
+          contradicted the Review inbox above ("Queue is clear" while pieces were waiting) — removed. */}
       <div className="admin-dashboard-grid">
-        <div className="chart-card">
-          <SectionHeading title="Today's queue" text="The entries closest to their response deadline — filtered to your assigned scripts." action={<button className="text-link" onClick={() => navigate('queue')}>Open queue <ArrowRight size={14} /></button>} />
-          {queueLoading ? <PenLoader label="Loading your review queue…" compact /> : queue.slice(0, 3).map(row => (
-            <div className="dashboard-list-row" key={row.id}>
-              <div><strong>{row.student_name}</strong><small>{row.level_title ?? row.source_type}</small></div>
-              <StatusChip tone="amber">{hoursRemaining(row.created_at)} hrs left</StatusChip>
-            </div>
-          ))}
-          {!queueLoading && queue.length === 0 && (
-            <div className="dashboard-queue-empty">
-              <span><Inbox size={16} /></span>
-              <div><strong>Queue is clear</strong><small>New entries will appear here when they’re assigned.</small></div>
-            </div>
-          )}
-        </div>
         <div className="chart-card">
           <SectionHeading
             title="Your teaching rhythm"
@@ -340,12 +320,12 @@ export function TeacherDashboard({ coordinator = false }: { coordinator?: boolea
       </div>
       <section className="showcase-section">
         <ShowcaseHeading
-          title="Gallery"
-          text="Practice shared across every branch."
+          title="Showcase"
+          text="Recent work shared by the students and teachers of your branch."
         />
       
         {showcaseLoading ? (
-          <PenLoader label="Loading gallery…" compact />
+          <PenLoader label="Loading the showcase…" compact />
         ) : showcasePosts.length === 0 ? (
           <p className="muted">Nothing shared yet.</p>
         ) : (
@@ -374,7 +354,9 @@ export function CoordinatorDashboard() {
 
 export function TeacherQueue({ coordinator = false }: { coordinator?: boolean }) {
   const [filter, setFilter] = useState<Script | 'All'>('All');
-  const [reviewTypeFilter, setReviewTypeFilter] = useState<'all' | 'practice' | 'checkpoint_assessment' | 'marked'>('all');
+  // v3 (5.13): the queue is split by the established course types only — Certification / Mashq / Crash.
+  const [reviewTypeFilter, setReviewTypeFilter] = useState<'all' | 'certification' | 'mashq' | 'crash'>('all');
+  const legacyKind = (row: ApiQueueRow): 'certification' | 'mashq' | 'crash' => (row.entry_kind === 'mashq_marking' ? 'mashq' : 'certification');
   const [rows, setRows] = useState<ApiQueueRow[]>([]);
   const [assignedScripts, setAssignedScripts] = useState<ApiAssignedScript[]>([]);
   const [branchMap, setBranchMap] = useState<Record<string, string>>({});
@@ -407,24 +389,19 @@ export function TeacherQueue({ coordinator = false }: { coordinator?: boolean })
   const filtered = rows.filter(row => {
     const assignedCode = assignedScripts.find(item => item.id === row.khat_type_id)?.code;
     const matchesScript = filter === 'All' || scriptFromCode(row.khat_type_code ?? assignedCode) === filter;
-    const matchesType = reviewTypeFilter === 'all'
-      || (reviewTypeFilter === 'practice' && row.entry_kind !== 'checkpoint_assessment')
-      || (reviewTypeFilter === 'checkpoint_assessment' && row.entry_kind === 'checkpoint_assessment')
-      || (reviewTypeFilter === 'marked' && false);
+    const matchesType = reviewTypeFilter === 'all' || legacyKind(row) === reviewTypeFilter;
     return matchesScript && matchesType;
   });
   const reviewTypeCount = (kind: typeof reviewTypeFilter) => {
     if (kind === 'all') return rows.length;
-    if (kind === 'practice') return rows.filter(row => row.entry_kind !== 'checkpoint_assessment').length;
-    if (kind === 'checkpoint_assessment') return rows.filter(row => row.entry_kind === kind).length;
-    return 0;
+    return rows.filter(row => legacyKind(row) === kind).length;
   };
   const overdueCount = rows.filter(row => row.status !== 'in_review' && hoursRemaining(row.created_at) === 0).length;
   const reviewTypeNames = {
     all: 'All work',
-    practice: 'Practice',
-    checkpoint_assessment: 'Online assessments',
-    marked: 'Marked',
+    certification: 'Certification',
+    mashq: 'Mashq',
+    crash: 'Crash',
   };
 
   const openRow = async (row: ApiQueueRow) => {
@@ -450,7 +427,7 @@ export function TeacherQueue({ coordinator = false }: { coordinator?: boolean })
         </div>
         <div className="teacher-queue-stats" aria-label="Queue summary">
           <div className="teacher-queue-stat waiting"><small>Waiting</small><strong>{loading ? '—' : rows.filter(row => row.status === 'assigned').length}</strong></div>
-          <div className="teacher-queue-stat assessments"><small>Assessments</small><strong>{loading ? '—' : reviewTypeCount('checkpoint_assessment')}</strong></div>
+          <div className="teacher-queue-stat assessments"><small>Mashq</small><strong>{loading ? '—' : reviewTypeCount('mashq')}</strong></div>
           <div className="teacher-queue-stat overdue"><small>Overdue</small><strong>{loading ? '—' : overdueCount}</strong></div>
         </div>
       </div>
@@ -477,8 +454,8 @@ export function TeacherQueue({ coordinator = false }: { coordinator?: boolean })
         <div className="queue-empty-state">
           <div className="queue-empty-icon"><Inbox size={24} strokeWidth={1.7} /></div>
           <p className="eyebrow">Review queue</p>
-          <h3>{reviewTypeFilter === 'marked' ? 'No marked work in this queue' : filter === 'All' ? 'You’re all caught up' : `No ${filter} entries right now`}</h3>
-          <p>{reviewTypeFilter === 'marked' ? 'Completed reviews are available in My reviews.' : filter === 'All' ? 'There is no work waiting for review. New student work will appear here as it arrives.' : `There are no entries matching ${filter} in your current queue. Try another course or check back later.`}</p>
+          <h3>{reviewTypeFilter !== 'all' ? `No ${reviewTypeNames[reviewTypeFilter]} work right now` : filter === 'All' ? 'You’re all caught up' : `No ${filter} entries right now`}</h3>
+          <p>{reviewTypeFilter !== 'all' ? 'Try another type or check back later.' : filter === 'All' ? 'There is no work waiting for review. New student work will appear here as it arrives.' : `There are no entries matching ${filter} in your current queue. Try another course or check back later.`}</p>
           {(filter !== 'All' || reviewTypeFilter !== 'all') && <button className="text-link" onClick={() => { setFilter('All'); setReviewTypeFilter('all'); }}>View all work <ArrowRight size={14} /></button>}
         </div>
       ) : (
@@ -490,14 +467,14 @@ export function TeacherQueue({ coordinator = false }: { coordinator?: boolean })
             const scriptName = row.khat_type_name ?? 'Unknown script';
             const hrs = hoursRemaining(row.created_at);
             const sentDate = new Date(row.created_at);
-            const typeName = row.entry_kind === 'checkpoint_assessment' ? 'Online assessment' : row.entry_kind === 'mashq_marking' ? 'Mashq worksheet' : row.entry_kind === 'secondary_marking' ? 'Practice' : 'Practice';
+            const typeName = row.entry_kind === 'mashq_marking' ? 'Mashq' : row.entry_kind === 'checkpoint_assessment' ? 'Certification · assessment' : 'Certification';
             const dueLabel = row.status === 'in_review' ? 'In review' : hrs === 0 ? 'Overdue' : hrs < 24 ? `${hrs} hrs left` : `${Math.ceil(hrs / 24)} days left`;
             return (
               <tr key={row.id} className={row.entry_kind === 'checkpoint_assessment' ? 'assessment' : ''}>
                 <td><strong>{row.student_name}</strong><small>{branchMap[row.student_branch_id] ?? '—'}</small></td>
                 <td><span className="teacher-queue-course"><b>{row.khat_type_code ? row.khat_type_code.slice(0, 1).toUpperCase() : '•'}</b>{scriptName}</span></td>
                 <td>{row.level_title ?? '—'}</td>
-                <td><span className="teacher-queue-work">{row.original_filename ?? (row.entry_kind === 'checkpoint_assessment' ? 'Assessment submission' : row.entry_kind === 'mashq_marking' ? 'Mashq worksheet' : 'Practice sheet')}</span></td>
+                <td><span className="teacher-queue-work">{row.original_filename ?? (row.entry_kind === 'checkpoint_assessment' ? 'Assessment submission' : row.entry_kind === 'mashq_marking' ? 'Mashq worksheet' : 'Uploaded sheet')}</span></td>
                 <td><span className={`teacher-queue-type ${row.entry_kind === 'checkpoint_assessment' ? 'assessment' : 'practice'}`}>{typeName}</span></td>
                 <td className="nowrap">{Number.isNaN(sentDate.getTime()) ? '—' : sentDate.toLocaleDateString(undefined, { day: 'numeric', month: 'short' })}</td>
                 <td className={`nowrap ${hrs === 0 && row.status !== 'in_review' ? 'late' : ''}`}>{dueLabel}</td>
@@ -511,7 +488,7 @@ export function TeacherQueue({ coordinator = false }: { coordinator?: boolean })
           </table>
         </div>
       )}
-      {!loading && filtered.length > 0 && <p className="teacher-queue-note">Rows with an orange edge are online assessments. Marks you give are sent to the student as a chat message and shown on their course page.</p>}
+      {!loading && filtered.length > 0 && <p className="teacher-queue-note">Rows with an orange edge are assessments. Marks you give are sent to the student as a chat message and shown on their course page.</p>}
     </main>
   );
 }
@@ -974,77 +951,9 @@ type ApiAsset = {
   imageUrl?: string;
 };
 
+// v3 note E: the teacher showcase has its own form and look (src/v2/content).
 export function TeacherShowcase() {
-  const [posts, setPosts] = useState<ApiShowcasePost[]>([]);
-  const [postsLoading, setPostsLoading] = useState(true);
-  const [caption, setCaption] = useState('');
-  const [file, setFile] = useState<File | null>(null);
-  const [editingFile, setEditingFile] = useState<File | null>(null);
-  const [posting, setPosting] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  const load = () => apiFetch<ApiShowcasePost[]>('/showcase/mine').then(async list => {
-    const resolved = await Promise.all(list.map(async item => {
-      if (!item.image_storage_key) return item;
-      try {
-        return { ...item, imageUrl: await getViewUrl(item.image_storage_key) };
-      } catch {
-        return item;
-      }
-    }));
-    setPosts(resolved);
-  }).catch(() => {}).finally(() => setPostsLoading(false));
-  useEffect(() => { load(); }, []);
-
-  const post = async () => {
-    if (!file) return;
-    setPosting(true);
-    setError(null);
-    try {
-      const { storageKey } = await uploadFile('showcase', file);
-      await apiFetch('/showcase', { method: 'POST', body: { imageStorageKey: storageKey, caption } });
-      setCaption('');
-      setFile(null);
-      await load();
-    } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'Failed to post.');
-    } finally {
-      setPosting(false);
-    }
-  };
-
-  return (
-    <main className="page portal-page showcase-page">
-      <SectionHeading eyebrow="Share your work" title="My Showcase" text="Teacher posts are auto-approved — no moderation gate. Admin retains the ability to remove any post." />
-      {error && <p className="error-text">{error}</p>}
-      <div className="showcase-form">
-        <label className="field-label">Caption<textarea className="field textarea" value={caption} onChange={e => setCaption(e.target.value)} placeholder="What did you notice while making this piece?" /></label>
-        <UploadBox tall label={file?.name ?? 'Add a photo of your work'} sublabel={file ? 'Photo ready — tap to replace or edit' : 'Posts immediately — no approval needed'} icon={FileImage} onChange={setEditingFile} />
-        <Button onClick={post}>{posting ? <PenLoader label="Posting showcase work" compact tiny /> : 'Post to gallery'} {!posting && <ArrowRight size={15} />}</Button>
-      </div>
-      {editingFile && <ShowcaseImageEditor file={editingFile} onCancel={() => setEditingFile(null)} onSave={editedFile => { setFile(editedFile); setEditingFile(null); }} />}
-      <SectionHeading title="My posted work" />
-      <div className="gallery-grid">
-        {postsLoading ? <PenLoader label="Loading your showcase posts…" compact /> : posts.length === 0 && (
-          <div className="showcase-empty-state">
-            <span><FileImage size={17} /></span>
-            <div><strong>You haven’t posted anything yet</strong><p>Your shared pieces will appear here.</p></div>
-          </div>
-        )}
-        {posts.map(post => (
-          <ShowcasePostCard key={post.id} post={{
-            id: post.id,
-            role: 'teacher',
-            imageUrl: post.imageUrl,
-            caption: post.caption,
-            authorName: post.author_name ?? 'You',
-            branch: post.branch_name ?? post.branch,
-            status: post.status,
-          }} />
-        ))}
-      </div>
-    </main>
-  );
+  return <V3MyShowcasePage mode="teacher" />;
 }
 
 export function AssetLibrary() {
@@ -1442,7 +1351,7 @@ export function CompetitionJudging() {
   if (!competition) {
     return (
       <main className="page portal-page">
-        <SectionHeading eyebrow="Guild challenges" title="Competition judging" text="Review assigned entries and submit your ranked selections to the admin team." />
+        <SectionHeading eyebrow="Competitions" title="Competition judging" text="Review assigned entries and submit your ranked selections to the admin team." />
         {error ? <p className="error-text">{error}</p> : (
           <div className="judging-empty-state">
             <div className="judging-empty-icon"><Trophy size={23} /></div>
@@ -1636,12 +1545,15 @@ export function HostEvent() {
       <SectionHeading
         eyebrow="Host a session"
         title="Host a Live Event"
-        text="Host directly from your browser. Students join in-site, and the event recording is saved to the guild library."
+        text="Host directly from your browser. Students join in-site, and the event recording is saved to the Funun al-Quran library."
       />
 
       <p className="muted">Allow camera and microphone access when the studio opens. Starting and ending the broadcast, student access, notifications, and recordings are managed here.</p>
 
       {error && <p className="error-text">{error}</p>}
+
+      {/* v3 note 4.5: recordings are YouTube links played on the site */}
+      <V3RecordingsManager />
 
       {studio && (
         <section className="card live-now-card livekit-studio-card">

@@ -1,0 +1,132 @@
+/* v3 (teacher) — simple review queue: kind tabs, one clear Review + Download per row */
+.v3-inbox .v2-inbox-head h1{font-size:clamp(28px,3.4vw,40px)}
+.v3-inbox .v2-inbox-head .muted{font-size:15px;max-width:620px}
+
+.v3rv-kind-tabs{display:flex;flex-wrap:wrap;gap:8px;margin:0 0 14px}
+.v3rv-kind-tabs button{display:inline-flex;align-items:center;gap:8px;min-height:46px;padding:8px 18px;border:1px solid var(--line);border-radius:6px;background:var(--card);color:var(--ink);font-size:15px;font-weight:700}
+.v3rv-kind-tabs button b{min-width:26px;padding:2px 8px;border-radius:4px;background:var(--surface-tint-2);color:var(--muted);font-size:13px;text-align:center}
+.v3rv-kind-tabs button.is-active{border-color:var(--surface-deep);background:var(--surface-deep);color:var(--text-on-deep)}
+.v3rv-kind-tabs button.is-active b{background:color-mix(in srgb,var(--text-on-deep) 18%,transparent);color:var(--text-on-deep)}
+
+.v2-inbox-stats .is-confirm{background:color-mix(in srgb,var(--gold) 12%,var(--card));color:var(--ink)}
+.v3-bulk-help{margin:-2px 0 12px;font-size:13.5px;line-height:1.5}
+
+.v3-queue{display:grid;overflow:hidden;border:1px solid var(--line);border-radius:6px;background:var(--card)}
+.v3-queue-selectall{display:flex;align-items:center;gap:10px;min-height:44px;padding:0 16px;border-bottom:1px solid var(--line);background:var(--surface-tint-2);color:var(--muted);font-size:13.5px;font-weight:700;cursor:pointer}
+.v3-queue-selectall input,.v3-qrow-check input{width:20px;height:20px;accent-color:var(--gold)}
+.v3-qrow{position:relative;display:flex;align-items:center;gap:12px;min-height:88px;padding:12px 16px 12px 6px;border-bottom:1px solid color-mix(in srgb,var(--line) 70%,transparent)}
+.v3-qrow:last-child{border-bottom:0}
+.v3-qrow::before{content:'';position:absolute;left:0;top:0;bottom:0;width:4px}
+.v3-qrow.tone-late::before{background:var(--v2-late)}
+.v3-qrow.tone-over::before{background:var(--v2-over)}
+.v3-qrow.is-selected{background:color-mix(in srgb,var(--gold) 7%,var(--card))}
+.v3-qrow-check{display:grid;place-items:center;width:40px;height:44px;flex:none;cursor:pointer}
+.v3-qrow-main{display:grid;gap:4px;flex:1;min-width:0}
+.v3-qrow-name{display:flex;flex-wrap:wrap;align-items:baseline;gap:8px}
+.v3-qrow-name strong{font-size:16.5px}
+.v3-qrow-name small{color:var(--muted);font-size:13px}
+.v3-qrow-step{display:flex;flex-wrap:wrap;align-items:center;gap:8px;color:var(--ink);font-size:14.5px;line-height:1.35}
+.v3-qrow-meta{display:flex;flex-wrap:wrap;align-items:center;gap:6px}
+.v3rv-kind-tag{display:inline-flex;align-items:center;min-height:22px;padding:1px 8px;border-radius:4px;font-size:11.5px;font-weight:800;letter-spacing:.02em;text-transform:uppercase}
+.v3rv-kind-tag.kind-certification{background:color-mix(in srgb,var(--gold) 13%,var(--card));color:var(--gold)}
+.v3rv-kind-tag.kind-mashq{background:color-mix(in srgb,#5aa469 16%,var(--card));color:color-mix(in srgb,#2f7a42 85%,var(--ink))}
+.v3rv-kind-tag.kind-crash{background:color-mix(in srgb,#5b8fd6 16%,var(--card));color:color-mix(in srgb,#2c5ea8 85%,var(--ink))}
+.v3rv-soft-tag{display:inline-flex;align-items:center;min-height:24px;padding:2px 9px;border-radius:4px;background:var(--surface-tint-2);color:var(--muted);font-size:12.5px;font-weight:700}
+.v3rv-soft-tag.is-new{background:color-mix(in srgb,var(--gold) 12%,var(--card));color:var(--gold)}
+.v3-confirm-tag{display:inline-flex;align-items:center;min-height:24px;padding:2px 9px;border:1px dashed var(--gold);border-radius:4px;color:var(--gold);font-size:12.5px;font-weight:800}
+.v3-qrow-actions{display:flex;gap:8px;flex:none}
+.v3-qrow-actions .btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;min-height:46px;margin:0;border-radius:6px;font-size:15px}
+.v3-review-btn{min-width:108px}
+.v3-dl-btn{min-width:46px;padding:0 14px}
+
+@media (max-width:640px){
+  .v3-qrow{flex-wrap:wrap;align-items:flex-start;padding:12px 12px 12px 4px;gap:8px}
+  .v3-qrow .v2-avatar{display:none}
+  .v3-qrow-main{flex-basis:calc(100% - 52px)}
+  .v3-qrow-actions{width:100%;padding-left:44px}
+  .v3-review-btn{flex:1}
+  .v3-dl-btn span{display:none}
+  .v3rv-kind-tabs button{flex:1 1 calc(50% - 8px);justify-content:center;padding:8px 10px}
+}
+
+/* review workspace v3 additions */
+.v3-confirm-banner{display:flex;flex-wrap:wrap;align-items:center;gap:10px;padding:12px 14px;border:1px dashed var(--gold);border-radius:6px;background:color-mix(in srgb,var(--gold) 7%,var(--card))}
+.v3-confirm-banner p{flex:1;min-width:220px;margin:0;font-size:14.5px;line-height:1.45}
+.v3-confirm-banner .btn{min-height:46px;margin:0;border-radius:6px}
+.v3-attempt-box{display:flex;flex-wrap:wrap;align-items:center;gap:10px;padding:12px 14px;border:1px solid var(--line);border-radius:6px;background:var(--surface-tint-2)}
+.v3-attempt-box p{flex:1;min-width:220px;margin:0;font-size:14px}
+.v3-attempt-box .btn{min-height:44px;margin:0;border-radius:6px}
+.v3-markpad{display:grid;gap:8px}
+.v3-markpad-row{display:grid;grid-template-columns:repeat(10,minmax(0,1fr));gap:6px}
+.v3-markpad-row button{min-height:46px;border:1px solid var(--line);border-radius:6px;background:var(--card);color:var(--ink);font-size:17px;font-weight:800}
+.v3-markpad-row button.band-revision{border-color:color-mix(in srgb,var(--v2-warn) 45%,var(--line))}
+.v3-markpad-row button.band-pass{border-color:color-mix(in srgb,#5b8fd6 45%,var(--line))}
+.v3-markpad-row button.band-distinction{border-color:color-mix(in srgb,#5aa469 55%,var(--line))}
+.v3-markpad-row button.is-active{border-color:var(--surface-deep);background:var(--surface-deep);color:var(--text-on-deep)}
+.v3-markpad-meaning{margin:0;color:var(--muted);font-size:13.5px;line-height:1.4}
+.v3-markpad-meaning b{color:var(--ink)}
+@media (max-width:420px){.v3-markpad-row{grid-template-columns:repeat(5,minmax(0,1fr))}}
+
+/* My workload — plain ordered list, bigger type */
+.v3-wl .v2-wl-block h3{font-size:18px}
+.v3-wl .v2-wl-block .muted{font-size:14.5px;line-height:1.45}
+.v3-wl-order{display:grid;gap:8px;margin:10px 0;padding:0;list-style:none}
+.v3-wl-item{display:flex;align-items:center;gap:12px;min-height:58px;padding:8px 10px;border:1px solid var(--line);border-radius:6px;background:var(--card)}
+.v3-wl-num{width:34px;height:34px;display:grid;place-items:center;flex:none;border-radius:4px;background:var(--surface-deep);color:var(--text-on-deep);font-size:16px}
+.v3-wl-name{display:grid;flex:1;min-width:0}
+.v3-wl-name strong{font-size:16px}
+.v3-wl-name small{color:var(--muted);font-size:13px}
+.v3-wl-btns{display:flex;gap:4px}
+.v3-wl-btns button{width:42px;height:42px;display:grid;place-items:center;border:1px solid var(--line);border-radius:6px;background:var(--card);color:var(--ink)}
+.v3-wl-btns button:disabled{opacity:.35}
+
+/* scan-return assistant (WhatsApp-like dialog) */
+.v3-bot-backdrop{position:fixed;inset:0;z-index:200;display:grid;place-items:end center;padding:16px;background:rgba(10,20,30,.42)}
+@media (min-width:700px){.v3-bot-backdrop{place-items:center}}
+.v3-bot{display:grid;grid-template-rows:auto 1fr;width:min(560px,100%);max-height:min(86vh,720px);overflow:hidden;border-radius:8px;background:#efeae2;box-shadow:0 18px 50px rgba(0,0,0,.3)}
+.v3-bot-head{display:flex;align-items:center;gap:10px;padding:12px 14px;background:#075e54;color:#fff}
+.v3-bot-head>span:nth-child(2){display:grid;flex:1}
+.v3-bot-head small{opacity:.8;font-size:12.5px}
+.v3-bot-head .v2-icon-btn{color:#fff}
+.v3-bot-avatar{width:38px;height:38px;display:grid;place-items:center;border-radius:50%;background:#25d366;color:#fff}
+.v3-bot-body{display:grid;align-content:start;gap:10px;overflow:auto;padding:14px}
+.v3-bot-msg,.v3-bot-me{max-width:88%;padding:9px 12px;border-radius:8px;font-size:15px;line-height:1.45;color:#111b21;box-shadow:0 1px 1px rgba(0,0,0,.08)}
+.v3-bot-msg{justify-self:start;background:#fff;border-top-left-radius:2px}
+.v3-bot-me{justify-self:end;background:#d9fdd3;border-top-right-radius:2px}
+.v3-bot-msg ul{margin:6px 0 0;padding-left:18px}
+.v3-bot-warn{margin:6px 0 0;color:#8a5a00;font-size:14px}
+.v3-bot-choices{display:flex;flex-wrap:wrap;gap:8px;justify-self:stretch}
+.v3-bot-choices .btn{min-height:46px;margin:0;border-radius:6px}
+.v3-bot-choices .btn-primary{background:#00a884;border-color:#00a884;color:#fff}
+.v3-bot-choices .btn-outline{background:#fff}
+.v3-bot-compose{display:grid;gap:8px}
+.v3-bot-compose textarea{margin:0;background:#fff;font-size:15px}
+.v3-bot-chips{display:flex;flex-wrap:wrap;gap:6px}
+.v3-bot-chips button{padding:7px 11px;border:1px solid #c9d3cf;border-radius:16px;background:#fff;color:#111b21;font-size:13.5px;text-align:left}
+.v3-bot-chips button.is-on{border-color:#00a884;background:#d9fdd3}
+.v3-bot-results{list-style:none;padding:0!important}
+.v3-bot-results li{display:flex;align-items:center;gap:6px;font-size:13.5px}
+.v3-bot-results .is-ok{color:#08734f}.v3-bot-results .is-bad{color:#b3261e}
+.v2-meter{min-height:18px}.v2-meter-text{display:inline-block;line-height:1.4;font-size:13px}
+
+/* v3 integration: one obvious flow — 1 mark · 2 comment · 3 send; a greyed Send says why */
+.v2-rc-stepline{display:flex;align-items:center;gap:8px;margin:6px 0 0;font-size:13px;font-weight:700;color:var(--ink)}
+.v2-rc-stepline b{display:inline-grid;place-items:center;width:22px;height:22px;border-radius:50%;background:var(--surface-tint);color:var(--gold);font-size:12px}
+.v2-rc-stepline span{font-weight:500;color:var(--muted)}
+html .v2-rc .btn.v2-rc-send.is-waiting:disabled{opacity:1;background:var(--surface-tint)!important;border-color:var(--line)!important;color:var(--muted)!important;box-shadow:none!important;cursor:not-allowed}
+.v2-rc-why{margin:-2px 0 0;font-size:13px;color:var(--muted);text-align:center}
+.v2-qm .v2-qm-now{margin-left:auto}
+
+/* v3 audit 14: waiting a long time is not an error — amber, never red, in the inbox and its rows. */
+.v2-review-page,.v3-strip,.v2-workload,.v3-workload{--v3-wait-amber:#b7791f;--v3-wait-amber-strong:#975a16;--v3-wait-amber-soft:color-mix(in srgb,#d69e2e 18%,var(--card,#fff))}
+.v2-review-page .v3-qrow.tone-late::before,.v2-review-page .v2-inbox-row.tone-late::before{background:var(--v3-wait-amber)}
+.v2-review-page .v3-qrow.tone-over::before,.v2-review-page .v2-inbox-row.tone-over::before{background:var(--v3-wait-amber-strong)}
+.v2-review-page .v2-wait.tone-late{background:var(--v3-wait-amber-soft);color:var(--v3-wait-amber-strong)}
+.v2-review-page .v2-wait.tone-over{background:var(--v3-wait-amber-soft);color:var(--v3-wait-amber-strong);box-shadow:inset 0 0 0 1px var(--v3-wait-amber)}
+.v2-review-page .v2-inbox-stats .is-late,.v2-review-page .v2-inbox-stats .is-late b{background:var(--v3-wait-amber-soft);color:var(--v3-wait-amber-strong)}
+.v2-review-page .v2-chip-warn{color:var(--v3-wait-amber-strong)!important}
+/* v3 audit 23: one-tap confirm + undo bar */
+.v3-confirm-undo{display:flex;flex-wrap:wrap;align-items:center;gap:10px;margin:0 0 12px;padding:10px 14px;border:1px solid color-mix(in srgb,var(--v2-good,#2f855a) 40%,var(--line));border-radius:4px;background:color-mix(in srgb,var(--v2-good,#2f855a) 9%,var(--card));font-size:14px}
+.v3-confirm-undo svg{color:var(--v2-good,#2f855a)}
+.v3-confirm-undo>span{flex:1;min-width:180px}
+.v3-qrow-actions .v3-review-btn{white-space:nowrap}
