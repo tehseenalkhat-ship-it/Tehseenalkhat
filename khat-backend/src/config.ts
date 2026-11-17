@@ -63,7 +63,8 @@ export const config = {
   // Optional on purpose — emails print to console until set
   resendApiKey: process.env.RESEND_API_KEY,
   emailFrom: process.env.EMAIL_FROM ?? 'no-reply@example.com',
-  frontendUrl: process.env.FRONTEND_URL ?? 'http://localhost:5173',
+  // Used for links in emails (incl. the survey link for students not signed up).
+  frontendUrl: process.env.FRONTEND_URL ?? 'https://tehseenalkhat.ajsn.co.ke',
   // Password for the private /logs page. When unset, /logs is disabled (404).
   logsPassword: process.env.LOGS_PASSWORD?.trim() || undefined,
 };

@@ -1,5 +1,5 @@
 // Shrinks files in the browser before upload, so the server only ever stores small files.
-//   Images -> WebP (JPEG where the browser can't encode WebP), resized/re-encoded until under 1 MB.
+//   Images -> JPEG, resized/re-encoded until under 1 MB.
 //   Videos -> MP4 (H.264 + AAC), at most 720p on the short side, 30 fps, medium quality bitrate.
 // Anything that can't be compressed (PDF, GIF, SVG, unsupported codec/browser) is uploaded as-is.
 
@@ -40,7 +40,8 @@ async function compressImage(file: File): Promise<File> {
       canvas.width = Math.max(1, Math.round(bitmap.width * scale));
       canvas.height = Math.max(1, Math.round(bitmap.height * scale));
 
-      for (const type of ['image/webp', 'image/jpeg']) {
+      // JPEG only: the stamped PDF downloads (pdf-lib) can embed JPEG and PNG, not WebP.
+      for (const type of ['image/jpeg']) {
         ctx.clearRect(0, 0, canvas.width, canvas.height);
         if (type === 'image/jpeg') {
           ctx.fillStyle = '#fff'; // JPEG has no transparency
