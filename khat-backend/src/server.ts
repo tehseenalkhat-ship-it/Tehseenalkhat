@@ -106,11 +106,13 @@ process.on('uncaughtException', (err) => {
 
 async function main() {
   // v2/v3 database updates (once; recorded in khat_migrations). Errors are logged, the site still starts.
-  await runStartupMigrations(msg => app.log.info(msg)).catch((err) => app.log.error(err, 'Database update failed'));
+  // Startup messages also go to the private /logs page (the hosting keeps no log file).
+  const startupNotes: string[] = [];
+  await runStartupMigrations(msg => { app.log.info(msg); startupNotes.push(msg); })
+    .catch((err) => { app.log.error(err, 'Database update failed'); startupNotes.push(`Database update FAILED: ${err.message}`); });
   await ensureProblemTables().catch((err) => app.log.error(err, 'Could not create problem_reports / error_log tables'));
+  for (const msg of startupNotes) void logError({ source: 'server', message: `Startup: ${msg}` });
   await ensureUserDetailColumns().catch((err) => app.log.error(err, 'Could not add users.phone / users.its_number'));
-  // One-time test-data clean-up: only with RESET_DUMMY_DATA=yes on the hosting panel (see dummyDataReset.ts).
-  await runDummyDataReset(msg => app.log.info(msg)).catch((err) => app.log.error(err, 'Dummy-data clean-up failed'));
   await app.register(cors, { origin: true }); // tighten this to your real frontend URL before going live
   await app.register(authPlugin);
 
@@ -195,6 +197,14 @@ async function main() {
 
     setInterval(tick, MINUTE).unref();
     tick();
+
+    // One-time test-data clean-up: only with RESET_DUMMY_DATA=yes on the hosting panel (see dummyDataReset.ts).
+    // Runs after the site is up, so a slow clean-up can't make the hosting think the start failed.
+    const startupLog = (msg: string) => { app.log.info(msg); void logError({ source: 'server', message: `Startup: ${msg}` }); };
+    void runDummyDataReset(startupLog).catch((err) => {
+      app.log.error(err, 'Dummy-data clean-up failed');
+      void logError({ source: 'server', message: `Startup: dummy-data clean-up FAILED: ${err.message}`, stack: err.stack });
+    });
   } catch (err) {
     app.log.error(err);
     process.exit(1);
