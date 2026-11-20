@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { CheckCircle2, Download, Undo2, Pencil, Inbox, Loader2, Printer, RefreshCw, ScanLine, Search, SlidersHorizontal, X } from 'lucide-react';
 import { ApiError, apiFetch } from '@/api';
-import { PenLoader } from '@/components/ui';
+import { PenLoader, navigate } from '@/components/ui';
 import type { InboxItem, ReviewerLoad, Submission } from '../contracts';
 import { openV2, readV2Param } from '../nav';
 import { initials, waitTone, waitingLabel } from '../chat/media';
@@ -28,6 +28,9 @@ export function V2ReviewInboxPage(_props: Props) {
   const [activeId, setActiveId] = useState<string | null>(() => readV2Param('submissionId'));
   const [bulk, setBulk] = useState<string | null>(null);
   const [bulkError, setBulkError] = useState<string | null>(null);
+  // Work on courses made before the Course builder lives in the old queue, not here.
+  const [older, setOlder] = useState(0);
+  useEffect(() => { apiFetch<unknown[]>('/entries/queue', { silent: true }).then(r => setOlder(Array.isArray(r) ? r.length : 0)).catch(() => undefined); }, []);
   const [workloadOpen, setWorkloadOpen] = useState(false);
   const [me, setMe] = useState<ReviewerLoad | null>(null);
   const [sentToday, setSentToday] = useState(0);
@@ -197,6 +200,7 @@ export function V2ReviewInboxPage(_props: Props) {
           <p className="eyebrow">Review inbox · whole branch</p>
           <h1>{status === 'open' ? (loading ? 'Review inbox' : items.length ? `${items.length} piece${items.length === 1 ? '' : 's'} waiting` : 'All caught up') : 'Reviewed work'}</h1>
           <p className="muted">{status === 'open' ? 'Oldest first. Tap Review, look at the sheet, give a mark, send — the next one opens by itself.' : 'Work that has been answered. Open one to change a mark or add a note.'}</p>
+          {older > 0 && <p><button type="button" className="btn btn-outline" onClick={() => navigate('queue')}>Older courses work: {older} waiting</button></p>}
         </div>
         <div className="v2-inbox-head-actions">
           <button type="button" className="v2-workload-btn" onClick={() => setWorkloadOpen(true)} aria-label="My workload">
