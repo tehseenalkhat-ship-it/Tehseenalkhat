@@ -52,10 +52,10 @@ const PUBLIC_PAGES = ['landing', 'signup', 'login', 'forgot-password', 'reset-pa
 const CHAT_PAGES = new Set(['v2-task', 'v2-dept-chat', 'v2-inbox', 'v2-community', 'chats', 'teacher-chats', 'course', 'v2-course']);
 
 const PAGE_LABELS: Record<string, string> = {
-  dashboard: 'Dashboard', student: 'Dashboard', chats: 'Chats', 'teacher-chats': 'Student messages', 'teacher-dashboard': 'Dashboard', 'coordinator-dashboard': 'Dashboard',
+  dashboard: 'Dashboard', student: 'Dashboard', chats: 'Chats', 'teacher-chats': 'Older course chats', 'teacher-dashboard': 'Dashboard', 'coordinator-dashboard': 'Dashboard',
   admin: 'Dashboard', catalog: 'Courses', achievements: 'Achievements', gallery: 'Gallery', competitions: 'Competitions', events: 'Events',
   resources: 'Resources', showcase: 'Showcase', notifications: 'Notifications', profile: 'Profile', settings: 'Settings',
-  course: 'Course', mashq: 'Mashq worksheets', queue: 'Review queue', review: 'Review entry', reviews: 'My reviews', assets: 'Asset library',
+  course: 'Course', mashq: 'Mashq worksheets', queue: 'Older courses work', review: 'Review entry', reviews: 'My reviews', assets: 'Asset library',
   judging: 'Judging', 'events-host': 'Host events', 'branch-stats': 'Branch statistics', 'branch-teachers': 'Branch teachers',
   'branch-students': 'Branch students', 'student-profile': 'Student profile', 'teacher-profile-view': 'Teacher profile',
   'admin-courses': 'Course builder', 'admin-tr-numbers': 'TR number uploads', 'admin-users': 'Teacher & load', 'admin-logs': 'Entry logs',

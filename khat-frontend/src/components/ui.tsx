@@ -91,23 +91,23 @@ const roleNavigation: Record<Role, [string, string, typeof LayoutDashboard][]> =
     ['v2-competitions', 'Competitions', Trophy], ['events', 'Events', CalendarDays], ['resources', 'Resources', Library],
     ['showcase', 'My showcase', PenTool], ['notifications', 'Notifications', Bell],
   ],
-  // v3 audit: the old "Review queue" / "My reviews" pages are gone from the menu — the Review inbox is the one place.
+  // The Review inbox only shows work from Course-builder courses; "Older courses work" (the old Review queue) covers the older courses.
   // "Judging" is added only for a teacher who is actually assigned as a judge (see JUDGING_ITEM below).
   teacher: [
-    ['teacher-dashboard', 'Dashboard', Home], ['v2-inbox', 'Review inbox', Inbox], ['v2-scan-return', 'Upload marked items', ScanLine], ['v2-dept-chat', 'Student messages', MessageCircle],
+    ['teacher-dashboard', 'Dashboard', Home], ['v2-inbox', 'Review inbox', Inbox], ['queue', 'Older courses work', ClipboardList], ['v2-scan-return', 'Upload marked items', ScanLine], ['v2-dept-chat', 'Student messages', MessageCircle], ['teacher-chats', 'Older course chats', MessageCircle],
     ['v2-teacher-courses', 'All courses', BookOpen], ['v2-insights', 'Student insights', Sparkles], ['v2-team', 'Team report', Gauge],
     ['v2-competitions', 'Competitions & calls', Trophy], ['showcase', 'Showcase', PenTool], ['assets', 'Asset library', FolderOpen],
     ['events-host', 'Host events', Video], ['notifications', 'Notifications', Bell],
   ],
   coordinator: [
-    ['coordinator-dashboard', 'Dashboard', Home], ['v2-inbox', 'Review inbox', Inbox], ['v2-scan-return', 'Upload marked items', ScanLine], ['v2-dept-chat', 'Student messages', MessageCircle],
+    ['coordinator-dashboard', 'Dashboard', Home], ['v2-inbox', 'Review inbox', Inbox], ['queue', 'Older courses work', ClipboardList], ['v2-scan-return', 'Upload marked items', ScanLine], ['v2-dept-chat', 'Student messages', MessageCircle],
     ['v2-teacher-courses', 'All courses', BookOpen], ['v2-insights', 'Student insights', Sparkles], ['v2-team', 'Team report', Gauge],
     ['branch-stats', 'Branch statistics', BarChart3], ['branch-teachers', 'Branch teachers', Users], ['branch-students', 'Branch students', GraduationCap],
     ['v2-competitions', 'Competitions & calls', Trophy], ['showcase', 'Showcase', PenTool], ['assets', 'Asset library', FolderOpen],
     ['events-host', 'Host events', Video], ['notifications', 'Notifications', Bell],
   ],
   admin: [
-    ['v2-admin-home', 'Home', Home], ['v2-inbox', 'Review inbox', Inbox], ['v2-builder', 'Course builder', BookOpen],
+    ['v2-admin-home', 'Home', Home], ['v2-inbox', 'Review inbox', Inbox], ['queue', 'Older courses work', ClipboardList], ['v2-builder', 'Course builder', BookOpen],
     ['v2-insights', 'Student insights', Sparkles], ['v2-merit', 'Merit points', Award], ['v2-policies', 'Branch policies', ShieldCheck],
     ['v2-team', 'Team report', Gauge], ['v2-people', 'People & roles', UsersRound], ['v2-announcements', 'Announcements & surveys', Megaphone],
     ['v2-dept-chat', 'Student messages', MessageCircle], ['v2-badges', 'Badge designs', Trophy], ['notifications', 'Notifications', Bell],

@@ -422,7 +422,7 @@ export function TeacherQueue({ coordinator = false }: { coordinator?: boolean })
       <div className="teacher-queue-heading">
         <div>
           <p className="eyebrow">Teacher portal{coordinator && ' · Branch coordinator'}</p>
-          <h1>Review queue</h1>
+          <h1>Older courses work</h1>
           <p>Work sent to you, oldest first. Open a row to reply, annotate, record a voice note and give marks in the same chat.</p>
         </div>
         <div className="teacher-queue-stats" aria-label="Queue summary">

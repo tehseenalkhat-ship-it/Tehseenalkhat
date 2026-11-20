@@ -3,6 +3,7 @@ import { BookOpen, ChevronRight, Inbox, ScanLine, SlidersHorizontal } from 'luci
 import { apiFetch } from '@/api';
 import type { InboxItem, ReviewerLoad } from '../contracts';
 import { openV2 } from '../nav';
+import { navigate } from '@/components/ui';
 import { LoadMeter, WorkloadPanel } from '../review/WorkloadPanel';
 import { COURSE_KINDS, KIND_LABEL, kindOf, type CourseKind } from './teacherTypes';
 import './teacher.css';
@@ -14,6 +15,8 @@ import './teacher.css';
 export function TeacherActionStrip() {
   const [items, setItems] = useState<InboxItem[] | null>(null);
   const [failed, setFailed] = useState(false);
+  // Work on courses made before the Course builder (old Review queue); null = not loaded.
+  const [older, setOlder] = useState<number | null>(null);
   const [me, setMe] = useState<ReviewerLoad | null>(null);
   const [workloadOpen, setWorkloadOpen] = useState(false);
 
@@ -23,6 +26,7 @@ export function TeacherActionStrip() {
       setItems(Array.isArray(res) ? res : []);
       setFailed(false);
     } catch { setFailed(true); }
+    apiFetch<unknown[]>('/entries/queue', { silent: true }).then(rows => setOlder(Array.isArray(rows) ? rows.length : 0)).catch(() => undefined);
   }, []);
   useEffect(() => {
     void load();
@@ -42,7 +46,7 @@ export function TeacherActionStrip() {
         <span className="v3-strip-icon" aria-hidden="true"><Inbox size={26} /></span>
         <div className="v3-strip-text">
           <p className="v3-strip-big">
-            {items === null ? (failed ? 'Your review inbox' : 'Checking your inbox…') : n === 0 ? 'Nothing waiting — all caught up' : `${n} piece${n === 1 ? '' : 's'} waiting for you`}
+            {items === null ? (failed ? 'Your review inbox' : 'Checking your inbox…') : n === 0 && !older ? 'Nothing waiting — all caught up' : n === 0 ? 'Nothing new in the inbox' : `${n} piece${n === 1 ? '' : 's'} waiting for you`}
           </p>
           {n > 0 && (
             <p className="v3-strip-kinds">
@@ -51,6 +55,11 @@ export function TeacherActionStrip() {
               ))}
               {overdue > 0 && <span className="v3-strip-warn">{overdue} waiting over 3 days</span>}
               {confirm > 0 && <span className="v3-strip-note">{confirm} automatic mark{confirm === 1 ? '' : 's'} to confirm</span>}
+            </p>
+          )}
+          {!!older && (
+            <p className="v3-strip-kinds">
+              <button type="button" className="v3tc-kind-tag" onClick={() => navigate('queue')}>Older courses work: {older} waiting</button>
             </p>
           )}
         </div>
