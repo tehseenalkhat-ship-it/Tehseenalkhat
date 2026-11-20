@@ -14,7 +14,7 @@ import type {
 } from '../lib/commsTypes.js';
 import {
   appUrl, DEFAULT_TEMPLATES, EMAIL_DAILY_CAP, EMAIL_KEYS, EMAIL_PER_RUN, isEmailKey, loadTemplate, queueEmail, queueEmailMany,
-  renderWith, runEmailQueueSweep, sentInLast24h,
+  renderWith, sentInLast24h,
 } from '../lib/emailTemplates.js';
 import { iso } from '../lib/threadData.js';
 import { readXlsx } from '../lib/xlsx.js';
@@ -88,24 +88,12 @@ async function audienceLists(branchId: string | null) {
 // ---------------------------------------------------------------- email queue timer
 // Started here (not in server.ts) so the email queue owns its own schedule: every 2 minutes a
 // few queued emails go out (capped per run and per day — see emailTemplates.ts).
-let queueTimer: NodeJS.Timeout | null = null;
 
 export async function announcementsV2Routes(app: FastifyInstance): Promise<void> {
   const admins = { preHandler: [app.authenticate, requireAnyAdmin(app)] };
   const master = { preHandler: [app.authenticate, requireMaster(app)] };
 
-  if (process.env.EMAIL_QUEUE_SWEEP !== 'off') {
-    app.addHook('onReady', async () => {
-      if (queueTimer) return;
-      queueTimer = setInterval(() => {
-        runEmailQueueSweep()
-          .then(r => { if (r.sent || r.failed) app.log.info(r, 'v3 email queue sweep'); })
-          .catch(err => app.log.error(err, 'v3 email queue sweep failed'));
-      }, 2 * 60_000);
-      queueTimer.unref?.();
-    });
-    app.addHook('onClose', async () => { if (queueTimer) clearInterval(queueTimer); queueTimer = null; });
-  }
+  // The email queue is sent by the background job runner in server.ts.
 
   // ================================================================ announcements & surveys (admin)
   app.get<{ Querystring: { kind?: string } }>('/announcements', admins, async request => {

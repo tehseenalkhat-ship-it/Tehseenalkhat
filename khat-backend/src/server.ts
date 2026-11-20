@@ -36,6 +36,8 @@ import { logsRoutes } from './routes/logs.routes.js';
 import { ensureProblemTables, logError } from './services/problemReports.js';
 import { ensureUserDetailColumns } from './services/userDetails.js';
 import { runStartupMigrations } from './services/migrations.js';
+import { createJobRunner, type BackgroundJob } from './services/backgroundJobs.js';
+import { runEmailQueueSweep } from './v2/lib/emailTemplates.js';
 import { policiesV2Routes } from './v2/routes/policies.routes.js';
 import { catalogV2Routes } from './v2/routes/catalog.routes.js';
 import { coursesV2Routes } from './v2/routes/courses.routes.js';
@@ -165,40 +167,31 @@ async function main() {
     await app.register(fastifyStatic, { root: publicDir });
   }
 
+  // Background jobs: checked at startup, on every request and every minute (see backgroundJobs.ts),
+  // so they keep running even if the hosting puts the app to sleep between visits.
+  const MINUTE = 60 * 1000;
+  const jobs: BackgroundJob[] = [
+    { name: 'diversion sweep', everyMs: 60 * MINUTE, run: runDiversionAndIdleFlagSweep },
+    { name: 'v2 SLA sweep', everyMs: 15 * MINUTE, run: runSlaSweep },
+    { name: 'v2 merit reminders sweep', everyMs: 60 * MINUTE, run: runMeritReminderSweep },
+    { name: 'v2 staff digest sweep', everyMs: 60 * MINUTE, run: runStaffDigestSweep },
+    { name: 'v2 nudges sweep', everyMs: 60 * MINUTE, run: runNudgeSweep },
+    ...(process.env.EMAIL_QUEUE_SWEEP !== 'off' ? [{ name: 'v3 email queue sweep', everyMs: 2 * MINUTE, run: () => runEmailQueueSweep() }] : []),
+  ];
+  const didSomething = (r: unknown) => !!r && typeof r === 'object' && Object.values(r).some(v => typeof v === 'number' && v > 0);
+  const tick = createJobRunner(
+    jobs,
+    (name, result) => { if (didSomething(result)) app.log.info(result as object, name); },
+    (name, err) => app.log.error(err, `${name} failed`),
+  );
+  app.addHook('onRequest', async () => { tick(); });
+
   try {
     const address = await app.listen({ port: config.port, host: '0.0.0.0' });
     app.log.info(`Server listening at ${address}`);
 
-    // Auto-diversion + idle-flagging run on a simple in-process schedule for now.
-    // Fine for a single-instance deploy; if this ever runs on multiple server
-    // instances at once, move this to a real scheduled job (e.g. a cron-triggered
-    // endpoint) so it doesn't run redundantly on every instance.
-    const ONE_HOUR_MS = 60 * 60 * 1000;
-    setInterval(() => {
-      runDiversionAndIdleFlagSweep()
-        .then(({ pendingAssigned, diverted, idleFlagged }) => {
-          if (pendingAssigned || diverted || idleFlagged) {
-            app.log.info(
-              `Diversion sweep: ${pendingAssigned} pending assigned, ${diverted} diverted, ${idleFlagged} idle-flagged`
-            );
-          }
-        })
-        .catch((err) => app.log.error(err, 'Diversion sweep failed'));
-    }, ONE_HOUR_MS);
-
-    // v2 background jobs. SLA runs every 15 minutes; the others hourly (each job decides
-    // itself whether it is due, e.g. the digest only sends once a day).
-    const FIFTEEN_MIN_MS = 15 * 60 * 1000;
-    setInterval(() => {
-      runSlaSweep()
-        .then(r => { if (r.diverted || r.forwarded || r.autoMarked) app.log.info(r, 'v2 SLA sweep'); })
-        .catch(err => app.log.error(err, 'v2 SLA sweep failed'));
-    }, FIFTEEN_MIN_MS);
-    setInterval(() => {
-      for (const [name, job] of [['merit reminders', runMeritReminderSweep], ['staff digest', runStaffDigestSweep], ['nudges', runNudgeSweep]] as const) {
-        job().then(r => app.log.info(r, `v2 ${name} sweep`)).catch(err => app.log.error(err, `v2 ${name} sweep failed`));
-      }
-    }, ONE_HOUR_MS);
+    setInterval(tick, MINUTE).unref();
+    tick();
   } catch (err) {
     app.log.error(err);
     process.exit(1);
