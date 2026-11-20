@@ -35,6 +35,7 @@ import { reportRoutes } from './routes/reports.routes.js';
 import { logsRoutes } from './routes/logs.routes.js';
 import { ensureProblemTables, logError } from './services/problemReports.js';
 import { ensureUserDetailColumns } from './services/userDetails.js';
+import { runStartupMigrations } from './services/migrations.js';
 import { policiesV2Routes } from './v2/routes/policies.routes.js';
 import { catalogV2Routes } from './v2/routes/catalog.routes.js';
 import { coursesV2Routes } from './v2/routes/courses.routes.js';
@@ -101,6 +102,8 @@ process.on('uncaughtException', (err) => {
 });
 
 async function main() {
+  // v2/v3 database updates (once; recorded in khat_migrations). Errors are logged, the site still starts.
+  await runStartupMigrations(msg => app.log.info(msg)).catch((err) => app.log.error(err, 'Database update failed'));
   await ensureProblemTables().catch((err) => app.log.error(err, 'Could not create problem_reports / error_log tables'));
   await ensureUserDetailColumns().catch((err) => app.log.error(err, 'Could not add users.phone / users.its_number'));
   await app.register(cors, { origin: true }); // tighten this to your real frontend URL before going live
