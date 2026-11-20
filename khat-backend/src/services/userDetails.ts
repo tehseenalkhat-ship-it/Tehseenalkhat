@@ -9,7 +9,7 @@ export async function ensureUserDetailColumns(): Promise<void> {
 
 export const JAMEA_EMAIL = /^[^\s@]+@jameasaifiyah\.edu$/;
 const PHONE = /^\+\d{1,4} \d{5,15}$/; // "+254 712345678": country code, space, number
-const ITS = /^\d{8}$/;
+export const ITS = /^\d{8}$/;
 
 export type DetailChanges = { name?: string; email?: string; phone?: string | null; itsNumber?: string | null; trNumber?: string };
 
@@ -53,7 +53,8 @@ export async function updateUserDetails(db: Db, userId: string, input: DetailCha
 
   if (input.itsNumber !== undefined) {
     const its = input.itsNumber ? String(input.itsNumber).trim() : '';
-    if (its && !ITS.test(its)) return { error: 'The ITS number must be exactly 8 digits.', status: 400 };
+    // The ITS number is the sign-in name, so it can be changed but not removed.
+    if (!ITS.test(its)) return { error: 'The ITS number must be exactly 8 digits.', status: 400 };
     if (its) {
       const { rows } = await db.query(`SELECT id FROM users WHERE its_number = $1 AND id <> $2`, [its, userId]);
       if (rows.length) return { error: 'Another account already uses that ITS number.', status: 409 };

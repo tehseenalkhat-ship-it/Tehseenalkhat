@@ -1,8 +1,8 @@
 // Runnable check for editing account details + the staff first-password rule.
 //   1. start the server with STAFF_DEFAULT_PASSWORD set:   npm run dev
 //   2. in another terminal:                                npm run test:account
-// Uses the same .env as the server. Creates one throwaway staff account and puts back every
-// value it changes. Refuses to run against anything but localhost unless ALLOW_REMOTE_TEST=1.
+// Uses the same .env as the server. Creates a throwaway staff account and two throwaway students
+// (removed again at the end). Refuses to run against anything but localhost unless ALLOW_REMOTE_TEST=1.
 import 'dotenv/config';
 import assert from 'node:assert/strict';
 import { createHmac } from 'node:crypto';
@@ -19,6 +19,7 @@ let passed = 0;
 let staffId: string | null = null;
 let student: any = null;
 let otherStudent: any = null;
+const testTrs: string[] = [];
 
 function ok(name: string, condition: unknown) {
   assert.ok(condition, name);
@@ -44,18 +45,33 @@ async function call(method: string, path: string, body?: unknown, token?: string
 
 async function main() {
   const { rows: [admin] } = await pool.query(`SELECT id, role, branch_id, is_coordinator FROM users WHERE role = 'admin' AND deleted_at IS NULL LIMIT 1`);
-  const { rows: students } = await pool.query(`SELECT id, role, branch_id, is_coordinator, tr_number, its_number, phone, name FROM users WHERE role = 'student' AND deleted_at IS NULL AND tr_number IS NOT NULL ORDER BY created_at LIMIT 2`);
-  [student, otherStudent] = students;
-  assert.ok(admin && student && otherStudent, 'need an admin and two students with TR numbers');
-  const adminToken = jwtFor(admin);
+  assert.ok(admin, 'need an admin');
   const stamp = Date.now();
+  const digits = (n: number) => String(90000000 + ((stamp + n) % 9999999)); // throwaway 8-digit ITS numbers
+  // Two throwaway students with approved TR numbers (+ one spare approved TR).
+  for (const n of [1, 2, 3]) {
+    const tr = `TEST${stamp}${n}`;
+    testTrs.push(tr);
+    await pool.query(`INSERT INTO approved_tr_numbers (tr_number, branch_id, used) VALUES ($1, $2, false)`, [tr, admin.branch_id]);
+  }
+  for (const n of [1, 2]) {
+    await pool.query(
+      `INSERT INTO users (role, name, email, password_hash, branch_id, tr_number, its_number) VALUES ('student', $1, $2, 'x', $3, $4, $5)`,
+      [`Test Student ${n}`, `test.student.${stamp}.${n}@jameasaifiyah.edu`, admin.branch_id, testTrs[n - 1], digits(n)]);
+    await pool.query(`UPDATE approved_tr_numbers SET used = true, student_id = (SELECT id FROM users WHERE tr_number = $1) WHERE tr_number = $1`, [testTrs[n - 1]]);
+  }
+  const { rows: students } = await pool.query(`SELECT id, role, branch_id, is_coordinator, tr_number, its_number, phone, name FROM users WHERE tr_number IN ($1, $2) ORDER BY tr_number`, [testTrs[0], testTrs[1]]);
+  [student, otherStudent] = students;
+  const adminToken = jwtFor(admin);
   const email = `test.staff.${stamp}@jameasaifiyah.edu`;
+  let its = digits(10);
 
   console.log('New staff: first password + forced change');
-  const created = await call('POST', '/admin/users', { role: 'teacher', name: 'Test Staff', email, branchId: admin.branch_id }, adminToken);
+  ok('admin cannot add staff without an ITS number', (await call('POST', '/admin/users', { role: 'teacher', name: 'Test Staff', email, branchId: admin.branch_id }, adminToken)).status === 400);
+  const created = await call('POST', '/admin/users', { role: 'teacher', name: 'Test Staff', email, itsNumber: its, branchId: admin.branch_id }, adminToken);
   staffId = created.json.id;
   ok('admin creates staff with the default first password', created.status === 201 && created.json.tempPassword === DEFAULT);
-  const login = await call('POST', '/auth/login', { email, password: DEFAULT });
+  const login = await call('POST', '/auth/login', { its, password: DEFAULT });
   ok('staff can sign in with the first password and is told to change it', login.status === 200 && login.json.user.mustChangePassword === true);
   const firstToken = login.json.token;
   ok('nothing else opens before the change (403)', (await call('GET', '/auth/me', undefined, firstToken)).json.code === 'MUST_CHANGE_PASSWORD'
@@ -63,19 +79,24 @@ async function main() {
   ok('a new password under 8 characters is refused', (await call('POST', '/auth/change-password', { currentPassword: DEFAULT, newPassword: 'short' }, firstToken)).status === 400);
   const changed = await call('POST', '/auth/change-password', { currentPassword: DEFAULT, newPassword: 'MyOwnPass#2026' }, firstToken);
   ok('changing the password returns a working token', changed.status === 200 && (await call('GET', '/auth/me', undefined, changed.json.token)).status === 200);
-  ok('the first password no longer works', (await call('POST', '/auth/login', { email, password: DEFAULT })).status === 401);
-  const staffToken = (await call('POST', '/auth/login', { email, password: 'MyOwnPass#2026' })).json.token;
+  ok('the first password no longer works', (await call('POST', '/auth/login', { its, password: DEFAULT })).status === 401);
+  ok('sign-in with an email is refused (ITS only)', (await call('POST', '/auth/login', { its: email, password: 'MyOwnPass#2026' })).status === 400);
+  const staffToken = (await call('POST', '/auth/login', { its, password: 'MyOwnPass#2026' })).json.token;
 
   console.log('Editing my own details');
   ok('name is saved', (await call('PATCH', '/auth/me', { name: 'Test Staff Renamed' }, staffToken)).json.name === 'Test Staff Renamed');
   ok('phone without a country code is refused', (await call('PATCH', '/auth/me', { phone: '0712345678' }, staffToken)).status === 400);
   ok('phone with country code is saved', (await call('PATCH', '/auth/me', { phone: '+254 712345678' }, staffToken)).json.phone === '+254 712345678');
   ok('ITS that is not 8 digits is refused', (await call('PATCH', '/auth/me', { itsNumber: '1234567' }, staffToken)).status === 400);
-  ok('ITS is saved', (await call('PATCH', '/auth/me', { itsNumber: '87654321' }, staffToken)).json.itsNumber === '87654321');
-  await call('PATCH', `/admin/users/${otherStudent.id}/details`, { itsNumber: '11223344' }, adminToken);
-  ok('an ITS already used by someone else is refused (409)', (await call('PATCH', '/auth/me', { itsNumber: '11223344' }, staffToken)).status === 409);
+  ok('ITS cannot be removed (it is the sign-in name)', (await call('PATCH', '/auth/me', { itsNumber: '' }, staffToken)).status === 400);
+  const newIts = digits(20);
+  ok('ITS is saved', (await call('PATCH', '/auth/me', { itsNumber: newIts }, staffToken)).json.itsNumber === newIts);
+  ok('sign-in works with the new ITS', (await call('POST', '/auth/login', { its: newIts, password: 'MyOwnPass#2026' })).status === 200);
+  ok('sign-in with the old ITS no longer works', (await call('POST', '/auth/login', { its, password: 'MyOwnPass#2026' })).status === 401);
+  its = newIts;
+  ok('an ITS already used by someone else is refused (409)', (await call('PATCH', '/auth/me', { itsNumber: otherStudent.its_number }, staffToken)).status === 409);
 
-  console.log('Changing my email (= sign-in name)');
+  console.log('Changing my email');
   const newEmail = `test.renamed.${stamp}@jameasaifiyah.edu`;
   ok('email change without the password is refused', (await call('PATCH', '/auth/me', { email: newEmail }, staffToken)).status === 401);
   ok('email change with a wrong password is refused', (await call('PATCH', '/auth/me', { email: newEmail, currentPassword: 'nope' }, staffToken)).status === 401);
@@ -83,8 +104,7 @@ async function main() {
   const { rows: [someone] } = await pool.query(`SELECT email FROM users WHERE id = $1`, [otherStudent.id]);
   ok('an email used by another account is refused', [400, 409].includes((await call('PATCH', '/auth/me', { email: someone.email, currentPassword: 'MyOwnPass#2026' }, staffToken)).status));
   ok('email change with the password is saved', (await call('PATCH', '/auth/me', { email: newEmail.toUpperCase(), currentPassword: 'MyOwnPass#2026' }, staffToken)).json.email === newEmail);
-  ok('sign-in works with the new email', (await call('POST', '/auth/login', { email: newEmail, password: 'MyOwnPass#2026' })).status === 200);
-  ok('sign-in with the old email no longer works', (await call('POST', '/auth/login', { email, password: 'MyOwnPass#2026' })).status === 401);
+  ok('sign-in still works with the ITS after an email change', (await call('POST', '/auth/login', { its, password: 'MyOwnPass#2026' })).status === 200);
 
   console.log('TR numbers');
   const studentToken = jwtFor(student);
@@ -111,7 +131,11 @@ main()
     process.exitCode = 1;
   })
   .finally(async () => {
-    if (otherStudent) await pool.query(`UPDATE users SET its_number = $1 WHERE id = $2`, [otherStudent.its_number, otherStudent.id]);
+    for (const tr of testTrs) {
+      await pool.query(`UPDATE approved_tr_numbers SET used = false, student_id = NULL WHERE tr_number = $1`, [tr]).catch(() => {});
+      await pool.query(`DELETE FROM users WHERE tr_number = $1`, [tr]).catch(() => {});
+    }
+    for (const tr of testTrs) await pool.query(`DELETE FROM approved_tr_numbers WHERE tr_number = $1`, [tr]).catch(() => {});
     if (staffId) {
       for (const table of ['notifications', 'activity_log']) await pool.query(`DELETE FROM ${table} WHERE user_id = $1`, [staffId]).catch(() => {});
       await pool.query(`DELETE FROM users WHERE id = $1`, [staffId]);

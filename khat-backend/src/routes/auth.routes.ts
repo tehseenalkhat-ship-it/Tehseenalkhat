@@ -6,10 +6,11 @@ import { sendEmail } from '../email.js';
 import { config } from '../config.js';
 import type { AuthUser } from '../plugins/auth.js';
 import { notify } from '../services/notify.js';
-import { readUserDetails, updateUserDetails } from '../services/userDetails.js';
+import { ITS, readUserDetails, updateUserDetails } from '../services/userDetails.js';
 
-type LoginBody = { email: string; password: string };
-type SignupBody = { trNumber: string; name: string; email: string; password: string; branchId: string };
+// People sign in with their 8-digit ITS number (not their email).
+type LoginBody = { its: string; password: string };
+type SignupBody = { trNumber: string; itsNumber: string; name: string; email: string; password: string; branchId: string };
 type ChangePasswordBody = { currentPassword: string; newPassword: string };
 type ForgotPasswordBody = { email: string };
 type ResetPasswordBody = { token: string; newPassword: string };
@@ -22,23 +23,25 @@ function hashToken(token: string): string {
 
 export async function authRoutes(app: FastifyInstance) {
   app.post<{ Body: LoginBody }>('/login', async (request, reply) => {
-    const { email, password } = request.body;
-    if (!email || !password) {
-      return reply.code(400).send({ error: 'Email and password are required' });
+    const its = String(request.body.its ?? '').trim();
+    const { password } = request.body;
+    if (!its || !password) {
+      return reply.code(400).send({ error: 'ITS number and password are required' });
     }
+    if (!ITS.test(its)) return reply.code(400).send({ error: 'The ITS number must be exactly 8 digits.' });
 
     const { rows } = await pool.query(
       `SELECT id, name, email, password_hash, role, branch_id, is_coordinator, must_change_password
-       FROM users WHERE email = $1 AND deleted_at IS NULL`,
-      [email]
+       FROM users WHERE its_number = $1 AND deleted_at IS NULL`,
+      [its]
     );
     const user = rows[0];
 
     // Same error for "no such user" and "wrong password" — don't reveal which one it was.
-    if (!user) return reply.code(401).send({ error: 'Invalid email or password' });
+    if (!user) return reply.code(401).send({ error: 'Invalid ITS number or password' });
 
     const valid = await bcrypt.compare(password, user.password_hash);
-    if (!valid) return reply.code(401).send({ error: 'Invalid email or password' });
+    if (!valid) return reply.code(401).send({ error: 'Invalid ITS number or password' });
 
     const token = app.jwt.sign(
       {
@@ -79,6 +82,10 @@ export async function authRoutes(app: FastifyInstance) {
     if (!trNumber || !name || !email || !password || !branchId) {
       return reply.code(400).send({ error: 'trNumber, name, email, password, and branchId are required' });
     }
+    const itsNumber = String(request.body.itsNumber ?? '').trim();
+    if (!ITS.test(itsNumber)) return reply.code(400).send({ error: 'Enter your 8-digit ITS number.' });
+    const { rows: itsTaken } = await pool.query(`SELECT 1 AS x FROM users WHERE its_number = $1 LIMIT 1`, [itsNumber]);
+    if (itsTaken[0]) return reply.code(409).send({ error: 'An account with this ITS number already exists.' });
 
     const normalizedEmail = email.trim().toLowerCase();
     if (!/^[^\s@]+@jameasaifiyah\.edu$/.test(normalizedEmail)) {
@@ -99,9 +106,9 @@ export async function authRoutes(app: FastifyInstance) {
     try {
       await client.query('BEGIN');
       const { rows: userRows } = await client.query(
-        `INSERT INTO users (role, name, email, password_hash, branch_id, tr_number, must_change_password)
-         VALUES ('student', $1, $2, $3, $4, $5, false) RETURNING id, name, email, role, branch_id, is_coordinator`,
-        [name.trim(), normalizedEmail, passwordHash, branchId, normalizedTrNumber]
+        `INSERT INTO users (role, name, email, password_hash, branch_id, tr_number, its_number, must_change_password)
+         VALUES ('student', $1, $2, $3, $4, $5, $6, false) RETURNING id, name, email, role, branch_id, is_coordinator`,
+        [name.trim(), normalizedEmail, passwordHash, branchId, normalizedTrNumber, itsNumber]
       );
       const newUser = userRows[0];
       await client.query(`UPDATE approved_tr_numbers SET used = true, student_id = $1 WHERE tr_number = $2`, [

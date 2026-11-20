@@ -66,6 +66,7 @@ export function Auth({ signup = false, initialRole = 'student' }: { signup?: boo
 
   // Login fields
   const [email, setEmail] = useState('');
+  const [its, setIts] = useState(''); // 8-digit ITS number: what everyone signs in with
   const [password, setPassword] = useState('');
 
   // Signup-only fields
@@ -88,12 +89,12 @@ export function Auth({ signup = false, initialRole = 'student' }: { signup?: boo
 
   const handleLogin = async () => {
     setError(null);
-    if (!email || !password) { setError('Enter your email and password.'); return; }
+    if (!/^\d{8}$/.test(its) || !password) { setError('Enter your 8-digit ITS number and your password.'); return; }
     setBusy(true);
     try {
       const result = await apiFetch<{ token: string; user: { id: string; name: string; email: string; role: string; mustChangePassword: boolean; isCoordinator?: boolean } }>(
         '/auth/login',
-        { method: 'POST', body: { email, password }, auth: false }
+        { method: 'POST', body: { its, password }, auth: false }
       );
       const frontendRole = resolveFrontendRole(result.user);
       saveSession(result.token, { ...result.user, role: frontendRole } as never);
@@ -108,6 +109,7 @@ export function Auth({ signup = false, initialRole = 'student' }: { signup?: boo
   const handleSignup = async () => {
     setError(null);
     if (!trNumber || !name || !email || !password || !branchId) { setError('Please fill in every field.'); return; }
+    if (!/^\d{8}$/.test(its)) { setError('Enter your 8-digit ITS number.'); return; }
     if (!/^[^\s@]+@jameasaifiyah\.edu$/i.test(email.trim())) { setError('Enter your Jamea Saifiyah .edu email address.'); return; }
     if (password !== confirmPassword) { setError('Passwords do not match.'); return; }
     setBusy(true);
@@ -118,7 +120,7 @@ export function Auth({ signup = false, initialRole = 'student' }: { signup?: boo
       // second step right after the account is created below.
       const result = await apiFetch<{ token: string; user: { id: string; name: string; email: string; role: string } }>(
         '/auth/signup',
-        { method: 'POST', body: { trNumber: trNumber.toUpperCase(), name, email, password, branchId }, auth: false }
+        { method: 'POST', body: { trNumber: trNumber.toUpperCase(), itsNumber: its, name, email, password, branchId }, auth: false }
       );
       saveSession(result.token, { ...result.user, role: 'student' } as never);
       navigate('student-landing');
@@ -177,7 +179,8 @@ export function Auth({ signup = false, initialRole = 'student' }: { signup?: boo
               </label>
             </>
           )}
-          <label className="field-label">{signup ? 'Email' : 'Email'}<input className="field" type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder={signup ? '@jameasaifiyah.edu' : '@jameasaifiyah.edu'} />{signup && <small className="auth-email-note">Enter your Jamea Saifiyah .edu email.</small>}</label>
+          <label className="field-label">ITS number<input className="field" inputMode="numeric" autoComplete="username" maxLength={8} value={its} onChange={e => setIts(e.target.value.replace(/\D/g, ''))} placeholder="8 digits" />{signup && <small className="auth-email-note">You will sign in with your ITS number.</small>}</label>
+          {signup && <label className="field-label">Email<input className="field" type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="@jameasaifiyah.edu" /><small className="auth-email-note">Enter your Jamea Saifiyah .edu email.</small></label>}
           <label className="field-label">Password<PasswordInput value={password} onChange={setPassword} placeholder={signup ? 'At least 8 characters' : 'Your password'} autoComplete={signup ? 'new-password' : 'current-password'} /></label>
           {signup && <label className="field-label">Confirm password<PasswordInput value={confirmPassword} onChange={setConfirmPassword} placeholder="Re-enter password" autoComplete="new-password" /></label>}
           {error && <small className="error-text">{error}</small>}
@@ -381,7 +384,7 @@ export function SettingsPage({ role, theme, onThemeChange }: { role: Role; theme
       const session = getSessionUser();
       const token = localStorage.getItem('khat_token');
       if (session && token) saveSession(token, { ...session, name: updated.name, email: updated.email });
-      if (editing === 'email' && updated.email !== details?.email) setDetailNotice(`From now on, sign in with ${updated.email}.`);
+      if (editing === 'its' && updated.itsNumber !== details?.itsNumber) setDetailNotice(`From now on, sign in with ITS ${updated.itsNumber}.`);
       setDetails(updated);
       setEditing(null);
     } catch (err) {
@@ -501,15 +504,15 @@ export function SettingsPage({ role, theme, onThemeChange }: { role: Role; theme
             <EditableRow label="Name" value={details.name} {...rowProps('name')}>
               <input className="field" value={draft} onChange={e => setDraft(e.target.value)} maxLength={120} autoFocus required />
             </EditableRow>
-            <EditableRow label="Email" value={details.email} note="This is also your sign-in name." {...rowProps('email')}>
+            <EditableRow label="Email" value={details.email} {...rowProps('email')}>
               <input className="field" type="email" value={draft} onChange={e => setDraft(e.target.value)} placeholder="name@jameasaifiyah.edu" autoFocus required />
               <PasswordInput value={emailPassword} onChange={setEmailPassword} placeholder="Your current password (to confirm)" autoComplete="current-password" />
-              <small>Must end in @jameasaifiyah.edu. You will sign in with the new email from now on.</small>
+              <small>Must end in @jameasaifiyah.edu.</small>
             </EditableRow>
             <EditableRow label="Phone" value={details.phone} {...rowProps('phone')}>
               <PhoneField value={details.phone} defaultCountry={countryForBranch(branchName)} onChange={setDraft} />
             </EditableRow>
-            <EditableRow label="ITS number" value={details.itsNumber} {...rowProps('its')}>
+            <EditableRow label="ITS number" value={details.itsNumber} note="You sign in with this number." {...rowProps('its')}>
               <input className="field" inputMode="numeric" maxLength={8} value={draft} onChange={e => setDraft(e.target.value.replace(/\D/g, ''))} placeholder="8 digits" autoFocus />
             </EditableRow>
             {role === 'student' && <div className="settings-row"><div><strong>TR number</strong><small>{details.trNumber ?? '—'}</small><small className="editable-row-note">To change your TR, contact your admin.</small></div></div>}

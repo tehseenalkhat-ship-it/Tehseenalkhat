@@ -36,6 +36,7 @@ import { logsRoutes } from './routes/logs.routes.js';
 import { ensureProblemTables, logError } from './services/problemReports.js';
 import { ensureUserDetailColumns } from './services/userDetails.js';
 import { runStartupMigrations } from './services/migrations.js';
+import { runDummyDataReset } from './services/dummyDataReset.js';
 import { createJobRunner, type BackgroundJob } from './services/backgroundJobs.js';
 import { runEmailQueueSweep } from './v2/lib/emailTemplates.js';
 import { policiesV2Routes } from './v2/routes/policies.routes.js';
@@ -108,6 +109,8 @@ async function main() {
   await runStartupMigrations(msg => app.log.info(msg)).catch((err) => app.log.error(err, 'Database update failed'));
   await ensureProblemTables().catch((err) => app.log.error(err, 'Could not create problem_reports / error_log tables'));
   await ensureUserDetailColumns().catch((err) => app.log.error(err, 'Could not add users.phone / users.its_number'));
+  // One-time test-data clean-up: only with RESET_DUMMY_DATA=yes on the hosting panel (see dummyDataReset.ts).
+  await runDummyDataReset(msg => app.log.info(msg)).catch((err) => app.log.error(err, 'Dummy-data clean-up failed'));
   await app.register(cors, { origin: true }); // tighten this to your real frontend URL before going live
   await app.register(authPlugin);
 

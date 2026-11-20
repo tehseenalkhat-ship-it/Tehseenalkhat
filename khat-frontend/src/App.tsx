@@ -269,7 +269,8 @@ function App() {
     <div className={`app-layout${loaderVisible ? ' is-loading' : ''}`}>
       <Header role={role} theme={theme} onThemeChange={changeTheme} />
       {sessionUser && <V2AnnouncementBanner />}
-      {sessionUser && <V3InstallAppPrompt />}
+      {/* TODO (later): "Install app" prompt hidden for now. Turn back on together with the manifest + sw.js lines in index.html. */}
+      {false && sessionUser && <V3InstallAppPrompt />}
       <div className="app-shell-content">
         <nav className="app-breadcrumb" aria-label="Breadcrumb">
           <button onClick={() => navigate(dashboardRoute)}>Dashboard</button>

@@ -130,9 +130,9 @@ export function AdminDetailsModal({ userId, branchName, onClose, onSaved }: { us
       {details && (
         <form className="admin-details-form" onSubmit={e => { e.preventDefault(); void save(); }}>
           <label className="field-label">Name<input className="field" {...field('name')} required /></label>
-          <label className="field-label">Email (their sign-in name)<input className="field" type="email" {...field('email')} required /></label>
+          <label className="field-label">Email<input className="field" type="email" {...field('email')} required /></label>
           <label className="field-label">Phone<PhoneField value={details.phone} defaultCountry={countryForBranch(branchName)} onChange={phone => setForm(f => ({ ...f, phone }))} /></label>
-          <label className="field-label">ITS number<input className="field" inputMode="numeric" maxLength={8} {...field('itsNumber')} placeholder="8 digits" /></label>
+          <label className="field-label">ITS number (their sign-in name)<input className="field" inputMode="numeric" maxLength={8} {...field('itsNumber')} placeholder="8 digits" required /></label>
           {details.role === 'student' && <label className="field-label">TR number<input className="field" {...field('trNumber')} required /></label>}
           {error && <p className="error-text">{error}</p>}
           <div className="modal-actions">

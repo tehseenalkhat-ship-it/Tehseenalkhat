@@ -7,7 +7,8 @@
     <meta name="description" content="Learn Arabic calligraphy with the teachers of Funun al-Quran, Al-Jamea-tus-Saifiyah." />
     <link rel="icon" type="image/png" sizes="32x32" href="/icons/favicon-32.png" />
     <!-- Installable app (phone, iPad, desktop) -->
-    <link rel="manifest" href="/manifest.webmanifest" />
+    <!-- TODO (later): installable app switched off for now. Restore this line and the sw.js registration below. -->
+    <!-- <link rel="manifest" href="/manifest.webmanifest" /> -->
     <meta name="theme-color" content="#003049" />
     <meta name="mobile-web-app-capable" content="yes" />
     <meta name="application-name" content="Tehseen al-Khat" />
@@ -23,7 +24,8 @@
     <script type="module" src="/src/main.tsx"></script>
     <script>
       if ('serviceWorker' in navigator && location.protocol !== 'file:') {
-        window.addEventListener('load', function () { navigator.serviceWorker.register('/sw.js').catch(function () {}); });
+        // Installable app is off for now: remove the offline helper from browsers that already had it.
+        navigator.serviceWorker.getRegistrations().then(function (rs) { rs.forEach(function (r) { r.unregister(); }); }).catch(function () {});
       }
     </script>
   </body>

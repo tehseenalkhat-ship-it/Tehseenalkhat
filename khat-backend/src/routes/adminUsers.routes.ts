@@ -4,12 +4,13 @@ import { randomBytes } from 'node:crypto';
 import { pool } from '../db.js';
 import { notify } from '../services/notify.js';
 import { config } from '../config.js';
-import { readUserDetails, updateUserDetails, type DetailChanges } from '../services/userDetails.js';
+import { ITS, readUserDetails, updateUserDetails, type DetailChanges } from '../services/userDetails.js';
 
 type CreateStaffBody = {
   role: 'teacher' | 'admin';
   name: string;
   email: string;
+  itsNumber: string; // 8 digits; what they sign in with
   branchId: string;
   isCoordinator?: boolean;
   khatTypeIds?: string[]; // teachers only
@@ -61,6 +62,10 @@ export async function adminUserRoutes(app: FastifyInstance) {
       if (!role || !name || !email || !branchId) {
         return reply.code(400).send({ error: 'role, name, email, and branchId are required' });
       }
+      const itsNumber = String(request.body.itsNumber ?? '').trim();
+      if (!ITS.test(itsNumber)) return reply.code(400).send({ error: 'Enter the 8-digit ITS number (it is what they sign in with).' });
+      const { rows: itsTaken } = await pool.query(`SELECT 1 AS x FROM users WHERE its_number = $1 LIMIT 1`, [itsNumber]);
+      if (itsTaken[0]) return reply.code(409).send({ error: 'An account with this ITS number already exists.' });
       if (role !== 'teacher' && role !== 'admin') {
         return reply.code(400).send({ error: "role must be 'teacher' or 'admin'" });
       }
@@ -72,10 +77,10 @@ export async function adminUserRoutes(app: FastifyInstance) {
       try {
         await client.query('BEGIN');
         const { rows } = await client.query(
-          `INSERT INTO users (role, name, email, password_hash, branch_id, is_coordinator, must_change_password)
-           VALUES ($1, $2, $3, $4, $5, $6, true)
-           RETURNING id, role, name, email, branch_id, is_coordinator`,
-          [role, name.trim(), email.trim().toLowerCase(), passwordHash, branchId, Boolean(isCoordinator)]
+          `INSERT INTO users (role, name, email, password_hash, branch_id, is_coordinator, its_number, must_change_password)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, true)
+           RETURNING id, role, name, email, branch_id, is_coordinator, its_number`,
+          [role, name.trim(), email.trim().toLowerCase(), passwordHash, branchId, Boolean(isCoordinator), itsNumber]
         );
         const staff = rows[0];
 

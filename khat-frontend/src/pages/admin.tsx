@@ -1017,10 +1017,11 @@ function TeacherLoadManagement() {
   const [createRole, setCreateRole] = useState<'teacher' | 'admin'>('teacher');
   const [createName, setCreateName] = useState('');
   const [createEmail, setCreateEmail] = useState('');
+  const [createIts, setCreateIts] = useState(''); // 8-digit ITS number = their sign-in name
   const [createBranchId, setCreateBranchId] = useState('');
   const [createIsCoordinator, setCreateIsCoordinator] = useState(false);
   const [createKhatTypeIds, setCreateKhatTypeIds] = useState<string[]>([]);
-  const [createdAccount, setCreatedAccount] = useState<{ email: string; tempPassword: string } | null>(null);
+  const [createdAccount, setCreatedAccount] = useState<{ its: string; tempPassword: string } | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -1071,6 +1072,7 @@ function TeacherLoadManagement() {
       setError('Name, email, and branch are required.');
       return;
     }
+    if (!/^\d{8}$/.test(createIts)) { setError('Enter their 8-digit ITS number — it is what they sign in with.'); return; }
 
     try {
       const response = await apiFetch<{ tempPassword?: string; email: string; name: string; role: string }>(`/admin/users`, {
@@ -1079,15 +1081,17 @@ function TeacherLoadManagement() {
           role: createRole,
           name: createName.trim(),
           email: createEmail.trim(),
+          itsNumber: createIts,
           branchId: createBranchId,
           isCoordinator: createRole === 'teacher' ? createIsCoordinator : undefined,
           ...(createRole === 'teacher' && createKhatTypeIds.length ? { khatTypeIds: createKhatTypeIds } : {}),
         },
       });
 
-      setCreatedAccount(response.tempPassword ? { email: response.email, tempPassword: response.tempPassword } : null);
+      setCreatedAccount(response.tempPassword ? { its: createIts, tempPassword: response.tempPassword } : null);
       setCreateName('');
       setCreateEmail('');
+      setCreateIts('');
       setCreateIsCoordinator(false);
       setCreateKhatTypeIds([]);
       setCreateRole('teacher');
@@ -1174,6 +1178,7 @@ function TeacherLoadManagement() {
 
         <div className="form-row">
           <label className="field-label">Name<input className="field" value={createName} onChange={e => setCreateName(e.target.value)} placeholder="Full name" /></label>
+          <label className="field-label">ITS number<input className="field" inputMode="numeric" maxLength={8} value={createIts} onChange={e => setCreateIts(e.target.value.replace(/\D/g, ''))} placeholder="8 digits — they sign in with this" /></label>
           <label className="field-label">Email<input className="field" type="email" value={createEmail} onChange={e => setCreateEmail(e.target.value)} placeholder="email@example.com" /></label>
         </div>
 
@@ -1205,7 +1210,7 @@ function TeacherLoadManagement() {
           <Button onClick={createAccount}>Create account</Button>
         </div>
         {createdAccount && (
-          <div className="info-banner"><Check size={16} /><span>First password for {createdAccount.email}: <strong>{createdAccount.tempPassword}</strong>. They will be asked to set their own password when they first sign in.</span></div>
+          <div className="info-banner"><Check size={16} /><span>Sign-in ITS number <strong>{createdAccount.its}</strong>, first password: <strong>{createdAccount.tempPassword}</strong>. They will be asked to set their own password when they first sign in.</span></div>
         )}
       </div>
       <div className="stats-grid">
