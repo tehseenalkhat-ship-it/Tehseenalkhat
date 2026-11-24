@@ -179,7 +179,8 @@ export function readMasterSheet(csvText: string): MasterSheetRow[] {
       // No Branch column at all → leave branches alone; an empty / "All" cell → all branches.
       branches: hasBranchColumn ? parseBranchList(pick(rec.byKey, ['branches', 'branch'])) : undefined,
       mistarSizes: sizesText ? parseMistarSizes(sizesText) : undefined,
-      driveFolderUrl: pick(rec.byKey, ['drive folder', 'drive link', 'drive', 'folder']) || undefined,
+      // Only a real link counts: a sheet link shown as "Open folder" reaches us as just those words.
+      driveFolderUrl: Object.entries(rec.byKey).find(([k, v]) => /^(drive|folder)/.test(k) && /^https?:\/\//.test(v.trim()))?.[1].trim(),
     };
     for (const k of Object.keys(fields) as (keyof typeof fields)[]) if (fields[k] === undefined) delete fields[k];
     out.push({ rowNumber: rec.rowNumber, courseCode: normaliseCourseCode(rawCode), rawCode, fields, masterRow: rec.raw });

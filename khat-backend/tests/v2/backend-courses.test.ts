@@ -228,6 +228,11 @@ describe('CSV + master sheet', () => {
     assert.equal(p[0].action, 'same');
     assert.equal(p[1].action, 'error');
   });
+  test('Drive folder: "Open folder" text is ignored, a plain link in any Drive column is used', () => {
+    const rows = readMasterSheet('Course Code,Drive folder,Drive link\nFNK-C101,Open folder,https://drive.google.com/drive/folders/X1\nFNK-C102,Open folder,');
+    assert.equal(rows[0].fields.driveFolderUrl, 'https://drive.google.com/drive/folders/X1');
+    assert.equal(rows[1].fields.driveFolderUrl, undefined);
+  });
   test('no Course Code column → friendly error', () => { assert.throws(() => readMasterSheet('a,b\n1,2'), /Course Code/); });
   test('sheet URL conversion', () => {
     assert.equal(sheetUrlToCsvUrl('https://docs.google.com/spreadsheets/d/AbC_123-x/edit#gid=42'), 'https://docs.google.com/spreadsheets/d/AbC_123-x/export?format=csv&gid=42');
