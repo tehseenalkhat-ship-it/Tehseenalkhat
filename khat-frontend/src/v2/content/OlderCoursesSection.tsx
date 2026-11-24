@@ -40,6 +40,9 @@ export function V3OlderCoursesSection() {
     } finally { setBusy(null); }
   };
 
+  // Nothing to show once every course is made in the Course builder.
+  if (courses && !failed && courses.length === 0) return null;
+
   return (
     <section className="v3c-older" aria-label="Older courses">
       <div className="v3c-older-head">

@@ -60,7 +60,7 @@ export function V2StudentHomePage(_props: Props) {
     (entries ?? []).forEach(e => { counts[penKind(e.summary.penType)] += 1; });
     return counts;
   }, [entries]);
-  const activePen: PenKind = pen && pens[pen] ? pen : going[0] ? penKind(going[0].course.penType) : pens.normal ? 'normal' : pens.cut ? 'cut' : 'other';
+  const activePen: PenKind = pen && pens[pen] ? pen : going[0] ? penKind(going[0].course.penType) : pens.normal ? 'normal' : pens.cut ? 'cut' : pens.other ? 'other' : 'normal';
   const penGroups = useMemo(() => {
     const list = (entries ?? []).filter(e => penKind(e.summary.penType) === activePen);
     return KIND_ORDER.map(kind => ({ kind, items: list.filter(e => courseKind(e.summary.courseType) === kind) })).filter(group => group.items.length || group.kind !== 'other');
@@ -106,8 +106,6 @@ export function V2StudentHomePage(_props: Props) {
 
       {entries && (
         <>
-          {/* No Course-builder courses yet: skip the empty "what to do now" and pen sections; the older courses list below is the course list. */}
-          {entries.length > 0 && (<>
           {/* ---------- what to do now ---------- */}
           <section className="v3-sd-now" data-guide="now" aria-labelledby="v3-sd-now-title">
             <p className="v3-sd-eyebrow" id="v3-sd-now-title">What to do now</p>
@@ -149,7 +147,6 @@ export function V2StudentHomePage(_props: Props) {
               ))}
             </div>
           </section>
-          </>)}
 
           {/* Courses made before the Course builder (all live courses until they are rebuilt there). */}
           <V3OlderCoursesSection />

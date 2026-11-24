@@ -297,6 +297,12 @@ export function IngestPanel({
           {(counts.unknown_course ?? 0) > 0 && <span className="chip chip-red">{counts.unknown_course} for a course that doesn’t exist</span>}
         </div>
       )}
+      {phase === 'review' && ((counts.error ?? 0) + (counts.local_bad ?? 0)) > 0 && (
+        <div className="v2-note-amber"><AlertTriangle size={15} /><span>
+          <strong>Files marked “Name not understood” will not be added.</strong> This box only takes files named like {scope.courseCode ?? 'FNK-C101'}_MT_LV01_S01_P01_07_v1.jpg.
+          To add a file with any name, close this box, open the level (or “Add level by hand”), add a step, and use that step’s <strong>Upload</strong> or <strong>Add reference image</strong> button.
+        </span></div>
+      )}
       {planWarning && <div className="v2-note-amber"><AlertTriangle size={15} /><span>{planWarning}</span></div>}
       {phase === 'uploading' && (
         <div className="v2-progress" role="progressbar" aria-valuenow={progress} aria-valuemin={0} aria-valuemax={100} aria-label="Upload progress">

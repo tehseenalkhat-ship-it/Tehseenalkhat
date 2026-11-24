@@ -26,11 +26,21 @@ export function V2StudentCatalogSection(_props: Props) {
     (entries ?? []).forEach(e => { c[penKind(e.summary.penType)] += 1; });
     return c;
   }, [entries]);
-  const active: PenKind = pen && counts[pen] ? pen : counts.normal ? 'normal' : counts.cut ? 'cut' : 'other';
+  const active: PenKind = pen && counts[pen] ? pen : counts.normal ? 'normal' : counts.cut ? 'cut' : counts.other ? 'other' : 'normal';
   const groups = KIND_ORDER.map(kind => ({ kind, items: (entries ?? []).filter(e => penKind(e.summary.penType) === active && courseKind(e.summary.courseType) === kind) }))
     .filter(group => group.items.length || group.kind !== 'other');
 
-  if (entries && entries.length === 0) return null;
+  if (entries && entries.length === 0) {
+    return (
+      <section className="v3-sd-page v3-sd-section" style={{ padding: 0, marginBottom: 40 }} aria-labelledby="v3-sd-catalog-title">
+        <div className="v3-sd-section-head">
+          <p className="v3-sd-eyebrow">Courses for your branch</p>
+          <h2 id="v3-sd-catalog-title">Courses are being prepared</h2>
+          <p>Your teachers are setting up the courses. Please check again soon.</p>
+        </div>
+      </section>
+    );
+  }
   return (
     <section className="v3-sd-page v3-sd-section" style={{ padding: 0, marginBottom: 40 }} aria-labelledby="v3-sd-catalog-title">
       <div className="v3-sd-section-head">
