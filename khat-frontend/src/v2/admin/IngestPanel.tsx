@@ -430,13 +430,14 @@ The full Apps Script is in khat-backend/V2_DRIVE_WEBHOOK.md.`;
       onClose={onClose}
       footer={results ? <button type="button" className="btn btn-primary" onClick={onClose}>Done</button> : <>
         <button type="button" className="btn btn-outline" onClick={onClose}>Cancel</button>
-        <button type="button" className="btn btn-primary" disabled={!/^https?:\/\//.test(url.trim()) || busy} onClick={() => void run()}>{busy ? <><Loader2 className="v2-spin" size={15} /> Reading the folder…</> : 'Bring the files'}</button>
+        <button type="button" className="btn btn-primary" disabled={!(/^https?:\/\//.test(url.trim()) || (courseCode && !url.trim())) || busy} onClick={() => void run()}>{busy ? <><Loader2 className="v2-spin" size={15} /> Reading the folder…</> : 'Bring the files'}</button>
       </>}
     >
       {!results && <>
         <label className="field-label">Drive folder link
           <input className="field" inputMode="url" placeholder="https://drive.google.com/drive/folders/…" value={url} onChange={e => setUrl(e.target.value)} />
         </label>
+        {courseCode && <p className="v2-help">Leave this empty to use the course’s saved Drive folder (the “Drive folder” column of the master sheet). Press it again any time to bring new files.</p>}
         <p className="v2-help">Share the folder as “Anyone with the link can view”. Sub-folders are read too. Only new or newer files are added — files already here are skipped.</p>
         {error && <div className="v2-error"><AlertTriangle size={16} /><span>{error}</span></div>}
       </>}
