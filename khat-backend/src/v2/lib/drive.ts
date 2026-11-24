@@ -97,13 +97,16 @@ async function driveFetch(path: string, params: Record<string, string>, auth: Dr
   if (auth.kind === 'key') qs.set('key', auth.key);
   const headers: Record<string, string> = auth.kind === 'token' ? { Authorization: `Bearer ${auth.token}` } : {};
   const res = await fetch(`https://www.googleapis.com/drive/v3/${path}?${qs.toString()}`, { headers });
+  if (res.ok) return res;
+  const why = await res.json().then((b) => (b as { error?: { message?: string } })?.error?.message ?? '', () => '');
+  if (/api key not valid|api_key_invalid/i.test(why)) throw new DriveError('The GOOGLE_API_KEY on the server is not valid. Copy the key again from Google Cloud → Credentials.', 502);
+  if (/has not been used|is disabled|SERVICE_DISABLED/i.test(why)) throw new DriveError('The Google Drive API is not switched on for this key. In Google Cloud → Library, enable "Google Drive API".', 502);
   if (res.status === 404 || res.status === 403) {
     throw new DriveError(auth.kind === 'key'
       ? 'Google Drive says this folder or file cannot be opened. Share it as "Anyone with the link can view" and try again.'
       : 'Google Drive says this folder or file cannot be opened. Share it with the service account e-mail and try again.', 400);
   }
-  if (!res.ok) throw new DriveError(`Google Drive returned an error (${res.status}). Please try again in a minute.`, 502);
-  return res;
+  throw new DriveError(`Google Drive returned an error (${res.status}${why ? `: ${why}` : ''}).`, 502);
 }
 
 /** Lists every file under a folder (recursively), skipping Google Docs/Sheets and trashed items. */
