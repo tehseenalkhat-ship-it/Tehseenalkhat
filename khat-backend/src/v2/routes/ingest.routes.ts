@@ -1,4 +1,4 @@
-import { timingSafeEqual } from 'node:crypto';
+import { randomUUID, timingSafeEqual } from 'node:crypto';
 import type { FastifyInstance } from 'fastify';
 import { pool } from '../../db.js';
 import type { IngestCommitItem, IngestCommitResult } from '../contracts.js';
@@ -9,6 +9,12 @@ import { normaliseCourseCode } from '../lib/naming.js';
 
 const MAX_FILES_PER_CALL = 500;
 const SOURCES = ['upload', 'zip', 'drive', 'webhook'];
+
+// A whole Drive folder takes minutes, longer than a browser waits, so it runs in the background and the page asks for progress.
+// ponytail: kept in memory, lost on restart; running it again is safe (imported files are skipped).
+type DriveJob = { results: IngestCommitResult[]; done: boolean; error?: string };
+const driveJobs = new Map<string, DriveJob>();
+let runningDriveJob: string | null = null;
 
 function secretMatches(given: string | undefined, expected: string): boolean {
   if (!given) return false;
@@ -65,13 +71,24 @@ export async function ingestV2Routes(app: FastifyInstance): Promise<void> {
     }
     if (!folderUrl) return reply.code(400).send({ error: 'Paste the Google Drive folder link (or set the course\'s Drive folder first).' });
     if (!driveConfigured()) return reply.code(400).send({ error: DRIVE_NOT_CONFIGURED });
-    try {
-      return await importDriveFolder(folderUrl, courseCode, actor.id);
-    } catch (error) {
-      if (error instanceof DriveError) return reply.code(error.status).send({ error: error.message });
-      request.log.error(error);
-      return reply.code(500).send({ error: 'The Drive import stopped because of a server problem. Run it again — files already imported are skipped.' });
-    }
+    if (runningDriveJob) return { jobId: runningDriveJob };
+    const jobId = randomUUID();
+    const job: DriveJob = { results: [], done: false };
+    driveJobs.set(jobId, job);
+    runningDriveJob = jobId;
+    importDriveFolder(folderUrl, courseCode, actor.id, job.results)
+      .catch((error) => {
+        if (!(error instanceof DriveError)) request.log.error(error);
+        job.error = error instanceof DriveError ? error.message : 'The Drive import stopped because of a server problem. Run it again — files already imported are skipped.';
+      })
+      .finally(() => { job.done = true; runningDriveJob = null; setTimeout(() => driveJobs.delete(jobId), 60 * 60 * 1000); });
+    return { jobId };
+  });
+
+  app.get<{ Params: { jobId: string } }>('/ingest/drive/:jobId', master, async (request, reply) => {
+    const job = driveJobs.get(request.params.jobId);
+    if (!job) return reply.code(404).send({ error: 'This Drive import is no longer known (the server may have restarted). Run it again — files already imported are skipped.' });
+    return job;
   });
 
   /**

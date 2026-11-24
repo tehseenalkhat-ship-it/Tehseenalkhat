@@ -183,13 +183,13 @@ export async function ingestDriveFile(
 }
 
 /** Imports a whole Drive folder (recursively). Optional courseCode keeps only that course's files. */
-export async function importDriveFolder(folderUrl: string, courseCode: string | null, actorId: string | null): Promise<IngestCommitResult[]> {
+/** `results` is filled as it goes, so a caller can show progress. */
+export async function importDriveFolder(folderUrl: string, courseCode: string | null, actorId: string | null, results: IngestCommitResult[] = []): Promise<IngestCommitResult[]> {
   const folderId = driveIdFromUrl(folderUrl);
   if (!folderId) throw new DriveError('That does not look like a Google Drive folder link. Copy the link from Drive (Share → Copy link) and paste it here.', 400);
   const auth = await getDriveAuth();
   const files = await listDriveFolder(folderId, auth);
   const wanted = courseCode ? normaliseCourseCode(courseCode) : null;
-  const results: IngestCommitResult[] = [];
   for (const f of files) {
     const parsed = parseFileName(f.name);
     if (wanted && parsed.ok && parsed.parsed.courseCode !== wanted) continue;

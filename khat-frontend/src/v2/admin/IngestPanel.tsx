@@ -401,6 +401,7 @@ function DriveDialog({ courseCode, onClose, onDone }: { courseCode: string | nul
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [results, setResults] = useState<IngestCommitResult[] | null>(null);
+  const [progress, setProgress] = useState(0);
   const webhookUrl = `${API_BASE_URL}/v2/ingest/webhook`;
   const note = `Upload portal → Tehseen al-Khat (automatic)
 Web address: ${webhookUrl}
@@ -412,9 +413,19 @@ The full Apps Script is in khat-backend/V2_DRIVE_WEBHOOK.md.`;
     setBusy(true);
     setError(null);
     try {
-      const res = await apiFetch<IngestCommitResult[]>('/v2/ingest/drive', { method: 'POST', body: { folderUrl: url.trim(), ...(courseCode ? { courseCode } : {}) } });
-      setResults(res);
-      if (res.some(r => r.ok)) onDone();
+      // The server works through the folder in the background; ask how far it is every few seconds.
+      const { jobId } = await apiFetch<{ jobId: string }>('/v2/ingest/drive', { method: 'POST', body: { folderUrl: url.trim(), ...(courseCode ? { courseCode } : {}) } });
+      let job: { results: IngestCommitResult[]; done: boolean; error?: string };
+      for (;;) {
+        await new Promise(r => setTimeout(r, 3000));
+        job = await apiFetch(`/v2/ingest/drive/${jobId}`);
+        setProgress(job.results.length);
+        if (job.done) break;
+      }
+      if (job.error && !job.results.length) throw new Error(job.error);
+      setResults(job.results);
+      if (job.error) setError(job.error);
+      if (job.results.some(r => r.ok)) onDone();
     } catch (err) {
       setError(errorText(err));
     } finally {
@@ -430,7 +441,7 @@ The full Apps Script is in khat-backend/V2_DRIVE_WEBHOOK.md.`;
       onClose={onClose}
       footer={results ? <button type="button" className="btn btn-primary" onClick={onClose}>Done</button> : <>
         <button type="button" className="btn btn-outline" onClick={onClose}>Cancel</button>
-        <button type="button" className="btn btn-primary" disabled={!(/^https?:\/\//.test(url.trim()) || (courseCode && !url.trim())) || busy} onClick={() => void run()}>{busy ? <><Loader2 className="v2-spin" size={15} /> Reading the folder…</> : 'Bring the files'}</button>
+        <button type="button" className="btn btn-primary" disabled={!(/^https?:\/\//.test(url.trim()) || (courseCode && !url.trim())) || busy} onClick={() => void run()}>{busy ? <><Loader2 className="v2-spin" size={15} /> {progress ? `${progress} files checked…` : 'Reading the folder…'}</> : 'Bring the files'}</button>
       </>}
     >
       {!results && <>
@@ -441,8 +452,10 @@ The full Apps Script is in khat-backend/V2_DRIVE_WEBHOOK.md.`;
         <p className="v2-help">Share the folder as “Anyone with the link can view”. Sub-folders are read too. Only new or newer files are added — files already here are skipped.</p>
         {error && <div className="v2-error"><AlertTriangle size={16} /><span>{error}</span></div>}
       </>}
+      {busy && <p className="v2-help">This can take several minutes for a big folder. Keep this window open.</p>}
       {results && (
         <>
+          {error && <div className="v2-error"><AlertTriangle size={16} /><span>{error}</span></div>}
           <p className="v2-dialog-text"><strong>{plural(ok, 'file')} added.</strong> {results.length - ok > 0 && `${results.length - ok} skipped or need attention.`}</p>
           <ul className="v2-mini-list">
             {results.slice(0, 80).map(r => (
